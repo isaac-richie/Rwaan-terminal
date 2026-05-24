@@ -39,6 +39,14 @@ export async function getClobPublic(path: string, query: Record<string, string |
   return client.getClobPublic(path, query);
 }
 
+export async function getClobAuthenticated(
+  path: string,
+  query: Record<string, string | number | boolean | undefined> = {},
+  headers: Record<string, string>
+): Promise<unknown> {
+  return client.getClobAuthenticated(path, query, headers);
+}
+
 export async function postClobPublic(path: string, payload: unknown): Promise<unknown> {
   return client.postClobPublic(path, payload);
 }

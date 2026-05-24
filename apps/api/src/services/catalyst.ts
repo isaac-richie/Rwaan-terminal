@@ -74,7 +74,7 @@ export async function findCatalysts(newsText: string): Promise<CatalystMarket[]>
       image: m.image,
       probability: Number(yes),
       volume: m.volume,
-      reasoning: `Impact correlation discovered via agent reasoning. News catalyst directly pressures price discovery on "${m.question}".`
+      reasoning: `Impact correlation discovered through catalyst analysis. News catalyst directly pressures price discovery on "${m.question}".`
     };
   });
 

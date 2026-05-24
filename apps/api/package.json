@@ -7,25 +7,30 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "test": "vitest run",
-    "sponsor-agent": "tsx src/scripts/sponsor-agent.ts",
-    "activate-agent": "tsx src/scripts/activate-agent.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
     "@fastify/websocket": "^11.2.0",
+    "@polymarket/builder-relayer-client": "^0.0.9",
+    "@polymarket/builder-signing-sdk": "^1.0.0",
     "@smartmarket/config": "*",
     "@smartmarket/polymarket-sdk": "*",
-    "@x402/core": "^2.9.0",
-    "@x402/stellar": "^2.9.0",
+    "@types/pg": "^8.20.0",
+    "better-sqlite3": "^12.9.0",
     "dotenv": "^16.6.1",
+    "ethers": "^6.16.0",
     "fastify": "^5.8.2",
     "ioredis": "^5.4.1",
+    "pg": "^8.21.0",
+    "viem": "^2.50.4",
     "ws": "^8.17.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.12.7",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.7.1",
     "typescript": "^5.4.5",
     "vitest": "^4.0.18"

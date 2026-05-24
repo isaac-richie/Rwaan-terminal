@@ -48,6 +48,14 @@ export class PolymarketClient {
     return this.getJson(this.withQuery(`${this.config.clobBaseUrl}${path}`, query));
   }
 
+  async getClobAuthenticated(
+    path: string,
+    query: Record<string, string | number | boolean | undefined> = {},
+    headers: Record<string, string>
+  ): Promise<unknown> {
+    return this.getJson(this.withQuery(`${this.config.clobBaseUrl}${path}`, query), headers);
+  }
+
   async postClobPublic(path: string, payload: unknown): Promise<unknown> {
     return this.postJson(`${this.config.clobBaseUrl}${path}`, payload);
   }
@@ -70,8 +78,8 @@ export class PolymarketClient {
     return suffix ? `${url}?${suffix}` : url;
   }
 
-  private async getJson(url: string): Promise<unknown> {
-    const res = await fetch(url);
+  private async getJson(url: string, headers: Record<string, string> = {}): Promise<unknown> {
+    const res = await fetch(url, { headers });
     if (!res.ok) throw new Error(`Request failed: ${res.status}`);
     return res.json();
   }

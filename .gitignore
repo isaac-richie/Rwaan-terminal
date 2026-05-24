@@ -1,7 +1,12 @@
 node_modules
 .env
 .env.*
+!.env.example
 .DS_Store
+.data
+.claude
+apps/api/.data
+apps/web/tsconfig.tsbuildinfo
 .next
 .dist
 apps/api/dist

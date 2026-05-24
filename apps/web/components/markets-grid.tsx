@@ -10,10 +10,32 @@ interface MarketsGridProps {
   category: string
   sortBy: string
   search?: string
-  onUnlockAnalysis?: (market: PolymarketMarket) => void
 }
 
-export function MarketsGrid({ category, sortBy, search, onUnlockAnalysis }: MarketsGridProps) {
+function marketIdentity(market: PolymarketMarket) {
+  return String(market.id || market.conditionId || market.slug || `${market.question}-${market.endDate}`)
+}
+
+function marketRenderKey(market: PolymarketMarket, index: number) {
+  return [
+    market.id,
+    market.conditionId,
+    market.slug,
+    index,
+  ].filter(Boolean).join(":")
+}
+
+function dedupeMarkets(markets: PolymarketMarket[]) {
+  const seen = new Set<string>()
+  return markets.filter((market) => {
+    const key = marketIdentity(market)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
   const [markets, setMarkets] = useState<PolymarketMarket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -36,10 +58,10 @@ export function MarketsGrid({ category, sortBy, search, onUnlockAnalysis }: Mark
         if (fetchKey.current !== key) return
 
         if (reset) {
-          setMarkets(data)
+          setMarkets(dedupeMarkets(data))
           setPage(1)
         } else {
-          setMarkets((prev) => [...prev, ...data])
+          setMarkets((prev) => dedupeMarkets([...prev, ...data]))
           setPage(nextPage + 1)
         }
         setHasMore(data.length === limit)
@@ -98,18 +120,13 @@ export function MarketsGrid({ category, sortBy, search, onUnlockAnalysis }: Mark
   }
 
   if (!loading && filteredMarkets.length === 0) {
-    const normalized = category.toLowerCase()
-    const categoryLabel = category === "all" ? "All Events" : category
-    const isUpstreamSparse =
-      normalized === "health" || normalized === "weather & science" || normalized === "breaking news"
+    const categoryLabel = category === "all" ? "Rawali categories" : category === "Sports" ? "Sport" : category
 
     return (
       <div className="surface-card rounded-2xl p-8 text-center border border-[oklch(0.22_0.015_255)]">
         <p className="text-sm font-semibold text-foreground">No active events in {categoryLabel} right now.</p>
         <p className="text-xs text-muted-foreground mt-2">
-          {isUpstreamSparse
-            ? "This category is currently sparse on the upstream feed. Try All, Politics, Sports, or Geopolitics for live activity."
-            : "Try a broader category or remove your search term to see more results."}
+          Rawali is focused on Entertainment, Sport, News, Crypto, and Geopolitics. Try a broader category or remove your search term.
         </p>
       </div>
     )
@@ -120,10 +137,9 @@ export function MarketsGrid({ category, sortBy, search, onUnlockAnalysis }: Mark
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredMarkets.map((market, i) => (
           <TradingCard
-            key={market.id}
+            key={marketRenderKey(market, i)}
             market={market}
             index={i}
-            onUnlockAnalysis={onUnlockAnalysis}
           />
         ))}
       </div>

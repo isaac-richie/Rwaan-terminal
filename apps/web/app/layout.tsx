@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Space_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import Providers from "./providers";
+import { GeoblockBanner } from "@/components/geoblock-banner";
 import "./globals.css";
 
 const inter = Inter({
@@ -18,13 +19,13 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "StellarPulse — Prediction Events",
+  title: "Rawali Analytic — Prediction Terminal",
   description:
-    "Stellar-native prediction event terminal with real-time events and premium analysis.",
-  keywords: ["prediction event", "stellarpulse", "Stellar", "x402", "trading"],
+    "BNB-native prediction terminal routing live Polymarket markets, liquidity, and trading data.",
+  keywords: ["prediction terminal", "rawali analytic", "polymarket", "bnb", "trading"],
   openGraph: {
-    title: "StellarPulse — Prediction Events",
-    description: "Stellar-native prediction event terminal with real-time events and premium analysis.",
+    title: "Rawali Analytic — Prediction Terminal",
+    description: "BNB-native prediction terminal for live markets, liquidity, and trading data.",
     type: "website",
   },
 };
@@ -41,7 +42,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceMono.variable} dark`}>
       <body className="font-sans antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          <GeoblockBanner />
+          {children}
+        </Providers>
         <Analytics />
       </body>
     </html>

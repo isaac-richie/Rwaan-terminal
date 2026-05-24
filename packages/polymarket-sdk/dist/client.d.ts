@@ -11,6 +11,7 @@ export declare class PolymarketClient {
     getGamma(path: string, query?: Record<string, string | number | boolean | undefined>): Promise<unknown>;
     getData(path: string, query?: Record<string, string | number | boolean | undefined>): Promise<unknown>;
     getClobPublic(path: string, query?: Record<string, string | number | boolean | undefined>): Promise<unknown>;
+    getClobAuthenticated(path: string, query: Record<string, string | number | boolean | undefined> | undefined, headers: Record<string, string>): Promise<unknown>;
     postClobPublic(path: string, payload: unknown): Promise<unknown>;
     clobAuth(path: string, headers: Record<string, string>): Promise<unknown>;
     clobCreateApiKey(headers: Record<string, string>): Promise<unknown>;

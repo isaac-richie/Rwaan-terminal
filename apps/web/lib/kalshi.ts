@@ -48,16 +48,16 @@ function mapOutcomes(m: KalshiMarketRaw): PolymarketOutcome[] {
 
 function includesCategory(text: string, category: string) {
   const c = category.toLowerCase()
-  if (c === "all") return true
   const map: Record<string, string[]> = {
-    politics: ["politics", "election", "government"],
-    crypto: ["crypto", "bitcoin", "ethereum"],
-    economy: ["economy", "macro", "inflation", "rates", "recession"],
-    sports: ["sports", "nba", "nfl", "soccer", "baseball"],
-    geopolitics: ["geopolitics", "war", "china", "iran", "russia", "israel"],
-    weather: ["weather", "climate", "temperature", "storm"],
-    health: ["health", "medical", "disease"],
-    "breaking news": ["breaking", "live", "urgent"],
+    entertainment: ["entertainment", "culture", "music", "movie", "film", "tv", "celebrity", "awards"],
+    sport: ["sport", "sports", "nba", "nfl", "mlb", "nhl", "soccer", "football", "ufc", "tennis", "f1"],
+    sports: ["sport", "sports", "nba", "nfl", "mlb", "nhl", "soccer", "football", "ufc", "tennis", "f1"],
+    news: ["news", "breaking", "election", "government", "policy", "court", "fed", "inflation"],
+    crypto: ["crypto", "bitcoin", "btc", "ethereum", "eth", "bnb", "binance", "solana", "xrp", "defi", "etf"],
+    geopolitics: ["geopolitics", "war", "china", "iran", "russia", "ukraine", "israel", "gaza", "taiwan", "nato"],
+  }
+  if (c === "all") {
+    return Object.values(map).flat().some((needle) => text.includes(needle))
   }
   const needles = map[c] ?? [c]
   return needles.some((needle) => text.includes(needle))
@@ -117,7 +117,7 @@ export async function fetchKalshiMarkets(
 
     return flattened.slice(offset, offset + limit)
   } catch (error) {
-    console.error("[stellarpulse] Kalshi fetch error:", error)
+    console.error("[rawali] Kalshi fetch error:", error)
     return []
   }
 }

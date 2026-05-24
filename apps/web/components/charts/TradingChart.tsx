@@ -10,19 +10,22 @@ type PricePoint = { t: number; p: number };
 type Timeframe = {
   id: "1H" | "6H" | "1D" | "1W" | "1M";
   minutes: number;
-  windowMs: number;
+  interval: string; // Polymarket CLOB interval param
+  fidelity: number; // data points per interval
 };
 
 const timeframes: Timeframe[] = [
-  { id: "1H", minutes: 1, windowMs: 60 * 60 * 1000 },
-  { id: "6H", minutes: 5, windowMs: 6 * 60 * 60 * 1000 },
-  { id: "1D", minutes: 15, windowMs: 24 * 60 * 60 * 1000 },
-  { id: "1W", minutes: 60, windowMs: 7 * 24 * 60 * 60 * 1000 },
-  { id: "1M", minutes: 240, windowMs: 30 * 24 * 60 * 60 * 1000 },
+  { id: "1H", minutes: 1,   interval: "1h",  fidelity: 60  },
+  { id: "6H", minutes: 5,   interval: "6h",  fidelity: 60  },
+  { id: "1D", minutes: 15,  interval: "1d",  fidelity: 60  },
+  { id: "1W", minutes: 60,  interval: "1w",  fidelity: 60  },
+  { id: "1M", minutes: 240, interval: "max", fidelity: 30  },
 ];
 
 function normalizePoints(raw: any): PricePoint[] {
   if (!raw) return [];
+  // Polymarket wraps history in { history: [...] }
+  if (raw && typeof raw === "object" && Array.isArray(raw.history)) raw = raw.history;
   if (Array.isArray(raw)) {
     if (raw.length === 0) return [];
     if (typeof raw[0] === "object") {
@@ -129,12 +132,11 @@ export function TradingChart({ tokenId, height = 320 }: { tokenId: string; heigh
       if (!tokenId || !chartRef.current) return;
       setLoading(true);
       try {
-        const end = Date.now();
-        const start = end - timeframe.windowMs;
         const url = new URL(`${API_BASE}/clob/prices-history`);
-        url.searchParams.set("token_id", tokenId);
-        url.searchParams.set("start", Math.floor(start / 1000).toString());
-        url.searchParams.set("end", Math.floor(end / 1000).toString());
+        // Polymarket CLOB expects: market=<tokenId>&interval=<1h|6h|1d|1w|max>&fidelity=<n>
+        url.searchParams.set("market", tokenId);
+        url.searchParams.set("interval", timeframe.interval);
+        url.searchParams.set("fidelity", String(timeframe.fidelity));
         const res = await fetch(url.toString());
         if (!res.ok) throw new Error("prices-history error");
         const raw = await res.json();

@@ -30,7 +30,7 @@ export const TerminalLayout = ({
                         <div className="w-8 h-8 rounded-lg bg-accent-primary flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)]">
                             <span className="font-outfit font-black text-white text-lg">S</span>
                         </div>
-                        <span className="font-outfit font-bold text-lg tracking-tight">StellarPulse</span>
+                        <span className="font-outfit font-bold text-lg tracking-tight">Rawali Analytic</span>
                     </div>
 
                     <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-white/[0.03] border border-white/[0.05] rounded-full">
@@ -44,9 +44,8 @@ export const TerminalLayout = ({
                         <Link href="/" className="text-xs font-bold text-ink-muted hover:text-white transition-colors uppercase tracking-widest">Events</Link>
                         <Link href="/portfolio" className="text-xs font-bold text-ink-muted hover:text-white transition-colors uppercase tracking-widest">Portfolio</Link>
                     </div>
-                    <Button variant="secondary" size="sm" className="hidden sm:flex">
-                        <Wallet size={14} className="mr-2" />
-                        Connect Wallet
+                    <Button variant="secondary" size="sm" className="hidden sm:flex" asChild>
+                        <Link href="/portfolio">Portfolio</Link>
                     </Button>
                 </div>
             </nav>
@@ -94,7 +93,7 @@ export const TerminalLayout = ({
             {/* Global Footer */}
             <footer className="h-12 border-t border-white/[0.04] bg-bg-surface flex items-center justify-between px-6">
                 <div className="flex items-center gap-4 text-[10px] font-bold text-ink-muted uppercase tracking-[0.2em]">
-                    <span>© 2024 StellarPulse Protocol</span>
+                    <span>© 2024 Rawali Analytic</span>
                     <span className="text-white/10">•</span>
                     <span>Open Liquidity Infrastructure</span>
                 </div>
@@ -108,21 +107,3 @@ export const TerminalLayout = ({
         </div>
     );
 };
-
-const Wallet = ({ size, className }: { size: number, className?: string }) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={className}
-    >
-        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-        <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
-    </svg>
-);

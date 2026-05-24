@@ -39,39 +39,75 @@ export type GeoblockResponse = {
     message?: string;
 };
 export type BridgeSupportedAsset = {
-    chainId: number;
-    tokenAddress: string;
-    symbol: string;
-    decimals: number;
-    minDeposit?: string;
+    chainId: string;
+    chainName: string;
+    token: {
+        name: string;
+        symbol: string;
+        address: string;
+        decimals: number;
+    };
+    minCheckoutUsd?: number;
 };
 export type BridgeSupportedAssetsResponse = {
     supportedAssets?: BridgeSupportedAsset[];
 };
 export type BridgeQuoteRequest = {
-    fromChainId: number;
+    fromAmountBaseUnit: string;
+    fromChainId: string;
     fromTokenAddress: string;
-    toChainId: number;
+    recipientAddress: string;
+    toChainId: string;
     toTokenAddress: string;
-    amount: string;
 };
 export type BridgeQuoteResponse = {
-    estimatedOutput?: string;
-    fee?: string;
-    etaSeconds?: number;
+    estCheckoutTimeMs?: number;
+    estFeeBreakdown?: Record<string, number | string>;
+    estInputUsd?: number;
+    estOutputUsd?: number;
+    estToTokenBaseUnit?: string;
+    quoteId?: string;
 };
 export type BridgeDepositRequest = {
     address: string;
 };
+export type BridgeDepositResponse = {
+    address?: {
+        evm?: string;
+        svm?: string;
+        btc?: string;
+        tvm?: string;
+    };
+    note?: string;
+};
 export type BridgeWithdrawRequest = {
     address: string;
-    toChainId: number;
+    toChainId: string;
     toTokenAddress: string;
     recipientAddr: string;
 };
+export type BridgeTransaction = {
+    fromChainId?: string;
+    fromTokenAddress?: string;
+    fromAmountBaseUnit?: string;
+    toChainId?: string;
+    toTokenAddress?: string;
+    status?: "DEPOSIT_DETECTED" | "PROCESSING" | "ORIGIN_TX_CONFIRMED" | "SUBMITTED" | "COMPLETED" | "FAILED" | string;
+    txHash?: string;
+    createdTimeMs?: number;
+};
 export type BridgeStatusResponse = {
-    status?: string;
-    message?: string;
+    transactions?: BridgeTransaction[];
+};
+export type FundingStatusPhase = "not_started" | "detected" | "processing" | "completed" | "failed";
+export type FundingStatusResponse = BridgeStatusResponse & {
+    ok: boolean;
+    depositAddress: string;
+    latest?: BridgeTransaction;
+    phase: FundingStatusPhase;
+    label: string;
+    message: string;
+    updatedAt: string;
 };
 export type PolymarketConfig = {
     geoblockUrl: string;
@@ -98,5 +134,145 @@ export type OrderValidationResponse = {
     message?: string;
     bestPrice?: number | null;
     bestSize?: number;
+};
+export type TradePreviewRequest = {
+    marketId: string;
+    tokenId: string;
+    outcome: string;
+    side: "BUY" | "SELL";
+    amountUsd: number;
+    tradingWalletAddress?: string;
+};
+export type TradePreviewWarning = {
+    code: "amount_below_min_order_size" | "balance_not_checked" | "insufficient_visible_liquidity" | "neg_risk_market" | "no_orderbook";
+    message: string;
+    severity: "info" | "warning";
+};
+export type PlatformFee = {
+    bps: number;
+    amount: number;
+    label: string;
+};
+export type TradeInsight = {
+    signal: "bullish" | "bearish" | "neutral";
+    headline: string;
+    keyRisk: string;
+    context: string;
+    signalStrength: number;
+};
+export type TradePreviewResponse = {
+    ok: boolean;
+    error?: string;
+    marketId?: string;
+    tokenId?: string;
+    outcome?: string;
+    side?: "BUY" | "SELL";
+    amountUsd?: number;
+    tradingWalletAddress?: string;
+    filledAmountUsd?: number;
+    unfilledAmountUsd?: number;
+    estimatedShares?: number;
+    avgPrice?: number | null;
+    maxPrice?: number | null;
+    bestAsk?: number | null;
+    minOrderSize?: number | null;
+    tickSize?: number | null;
+    warnings?: TradePreviewWarning[];
+    platformFee?: PlatformFee;
+    tradeInsight?: TradeInsight;
+};
+export type TradeReadinessStatus = "ready" | "pending" | "auth_required" | "blocked" | "unavailable";
+export type TradeReadinessCheckCode = "wallet_linked" | "trading_profile" | "funding_deposit" | "clob_session" | "collateral_balance_allowance" | "order_signing";
+export type TradeReadinessCheck = {
+    code: TradeReadinessCheckCode;
+    label: string;
+    status: TradeReadinessStatus;
+    message: string;
+};
+export type BalanceAllowanceSnapshot = {
+    balance: string;
+    allowance: string;
+    assetType: "COLLATERAL" | "CONDITIONAL";
+    tokenId?: string;
+};
+export type TradeReadinessRequest = {
+    connectedWalletAddress?: string;
+    tradingWalletAddress?: string;
+    tradingWalletKind?: TradingWalletKind;
+    depositAddress?: string;
+    marketId?: string;
+    tokenId?: string;
+    amountUsd?: number;
+};
+export type TradeReadinessResponse = {
+    ok: boolean;
+    canPreview: boolean;
+    canExecute: boolean;
+    executionLockedReason: string;
+    auth: {
+        clobSessionPresent: boolean;
+        clobSessionRequired: boolean;
+    };
+    checks: TradeReadinessCheck[];
+    collateral?: BalanceAllowanceSnapshot;
+    conditional?: BalanceAllowanceSnapshot;
+    error?: string;
+};
+export type TradingWalletKind = "eoa" | "safe" | "proxy" | "deposit";
+export type TradingProfileStatus = "wallet_linked" | "deposit_ready" | "funded" | "blocked";
+export type TradingProfile = {
+    connectedWalletAddress: string;
+    tradingWalletAddress: string;
+    tradingWalletKind: TradingWalletKind;
+    status: TradingProfileStatus;
+    fundingChainId: "56";
+    depositAddress?: {
+        evm?: string;
+        svm?: string;
+        btc?: string;
+        tvm?: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+};
+export type AnalysisVerdict = {
+    direction: "YES" | "NO";
+    confidence: number;
+    rationale: string;
+};
+export type PremiumNewsSource = {
+    title: string;
+    url: string;
+    summary: string;
+};
+export type PremiumAnalysis = {
+    verdict: AnalysisVerdict;
+    eventBrief: string;
+    globalContext: string;
+    structuralDrivers: string[];
+    marketSignalInterpretation: string;
+    informationAsymmetry: string;
+    riskLandscape: string[];
+    strategicInsight: string;
+    terminalNote: string;
+    newsSources: PremiumNewsSource[];
+    generatedAt: string;
+    signalHash: string;
+};
+export type PaymentRequirement = {
+    chainId: number;
+    tokenContract: string;
+    tokenSymbol: string;
+    tokenDecimals: number;
+    receiver: string;
+    amountRaw: string;
+    amountHuman: string;
+};
+export type PremiumAnalysisResponse = {
+    ok: boolean;
+    marketId?: string;
+    analysis?: PremiumAnalysis;
+    error?: string;
+    paymentRequired?: PaymentRequirement;
 };
 //# sourceMappingURL=polymarket.d.ts.map

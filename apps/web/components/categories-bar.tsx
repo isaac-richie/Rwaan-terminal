@@ -3,15 +3,13 @@
 import { useEffect, useMemo, useState } from "react"
 import {
   Globe,
-  Landmark,
-  Cpu,
   Coins,
   Flame,
   Trophy,
-  CloudLightning,
-  Microscope,
-  BarChart2,
   Sparkles,
+  Newspaper,
+  ArrowDownUp,
+  ChevronDown,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -27,22 +25,20 @@ type CategoryItem = {
 
 const polymarketCategories: CategoryItem[] = [
   { id: "all", label: "All", icon: Flame },
-  { id: "Politics", label: "Politics", icon: Landmark },
-  { id: "Sports", label: "Sports", icon: Trophy },
+  { id: "Entertainment", label: "Entertainment", icon: Sparkles },
+  { id: "Sports", label: "Sport", icon: Trophy },
+  { id: "News", label: "News", icon: Newspaper },
   { id: "Crypto", label: "Crypto", icon: Coins },
-  { id: "Iran", label: "Iran", icon: Globe },
-  { id: "Finance", label: "Finance", icon: BarChart2 },
   { id: "Geopolitics", label: "Geopolitics", icon: Globe },
-  { id: "Tech", label: "Tech", icon: Cpu },
-  { id: "Culture", label: "Culture", icon: Sparkles },
-  { id: "Economy", label: "Economy", icon: BarChart2 },
-  { id: "Weather & Science", label: "Weather & Science", icon: CloudLightning },
-  { id: "Health", label: "Health", icon: Microscope },
-  { id: "Breaking News", label: "Breaking News", icon: Flame },
-  { id: "Mentions", label: "Mentions", icon: Microscope },
-  { id: "Elections", label: "Elections", icon: Landmark },
 ]
 
+const sortOptions = [
+  { id: "trending", label: "Smart Feed" },
+  { id: "daily", label: "Quick Settles" },
+  { id: "volume", label: "Volume" },
+  { id: "newest", label: "Newest" },
+  { id: "ending", label: "Ending Soon" },
+]
 
 interface CategoriesBarProps {
   selected: string
@@ -62,11 +58,11 @@ type GammaTag = {
 export function CategoriesBar({
   selected,
   onSelect,
-  sortBy: _sortBy,
-  onSortChange: _onSortChange,
+  sortBy,
+  onSortChange,
 }: CategoriesBarProps) {
-  // sort/filter UI removed
   const [tags, setTags] = useState<GammaTag[]>([])
+  const [sortOpen, setSortOpen] = useState(false)
 
   useEffect(() => {
     const loadTags = async () => {
@@ -74,15 +70,23 @@ export function CategoriesBar({
         const res = await fetch(`${API_BASE}/gamma/tags`)
         if (!res.ok) return
         const data = await res.json()
-        if (Array.isArray(data)) {
-          setTags(data)
-        }
+        if (Array.isArray(data)) setTags(data)
       } catch {
         // ignore
       }
     }
     loadTags()
   }, [])
+
+  // Close sort dropdown on outside click
+  useEffect(() => {
+    if (!sortOpen) return
+    const handle = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest("[data-sort-menu]")) setSortOpen(false)
+    }
+    window.addEventListener("mousedown", handle)
+    return () => window.removeEventListener("mousedown", handle)
+  }, [sortOpen])
 
   const categories = useMemo(() => {
     if (!tags.length) return polymarketCategories
@@ -98,13 +102,14 @@ export function CategoriesBar({
     }))
   }, [tags])
 
-  // sort/filter UI removed
+  const currentSort = sortOptions.find((s) => s.id === sortBy) ?? sortOptions[0]
 
   return (
     <div className="sticky top-16 z-40 bg-[oklch(0.11_0.012_260/0.92)] backdrop-blur-xl border-b border-[oklch(0.22_0.015_255)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-4 py-3 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        <div className="flex items-center gap-3 py-2.5">
+          {/* Category chips — fade mask hints at scrollable overflow */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto no-scrollbar [mask-image:linear-gradient(to_right,black_85%,transparent)] sm:[mask-image:none]">
             {categories.map((cat) => {
               const isActive = selected === cat.id
               const Icon = cat.icon
@@ -113,23 +118,16 @@ export function CategoriesBar({
                   key={cat.id}
                   onClick={() => onSelect(cat.id)}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200 border",
+                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all duration-200 border",
                     isActive
-                      ? "bg-[oklch(0.22_0.04_82)] border-[oklch(0.78_0.16_82/0.5)] text-[oklch(0.78_0.16_82)] shadow-[0_0_12px_oklch(0.78_0.16_82/0.15)]"
-                      : "bg-[oklch(0.16_0.014_255)] border-[oklch(0.22_0.015_255)] text-[oklch(0.55_0.01_90)] hover:border-[oklch(0.28_0.018_255)] hover:text-[oklch(0.75_0.01_90)]"
+                      ? "bg-[oklch(0.22_0.04_82)] border-[oklch(0.78_0.16_82/0.5)] text-[oklch(0.78_0.16_82)] shadow-[0_0_10px_oklch(0.78_0.16_82/0.12)]"
+                      : "bg-transparent border-transparent text-[oklch(0.50_0.01_90)] hover:text-[oklch(0.75_0.01_90)] hover:bg-[oklch(0.16_0.014_255)]"
                   )}
                 >
-                  <Icon className={cn("w-3.5 h-3.5", isActive ? "text-[oklch(0.78_0.16_82)]" : "text-[oklch(0.45_0.01_90)]")} />
+                  <Icon className={cn("w-3 h-3", isActive ? "text-[oklch(0.78_0.16_82)]" : "text-[oklch(0.40_0.01_90)]")} />
                   {cat.label}
-                  {typeof cat.count === "number" && (
-                    <span
-                      className={cn(
-                        "text-[10px] font-mono px-1.5 py-0.5 rounded-md",
-                        isActive
-                          ? "bg-[oklch(0.78_0.16_82/0.2)] text-[oklch(0.78_0.16_82)]"
-                          : "bg-[oklch(0.22_0.015_255)] text-[oklch(0.4_0.01_90)]"
-                      )}
-                    >
+                  {typeof cat.count === "number" && isActive && (
+                    <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[oklch(0.78_0.16_82/0.15)] text-[oklch(0.78_0.16_82)]">
                       {cat.count.toLocaleString()}
                     </span>
                   )}
@@ -138,9 +136,36 @@ export function CategoriesBar({
             })}
           </div>
 
+          {/* Sort dropdown */}
+          <div className="relative shrink-0" data-sort-menu>
+            <button
+              onClick={() => setSortOpen((v) => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-muted-foreground border border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.013_255)] hover:border-[oklch(0.28_0.018_255)] transition-colors"
+            >
+              <ArrowDownUp className="w-3 h-3" />
+              <span className="hidden sm:inline">{currentSort.label}</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {sortOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-40 rounded-xl bg-[oklch(0.16_0.014_255)] border border-[oklch(0.22_0.015_255)] shadow-2xl overflow-hidden z-50">
+                {sortOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => { onSortChange(opt.id); setSortOpen(false) }}
+                    className={cn(
+                      "w-full text-left px-3 py-2 text-xs font-medium transition-colors",
+                      sortBy === opt.id
+                        ? "text-[oklch(0.78_0.16_82)] bg-[oklch(0.78_0.16_82/0.08)]"
+                        : "text-muted-foreground hover:text-foreground hover:bg-[oklch(0.2_0.014_255)]"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-
-        {/* sort & filters removed */}
       </div>
     </div>
   )

@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#0b0d11"/>
+      <stop offset="1" stop-color="#050609"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" x2="0" y1="0" y2="1">
+      <stop stop-color="#1a1d22"/>
+      <stop offset="1" stop-color="#111419"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="34" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .txt{font-family:Inter,Arial,sans-serif;fill:#f5f5f5;letter-spacing:0}
+      .muted{fill:#8e949f}
+      .gold{fill:#e8b93f}
+      .green{fill:#6ee795}
+      .red{fill:#ff6574}
+      .small{font-size:18px}
+      .tiny{font-size:14px}
+      .title{font-size:38px;font-weight:800}
+      .h2{font-size:30px;font-weight:800}
+      .h3{font-size:22px;font-weight:800}
+      .bold{font-weight:800}
+      .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="250" cy="40" r="280" fill="#e8b93f" opacity="0.08"/>
+  <circle cx="1320" cy="150" r="260" fill="#214cff" opacity="0.08"/>
+
+  <g transform="translate(70 34)">
+    <path d="M0 56 H1460" stroke="#242832"/>
+    <g transform="translate(0 0)">
+      <path d="M0 34 C18 4 42 4 58 34 C74 64 98 64 116 34" fill="none" stroke="#7d37ff" stroke-width="13" stroke-linecap="round"/>
+      <path d="M0 34 C18 64 42 64 58 34 C74 4 98 4 116 34" fill="none" stroke="#15b8ff" stroke-width="13" stroke-linecap="round" opacity="0.75"/>
+      <text x="142" y="24" class="txt bold" font-size="22">Rawali <tspan class="gold">Analytic</tspan></text>
+      <text x="142" y="43" class="txt muted tiny" letter-spacing="3">PREDICTION TERMINAL</text>
+    </g>
+    <text x="420" y="34" class="txt muted small">Markets</text>
+    <text x="500" y="34" class="txt muted small">Portfolio</text>
+    <rect x="680" y="8" width="390" height="44" rx="12" fill="#12161d" stroke="#252a35"/>
+    <text x="708" y="36" class="txt muted small">Search markets, teams, crypto...</text>
+    <rect x="1110" y="9" width="86" height="42" rx="12" fill="#111a14" stroke="#1f4028"/>
+    <text x="1130" y="36" class="txt green tiny">Live</text>
+    <rect x="1214" y="9" width="106" height="42" rx="12" fill="#12161d" stroke="#252a35"/>
+    <text x="1236" y="36" class="txt muted tiny">BNB Chain</text>
+    <rect x="1340" y="7" width="120" height="46" rx="13" fill="#e8b93f"/>
+    <text x="1366" y="37" class="txt bold tiny" fill="#08090c">Connect</text>
+  </g>
+
+  <g transform="translate(70 126)">
+    <text x="0" y="0" class="txt gold tiny bold">OPTION A - POLYMARKET-STYLE MARKET BOARD</text>
+    <rect x="0" y="26" width="955" height="430" rx="18" fill="url(#card)" stroke="#2a2e38" filter="url(#shadow)"/>
+    <rect x="985" y="26" width="475" height="430" rx="18" fill="url(#card)" stroke="#2a2e38" filter="url(#shadow)"/>
+
+    <text x="28" y="70" class="txt muted small">Sports - Basketball - NBA</text>
+    <text x="28" y="112" class="txt title">Knicks vs. Cavaliers</text>
+    <rect x="28" y="142" width="180" height="58" rx="11" fill="#40311f"/>
+    <text x="84" y="178" class="txt gold h3">Knicks</text>
+    <rect x="222" y="142" width="180" height="58" rx="11" fill="#3b182b"/>
+    <text x="268" y="178" class="txt" fill="#ff5c9b" font-size="22" font-weight="800">Cavaliers</text>
+
+    <text x="28" y="252" class="txt h3">Spread</text>
+    <text x="280" y="252" class="txt h3">2.5</text>
+    <rect x="28" y="274" width="180" height="50" rx="10" fill="#252b33"/>
+    <text x="88" y="306" class="txt muted small">CLE -2.5</text>
+    <rect x="222" y="274" width="180" height="50" rx="10" fill="#252b33"/>
+    <text x="284" y="306" class="txt muted small">NYK +2.5</text>
+    <text x="28" y="365" class="txt h3">Total</text>
+    <text x="278" y="365" class="txt h3">204.5</text>
+    <rect x="28" y="386" width="180" height="50" rx="10" fill="#252b33"/>
+    <text x="86" y="418" class="txt muted small">O 204.5</text>
+    <rect x="222" y="386" width="180" height="50" rx="10" fill="#252b33"/>
+    <text x="284" y="418" class="txt muted small">U 204.5</text>
+
+    <text x="560" y="112" class="txt h3">12:00 AM</text>
+    <text x="570" y="146" class="txt muted small">May 24</text>
+    <text x="810" y="116" class="txt" fill="#ff5c9b" font-size="50" font-weight="900">56%</text>
+    <text x="810" y="365" class="txt gold" font-size="50" font-weight="900">45%</text>
+    <g transform="translate(445 176)">
+      <path d="M0 24H420M0 92H420M0 160H420M0 228H420" stroke="#303540" stroke-dasharray="2 6"/>
+      <path d="M0 38H120V64H176V38H420" fill="none" stroke="#df4a89" stroke-width="3"/>
+      <path d="M0 202H120V176H176V202H420" fill="none" stroke="#e7922e" stroke-width="3"/>
+      <circle cx="405" cy="38" r="6" fill="#df4a89"/>
+      <circle cx="405" cy="202" r="6" fill="#e7922e"/>
+    </g>
+
+    <text x="1018" y="78" class="txt h2">Breaking markets</text>
+    <g transform="translate(1018 116)">
+      <text x="0" y="0" class="txt muted small">1</text>
+      <text x="34" y="0" class="txt small bold">Will Trump attend his son's wedding?</text>
+      <text x="386" y="0" class="txt h3">3%</text>
+      <text x="386" y="26" class="txt red tiny">down 64%</text>
+      <text x="0" y="70" class="txt muted small">2</text>
+      <text x="34" y="70" class="txt small bold">Will James Garner be included in squad?</text>
+      <text x="386" y="70" class="txt h3">10%</text>
+      <text x="386" y="96" class="txt red tiny">down 33%</text>
+      <text x="0" y="140" class="txt muted small">3</text>
+      <text x="34" y="140" class="txt small bold">Will D.K. Metcalf be traded?</text>
+      <text x="386" y="140" class="txt h3">25%</text>
+      <text x="386" y="166" class="txt green tiny">up 25%</text>
+      <path d="M0 206H420" stroke="#282d37"/>
+      <text x="0" y="250" class="txt h2">Hot topics</text>
+      <text x="0" y="292" class="txt muted small">1</text><text x="34" y="292" class="txt small bold">BTC</text><text x="300" y="292" class="txt muted small">$34M today</text>
+      <text x="0" y="334" class="txt muted small">2</text><text x="34" y="334" class="txt small bold">World Cup</text><text x="300" y="334" class="txt muted small">$11M today</text>
+    </g>
+  </g>
+
+  <g transform="translate(70 640)">
+    <text x="0" y="0" class="txt h2">All markets</text>
+    <text x="0" y="50" class="txt gold small bold">All</text>
+    <text x="72" y="50" class="txt muted small">Crypto</text>
+    <text x="165" y="50" class="txt muted small">Sports</text>
+    <text x="255" y="50" class="txt muted small">News</text>
+    <text x="330" y="50" class="txt muted small">Geopolitics</text>
+    <g transform="translate(0 80)">
+      <rect width="350" height="130" rx="14" fill="#191d23" stroke="#2b303a"/>
+      <text x="22" y="40" class="txt small bold">BTC Up or Down 5m?</text><text x="270" y="42" class="txt h3">51¢</text>
+      <rect x="22" y="72" width="140" height="38" rx="8" fill="#143523"/><text x="78" y="97" class="txt green small bold">Up</text>
+      <rect x="172" y="72" width="140" height="38" rx="8" fill="#3a1a22"/><text x="222" y="97" class="txt red small bold">Down</text>
+      <rect x="370" width="350" height="130" rx="14" fill="#191d23" stroke="#2b303a"/>
+      <text x="392" y="40" class="txt small bold">Will Spain win 2026 World Cup?</text><text x="640" y="42" class="txt h3">18¢</text>
+      <text x="392" y="103" class="txt muted small">$1B Vol.</text>
+      <rect x="740" width="350" height="130" rx="14" fill="#191d23" stroke="#2b303a"/>
+      <text x="762" y="40" class="txt small bold">US-Iran permanent peace deal?</text><text x="1010" y="42" class="txt h3">75¢</text>
+      <text x="762" y="103" class="txt muted small">$151M Vol.</text>
+      <rect x="1110" width="350" height="130" rx="14" fill="#191d23" stroke="#2b303a"/>
+      <text x="1132" y="40" class="txt small bold">Major AI IPO this month?</text><text x="1390" y="42" class="txt h3">63¢</text>
+      <text x="1132" y="103" class="txt muted small">$8.6M Vol.</text>
+    </g>
+  </g>
+</svg>

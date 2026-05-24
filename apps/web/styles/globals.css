@@ -124,7 +124,7 @@
   }
 }
 
-/* ─── Agent Economic HUD Scan-line ─── */
+/* ─── Terminal scan-line ─── */
 .hud-scanline {
   background: repeating-linear-gradient(
     0deg,
@@ -152,4 +152,3 @@
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
-

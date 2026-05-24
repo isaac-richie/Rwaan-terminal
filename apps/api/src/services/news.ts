@@ -83,3 +83,47 @@ export async function fetchLiveNews(query: string): Promise<NewsSource[]> {
     return [];
   }
 }
+
+export interface PremiumNewsArticle {
+  title: string;
+  url: string;
+  bodyText: string;
+}
+
+async function fetchArticleText(url: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return "";
+    const html = await res.text();
+    const stripped = html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&[a-z]+;/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return stripped.slice(0, 2000);
+  } catch {
+    return "";
+  }
+}
+
+export async function fetchPremiumNews(query: string): Promise<PremiumNewsArticle[]> {
+  const sources = await fetchLiveNews(query);
+  const articles = await Promise.all(
+    sources.map(async (source) => {
+      const bodyText = await fetchArticleText(source.url);
+      return { title: source.title, url: source.url, bodyText };
+    })
+  );
+  return articles.filter((a) => a.bodyText.length > 100);
+}

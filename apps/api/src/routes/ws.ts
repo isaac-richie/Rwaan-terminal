@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import WebSocket from "ws";
+import type { RawData } from "ws";
 
 type WsQuery = {
   token_ids?: string;
@@ -43,25 +44,25 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       sendSubscribe();
     });
 
-    upstream.on("message", (data) => {
-      if (connection.socket.readyState === connection.socket.OPEN) {
-        connection.socket.send(data.toString());
+    upstream.on("message", (data: RawData) => {
+      if (connection.readyState === WebSocket.OPEN) {
+        connection.send(data.toString());
       }
     });
 
     upstream.on("close", () => {
-      if (connection.socket.readyState === connection.socket.OPEN) {
-        connection.socket.close();
+      if (connection.readyState === WebSocket.OPEN) {
+        connection.close();
       }
     });
 
     upstream.on("error", () => {
-      if (connection.socket.readyState === connection.socket.OPEN) {
-        connection.socket.close();
+      if (connection.readyState === WebSocket.OPEN) {
+        connection.close();
       }
     });
 
-    connection.socket.on("close", () => {
+    connection.on("close", () => {
       clearInterval(pingInterval);
       if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) {
         upstream.close();

@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowUpRight, Flame, Sparkles } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowUpRight, Flame, TrendingUp } from "lucide-react"
 import { fetchMarkets } from "@/lib/markets"
 import type { PolymarketMarket } from "@/lib/polymarket"
 import { cn } from "@/lib/utils"
@@ -9,34 +10,20 @@ import { cn } from "@/lib/utils"
 function getYesPrice(market: PolymarketMarket): number {
   const yes = market.outcomes?.find((o) => o.name.toLowerCase().includes("yes"))?.price
   const fallback = market.outcomes?.[0]?.price
-  const price = typeof yes === "number" ? yes : typeof fallback === "number" ? fallback : 50
-  return price
+  return typeof yes === "number" ? yes : typeof fallback === "number" ? fallback : 50
 }
 
-function formatEndDate(dateStr?: string) {
-  if (!dateStr) return "—"
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return "—"
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-}
-
-interface TrendingHeaderProps {
-  onUnlockAnalysis: (market: PolymarketMarket) => void
-}
-
-export function TrendingHeader({ onUnlockAnalysis }: TrendingHeaderProps) {
+export function TrendingHeader() {
+  const router = useRouter()
   const [markets, setMarkets] = useState<PolymarketMarket[]>([])
   const [loading, setLoading] = useState(true)
-  const [indexPrices, setIndexPrices] = useState<Record<string, number>>({})
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       try {
-        const data = await fetchMarkets("all", 11, "trending", 0)
-        setMarkets(data.slice(0, 11))
+        const data = await fetchMarkets("all", 12, "trending", 0)
+        setMarkets(data.slice(0, 12))
       } catch (err) {
         console.error(err)
       } finally {
@@ -46,133 +33,84 @@ export function TrendingHeader({ onUnlockAnalysis }: TrendingHeaderProps) {
     load()
   }, [])
 
-  useEffect(() => {
-    const loadPrices = async () => {
-      const tokenIds = markets
-        .map((m) => m.tokenIds?.[0])
-        .filter((id): id is string => Boolean(id))
-      if (!tokenIds.length) return
-      try {
-        const res = await fetch(`${API_BASE}/clob/last-trades-prices`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token_ids: tokenIds }),
-        })
-        if (!res.ok) return
-        const data = await res.json()
-        const map: Record<string, number> = {}
-        if (Array.isArray(data)) {
-          for (const item of data) {
-            const id = item.token_id ?? item.tokenId ?? item.id
-            const price = item.price ?? item.last_trade_price ?? item.lastTradePrice
-            if (id && price !== undefined) map[id] = Number(price)
-          }
-        } else if (data?.prices && typeof data.prices === "object") {
-          for (const [id, price] of Object.entries(data.prices)) {
-            map[id] = Number(price)
-          }
-        } else if (data && typeof data === "object") {
-          for (const [id, price] of Object.entries(data)) {
-            map[id] = Number(price)
-          }
-        }
-        setIndexPrices(map)
-      } catch (err) {
-        console.error(err)
-      }
-    }
-    loadPrices()
-  }, [markets, API_BASE])
-
-  const getIndexPrice = (market: PolymarketMarket) => {
-    const tokenId = market.tokenIds?.[0]
-    if (tokenId && indexPrices[tokenId] !== undefined) {
-      const p = indexPrices[tokenId]
-      return p <= 1 ? p * 100 : p
-    }
-    return getYesPrice(market)
+  if (loading) {
+    return (
+      <section className="pt-20 pb-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Flame className="w-3.5 h-3.5 text-[oklch(0.78_0.16_82)]" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Hot Right Now</span>
+          </div>
+          <div className="flex gap-3 overflow-hidden">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="shrink-0 w-60 h-[100px] surface-card rounded-xl shimmer" />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
   }
 
+  if (markets.length === 0) return null
+
   return (
-    <section className="relative pt-20 pb-8">
+    <section className="pt-20 pb-2">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div>
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              <Flame className="w-3.5 h-3.5 text-[oklch(0.78_0.16_82)]" /> Trending Events
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mt-2">
-              Top activity today
-            </h1>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Flame className="w-3.5 h-3.5 text-[oklch(0.78_0.16_82)]" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Hot Right Now</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
           </div>
-          <button className="hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[oklch(0.18_0.014_255)] border border-[oklch(0.22_0.015_255)] text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-[oklch(0.78_0.16_82/0.4)] transition-all">
-            View all events
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
         </div>
 
-        <div className="surface-card rounded-2xl overflow-hidden border border-[oklch(0.22_0.015_255)]">
-          <div className="h-px gold-line" />
-          <div className="hidden lg:grid grid-cols-[1.2fr_0.3fr_0.35fr_0.35fr_0.35fr_0.35fr] gap-4 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground bg-[oklch(0.16_0.014_255)]">
-            <span>Intelligence Asset</span>
-            <span>Consensus</span>
-            <span>M2M Flow</span>
-            <span>Agency Depth</span>
-            <span>End Date</span>
-            <span className="text-right">Execution</span>
-          </div>
+        {/* Horizontal scrollable hot strip */}
+        <div className="relative">
+          {/* Fade masks */}
+          <div className="absolute left-0 top-0 bottom-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-[oklch(0.11_0.012_260)] to-transparent" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-[oklch(0.11_0.012_260)] to-transparent" />
 
-          {loading ? (
-            <div className="p-6 text-sm text-muted-foreground">Loading trending events…</div>
-          ) : (
-            <div className="divide-y divide-[oklch(0.22_0.015_255)]">
-              {markets.map((market) => {
-                const index = getIndexPrice(market)
-                const isUp = index >= 50
-                return (
-                  <div
-                    key={market.id}
-                    className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.3fr_0.35fr_0.35fr_0.35fr_0.35fr] gap-4 px-5 py-4 items-center hover:bg-[oklch(0.16_0.014_255)] transition-colors row-hover-accent"
-                  >
-                    <div className="flex items-center gap-3">
-                      {market.image ? (
-                        <img src={market.image} alt="" className="w-9 h-9 rounded-lg object-cover" />
-                      ) : (
-                        <div className="w-9 h-9 rounded-lg bg-[oklch(0.18_0.014_255)]" />
-                      )}
-                      <div>
-                        <div className="text-sm font-semibold text-foreground line-clamp-1">
-                          {market.question}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                          {market.category}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className={cn("text-sm font-semibold", isUp ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.58_0.2_25)]")}>
-                      {index.toFixed(1)}¢
-                    </div>
-
-                    <div className="text-sm font-mono text-muted-foreground">{market.volume}</div>
-                    <div className="text-sm font-mono text-muted-foreground">{market.liquidity}</div>
-                    <div className="text-xs text-muted-foreground">{formatEndDate(market.endDate)}</div>
-
-                    <div className="flex items-center gap-2 justify-end">
-                      <button 
-                        onClick={() => onUnlockAnalysis(market)}
-                        className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-[oklch(0.78_0.16_82/0.15)] text-[oklch(0.82_0.16_82)] border border-[oklch(0.78_0.16_82/0.35)] hover:bg-[oklch(0.78_0.16_82/0.25)] btn-press inline-flex items-center gap-1.5"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        Run x402 Model
-                      </button>
+          <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1 px-1">
+            {markets.map((market) => {
+              const price = getYesPrice(market)
+              const isUp = price >= 50
+              return (
+                <button
+                  key={market.id}
+                  onClick={() => router.push(`/markets/${market.id}`)}
+                  className="shrink-0 w-[240px] surface-card surface-card-hover rounded-xl p-3 text-left transition-all group/hot btn-press"
+                >
+                  <div className="flex items-start gap-2.5">
+                    {market.image ? (
+                      <img src={market.image} alt="" className="w-9 h-9 rounded-lg object-cover border border-[oklch(0.24_0.016_255)]" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-[oklch(0.18_0.014_255)] border border-[oklch(0.24_0.016_255)]" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold text-foreground line-clamp-2 leading-snug group-hover/hot:text-[oklch(0.92_0.01_90)] transition-colors">
+                        {market.question}
+                      </p>
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
+                  <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-[oklch(0.22_0.015_255/0.6)]">
+                    <span className={cn(
+                      "text-xs font-bold px-2 py-0.5 rounded-md",
+                      isUp
+                        ? "bg-[oklch(0.68_0.18_155/0.12)] text-[oklch(0.68_0.18_155)]"
+                        : "bg-[oklch(0.58_0.2_25/0.12)] text-[oklch(0.60_0.18_25)]"
+                    )}>
+                      {price.toFixed(0)}¢ Yes
+                    </span>
+                    <span className="text-[10px] font-mono text-muted-foreground">{market.volume}</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
+
+        {/* Gold separator */}
+        <div className="mt-5 h-px gold-line" />
       </div>
     </section>
   )

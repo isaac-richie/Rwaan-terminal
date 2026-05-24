@@ -54,7 +54,12 @@ export async function clobRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/clob/prices-history", async (req) => {
     const query = clobQuerySchema.parse(req.query ?? {});
-    return getClobPublic("/prices-history", query);
+    try {
+      return await getClobPublic("/prices-history", query);
+    } catch (err) {
+      req.log.warn({ err, query }, "CLOB price history unavailable; returning an empty series");
+      return [];
+    }
   });
 
   app.post("/clob/last-trades-prices", async (req, reply) => {

@@ -1,68 +1,66 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
-import { TrendingHeader } from "@/components/trending-header"
+import { MarketHero } from "@/components/market-hero"
 import { CategoriesBar } from "@/components/categories-bar"
 import { MarketsGrid } from "@/components/markets-grid"
 import { Footer } from "@/components/footer"
-import { AnalysisUnlockModal } from "@/components/analysis-unlock-modal"
-import { CatalystHero } from "@/components/catalyst-hero"
-import { AgentEconomicHud } from "@/components/agent-economic-hud"
-import type { PolymarketMarket } from "@/lib/polymarket"
 
-export default function Home() {
-  const [searchQuery, setSearchQuery] = useState("")
+function HomeContent() {
+  const searchParams = useSearchParams()
   const [category, setCategory] = useState("all")
   const [sortBy, setSortBy] = useState("trending")
-  const [analysisOpen, setAnalysisOpen] = useState(false)
-  const [analysisMarket, setAnalysisMarket] = useState<PolymarketMarket | null>(null)
 
-  useEffect(() => {
-    const query = new URLSearchParams(window.location.search).get("q") ?? ""
-    setSearchQuery(query)
-  }, [])
+  // Derive search query reactively from URL — handles both initial load
+  // and client-side router.push("/?q=...") from the navbar search modal.
+  const searchQuery = searchParams?.get("q") ?? ""
 
   useEffect(() => {
     if (searchQuery) setCategory("all")
   }, [searchQuery])
 
-  const openAnalysis = useCallback((market: PolymarketMarket) => {
-    setAnalysisMarket(market)
-    setAnalysisOpen(true)
-  }, [])
-
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="terminal-grid-bg min-h-screen bg-background flex flex-col ambient-glow">
       <Navbar />
 
-      {/* Agent Economic HUD — persistent, collapsible */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-[calc(1.75rem+4rem+0.75rem)]">
-        <AgentEconomicHud />
-      </div>
+      <MarketHero />
 
-      <CatalystHero onUnlockAnalysis={openAnalysis} />
-      <TrendingHeader onUnlockAnalysis={openAnalysis} />
-
-      <main id="markets" className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-10 pb-6">
+      <main id="markets" className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 relative z-[1]">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 pb-3">
           <div>
-            <h2 className="text-2xl font-bold text-foreground tracking-tight">Live Events</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Event discovery and paid analysis. Trading is intentionally disabled in this build.
+            <h2 className="text-xl font-bold text-foreground tracking-tight heading-accent">Market Board</h2>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Smart mix of quick-settle, crypto, and high-liquidity prediction markets.
             </p>
           </div>
+          {searchQuery && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Results for</span>
+              <span className="text-xs font-semibold text-[oklch(0.78_0.16_82)] px-2 py-0.5 rounded-md bg-[oklch(0.78_0.16_82/0.1)] border border-[oklch(0.78_0.16_82/0.2)]">
+                "{searchQuery}"
+              </span>
+            </div>
+          )}
         </div>
 
         <CategoriesBar selected={category} onSelect={setCategory} sortBy={sortBy} onSortChange={setSortBy} />
 
-        <div className="pt-6">
-          <MarketsGrid category={category} sortBy={sortBy} search={searchQuery} onUnlockAnalysis={openAnalysis} />
+        <div className="pt-5">
+          <MarketsGrid category={category} sortBy={sortBy} search={searchQuery} />
         </div>
       </main>
 
       <Footer />
-      <AnalysisUnlockModal open={analysisOpen} market={analysisMarket} onOpenChange={setAnalysisOpen} />
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <Suspense>
+      <HomeContent />
+    </Suspense>
   )
 }

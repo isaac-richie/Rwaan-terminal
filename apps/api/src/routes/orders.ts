@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getClobPublic } from "../services/polymarket.js";
+import { parseBookLevels } from "../services/tradePreview.js";
 
 const validateSchema = z.object({
   price: z.number().min(0.01).max(0.99),
@@ -39,11 +40,10 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
     try {
       const book = await getClobPublic("/book", { token_id: tokenId });
       const side = parsed.data.side === "buy" ? "asks" : "bids";
-      const entries = (book as Record<string, unknown>)[side] as Array<[string | number, string | number]> | undefined;
-      if (entries && entries.length) {
-        const [entryPrice, entrySize] = entries[0];
-        bestPrice = Number(entryPrice);
-        bestSize = Number(entrySize);
+      const entries = parseBookLevels(book, side);
+      if (entries.length) {
+        bestPrice = entries[0].price;
+        bestSize = entries[0].size;
       }
     } catch {
       // ignore book failures for validation

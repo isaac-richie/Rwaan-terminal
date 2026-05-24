@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* StellarPulse — Dark Gold Theme (always dark) */
+/* Rawali Analytic — Dark Gold Theme (always dark) */
 :root {
   /* Deep navy-charcoal base — institutional dark */
   --background: oklch(0.11 0.012 260);
@@ -119,9 +119,11 @@
   }
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    overflow-x: hidden;
   }
   ::selection {
     background: oklch(0.78 0.16 82 / 0.25);
@@ -151,19 +153,80 @@
     border-color: oklch(0.78 0.16 82 / 0.3);
   }
   .surface-card {
-    background: linear-gradient(180deg, oklch(0.145 0.014 255), oklch(0.135 0.012 255));
-    border: 1px solid oklch(0.22 0.015 255);
-    box-shadow: 0 10px 30px oklch(0.08 0.01 260 / 0.35);
-    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+    background:
+      linear-gradient(180deg, oklch(0.155 0.014 255 / 0.97), oklch(0.12 0.012 260 / 0.97)),
+      linear-gradient(135deg, oklch(0.78 0.16 82 / 0.04), transparent 50%);
+    border: 1px solid oklch(0.24 0.016 255);
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 0.3),
+      0 8px 24px oklch(0.06 0.01 260 / 0.4);
+    transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
   }
   .surface-card-hover:hover {
-    background: oklch(0.17 0.016 255);
-    border-color: oklch(0.78 0.16 82 / 0.35);
-    box-shadow: 0 22px 46px oklch(0.08 0.01 260 / 0.5), 0 0 0 1px oklch(0.78 0.16 82 / 0.12);
-    transform: translateY(-3px);
+    border-color: oklch(0.78 0.16 82 / 0.3);
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 0.3),
+      0 20px 50px oklch(0.06 0.01 260 / 0.55),
+      0 0 0 1px oklch(0.78 0.16 82 / 0.08),
+      inset 0 1px 0 oklch(1 0 0 / 0.03);
+    transform: translateY(-2px);
   }
   .glow-gold {
     box-shadow: 0 0 20px oklch(0.78 0.16 82 / 0.12), 0 0 40px oklch(0.78 0.16 82 / 0.06);
+  }
+  /* Premium probability bar with inner glow */
+  .prob-bar-fill {
+    background: linear-gradient(90deg, oklch(0.62 0.18 155), oklch(0.72 0.18 155));
+    box-shadow: 0 0 12px oklch(0.68 0.18 155 / 0.4), inset 0 1px 0 oklch(1 0 0 / 0.15);
+  }
+  /* Premium buy buttons */
+  .btn-yes {
+    background: linear-gradient(180deg, oklch(0.68 0.18 155 / 0.16) 0%, oklch(0.68 0.18 155 / 0.08) 100%);
+    border: 1px solid oklch(0.68 0.18 155 / 0.28);
+    transition: all 0.2s ease;
+  }
+  .btn-yes:hover {
+    background: linear-gradient(180deg, oklch(0.68 0.18 155 / 0.24) 0%, oklch(0.68 0.18 155 / 0.14) 100%);
+    border-color: oklch(0.68 0.18 155 / 0.5);
+    box-shadow: 0 0 16px oklch(0.68 0.18 155 / 0.15), inset 0 1px 0 oklch(1 0 0 / 0.05);
+  }
+  .btn-no {
+    background: linear-gradient(180deg, oklch(0.58 0.2 25 / 0.12) 0%, oklch(0.58 0.2 25 / 0.06) 100%);
+    border: 1px solid oklch(0.58 0.2 25 / 0.24);
+    transition: all 0.2s ease;
+  }
+  .btn-no:hover {
+    background: linear-gradient(180deg, oklch(0.58 0.2 25 / 0.2) 0%, oklch(0.58 0.2 25 / 0.12) 100%);
+    border-color: oklch(0.58 0.2 25 / 0.45);
+    box-shadow: 0 0 16px oklch(0.58 0.2 25 / 0.12), inset 0 1px 0 oklch(1 0 0 / 0.04);
+  }
+  /* Ambient page glow — top center radial */
+  .ambient-glow::before {
+    content: '';
+    position: fixed;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 400px;
+    background: radial-gradient(ellipse at center, oklch(0.78 0.16 82 / 0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* Section heading accent */
+  .heading-accent {
+    position: relative;
+    display: inline-block;
+  }
+  .heading-accent::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 40px;
+    height: 2px;
+    background: linear-gradient(90deg, oklch(0.78 0.16 82), oklch(0.78 0.16 82 / 0));
+    border-radius: 1px;
   }
   .ticker-scroll {
     animation: ticker 40s linear infinite;
@@ -216,5 +279,99 @@
   }
   .gold-line {
     background: linear-gradient(90deg, oklch(0.78 0.16 82 / 0.0), oklch(0.78 0.16 82 / 0.5), oklch(0.78 0.16 82 / 0.0));
+  }
+  .terminal-grid-bg {
+    background-image:
+      linear-gradient(oklch(0.22 0.015 255 / 0.22) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.22 0.015 255 / 0.18) 1px, transparent 1px),
+      linear-gradient(180deg, oklch(0.11 0.012 260), oklch(0.095 0.012 260));
+    background-size: 56px 56px, 56px 56px, auto;
+    background-attachment: fixed;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hero fade-up entrance — staggered via delay */
+  .hero-enter {
+    animation: heroEnter 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+  @keyframes heroEnter {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  /* Glow pulse on hero featured card border */
+  .hero-card-glow {
+    box-shadow:
+      0 0 0 1px oklch(0.78 0.16 82 / 0.14),
+      0 0 40px oklch(0.78 0.16 82 / 0.06),
+      0 24px 64px oklch(0 0 0 / 0.55);
+    transition: box-shadow 0.4s ease;
+  }
+  .hero-card-glow:hover {
+    box-shadow:
+      0 0 0 1px oklch(0.78 0.16 82 / 0.32),
+      0 0 60px oklch(0.78 0.16 82 / 0.12),
+      0 28px 72px oklch(0 0 0 / 0.65);
+  }
+  /* Scanline sweep — single pass over the featured market image */
+  .scanline {
+    position: relative;
+    overflow: hidden;
+  }
+  .scanline::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      oklch(0.78 0.16 82 / 0.04) 50%,
+      transparent 100%
+    );
+    background-size: 100% 200%;
+    animation: scanline 4s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes scanline {
+    0%   { background-position: 0 -100%; }
+    100% { background-position: 0 200%; }
+  }
+  /* Blinking cursor for terminal aesthetic */
+  .blink-cursor::after {
+    content: '▋';
+    animation: blinkCursor 1.1s step-start infinite;
+    color: oklch(0.78 0.16 82);
+    margin-left: 2px;
+  }
+  @keyframes blinkCursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  /* Radial probability arc fill */
+  .prob-ring {
+    transform: rotate(-90deg);
+    transform-origin: center;
+  }
+  .prob-ring-track {
+    stroke: oklch(0.18 0.014 255);
+    fill: none;
+  }
+  .prob-ring-fill {
+    fill: none;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  /* Fade in from left for news items */
+  .news-item-enter {
+    animation: newsItemEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+  @keyframes newsItemEnter {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
   }
 }

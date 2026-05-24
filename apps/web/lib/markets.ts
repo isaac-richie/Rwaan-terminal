@@ -21,6 +21,12 @@ function dedupeMarkets(markets: PolymarketMarket[]) {
   return out
 }
 
+function timeToNumber(value?: string): number {
+  if (!value) return 0
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 export async function fetchMarkets(
   category?: string,
   limit = 24,
@@ -28,7 +34,7 @@ export async function fetchMarkets(
   offset = 0,
   search?: string
 ): Promise<PolymarketMarket[]> {
-  const includeKalshi = (process.env.NEXT_PUBLIC_ENABLE_KALSHI ?? "true") !== "false"
+  const includeKalshi = (process.env.NEXT_PUBLIC_ENABLE_KALSHI ?? "false") === "true"
   const requests = [
     fetchPolymarketMarkets(category, limit, sortBy, offset, search),
     includeKalshi ? fetchKalshiMarkets(category ?? "all", limit, sortBy, offset, search) : Promise.resolve([])
@@ -39,7 +45,15 @@ export async function fetchMarkets(
   const kalshi = kalshiResult.status === "fulfilled" ? kalshiResult.value : []
 
   const merged = dedupeMarkets([...poly, ...kalshi])
-  merged.sort((a, b) => volumeToNumber(b.volume) - volumeToNumber(a.volume))
+  if (sortBy === "volume") {
+    merged.sort((a, b) => volumeToNumber(b.volume) - volumeToNumber(a.volume))
+  } else if (sortBy === "newest") {
+    merged.sort((a, b) => timeToNumber(b.createdAt) - timeToNumber(a.createdAt))
+  } else if (sortBy === "daily") {
+    merged.sort((a, b) => volumeToNumber(b.liquidity) - volumeToNumber(a.liquidity))
+  } else if (sortBy === "ending") {
+    merged.sort((a, b) => timeToNumber(a.endDate) - timeToNumber(b.endDate))
+  }
 
   return merged.slice(0, limit)
 }

@@ -1,14 +1,16 @@
-under# SmartMarket
+# Rawali Analytic Prediction Terminal
+
+BNB-native prediction trading terminal that routes Polymarket markets, orderbook liquidity, portfolio data, and funding flows into one interface.
 
 ## Monorepo Layout
 
-```
+```text
 SmartMarket
 ├ apps
 │  ├ api             Fastify API
 │  └ web             Next.js frontend
 ├ packages
-│  ├ polymarket-sdk  Wrapper for Gamma + CLOB + Bridge
+│  ├ polymarket-sdk  Wrapper for Gamma, CLOB, and Bridge APIs
 │  ├ types           Shared types
 │  └ config          Shared config
 ├ infra
@@ -22,91 +24,52 @@ SmartMarket
 1. Install deps:
    - `npm install`
 2. Configure env:
-   - `cp /Users/0xhardhat/SmartMarket/apps/web/.env.example /Users/0xhardhat/SmartMarket/apps/web/.env`
-   - `cp /Users/0xhardhat/SmartMarket/apps/api/.env.example /Users/0xhardhat/SmartMarket/apps/api/.env`
+   - `cp apps/web/.env.example apps/web/.env`
+   - `cp apps/api/.env.example apps/api/.env`
+   - Add `NEXT_PUBLIC_PRIVY_APP_ID` in `apps/web/.env` before testing wallet login.
 3. Start API and web:
    - `npm -w @smartmarket/api run dev`
    - `npm -w @smartmarket/web run dev`
 
-## Agent API (x402 M2M)
+## Environment Notes
 
-This project is analysis-first. Polymarket is a market data source; Stellar x402 is the payment/auth rail.
+The app has two env files:
+
+- `apps/web/.env` controls browser-visible settings: `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_PRIVY_APP_ID`, `NEXT_PUBLIC_POLYMARKET_BUILDER_CODE`, and `NEXT_PUBLIC_ENABLE_KALSHI`.
+- `apps/api/.env` controls server settings: host/port, Polymarket upstream URLs, optional OpenAI analysis, optional Redis cache, and SQLite trading profile storage.
+
+Operational fallbacks:
+
+- `OPENAI_API_KEY` is optional. When it is missing or the OpenAI request fails, the analysis service returns a deterministic fallback brief instead of failing the API.
+- `REDIS_URL` is optional for local development. Cache reads/writes are wrapped so the API remains responsive if Redis is unavailable, but production deployments should run Redis for lower upstream load.
+- `TRADING_PROFILE_DB_PATH` should point to persistent storage in production. The default example uses `.data/trading-profiles.sqlite`.
+- `PAYMENT_RECEIVER_ADDRESS` must be your BNB wallet before premium analysis can collect payment.
+- `NEXT_PUBLIC_POLYMARKET_BUILDER_CODE` must be the bytes32 builder code from your Polymarket Builder Profile before orders receive builder attribution.
+
+## Analysis API
+
+Polymarket and Kalshi are market data sources. The analysis endpoint returns structured intelligence for a selected event.
 
 ### Endpoints
 
 - `GET /analysis/quote`
-  - Returns current x402 payment requirements.
-- `GET /analysis/payment-readiness?address=<stellarAddress>`
-  - Checks if account exists and whether USDC trustline is available.
+  - Returns a lightweight description of the analysis action.
 - `POST /analysis/unlock`
-  - User/agent unlock with x402 payment proof in header.
-- `POST /analysis/unlock-agent-paid`
-  - Dedicated machine-to-machine endpoint requiring x402 payment.
-- `POST /analysis/unlock-agent`
-  - Server-managed auto-pay path (demo/helper mode).
+  - Generates structured market intelligence for the supplied market payload.
 
-### Receipt payload returned after unlock
-
-```json
-{
-  "receipt": {
-    "id": "uuid",
-    "rail": "x402",
-    "network": "stellar:testnet",
-    "asset": "C...",
-    "amountAtomic": "500000",
-    "amountUsd": 0.05,
-    "payTo": "G...",
-    "payer": "G...",
-    "txHash": "....",
-    "settledAt": "2026-04-09T12:00:00.000Z"
-  }
-}
-```
-
-### Judge-friendly test flow
-
-1. Check readiness:
+### Example
 
 ```bash
-curl "http://localhost:4000/analysis/payment-readiness?address=G...."
-```
-
-2. Request quote:
-
-```bash
-curl "http://localhost:4000/analysis/quote"
-```
-
-3. Machine unlock with x402 SDK (Node script):
-
-```ts
-import { x402Client, x402HTTPClient } from "@x402/core/client";
-import { createEd25519Signer, ExactStellarScheme } from "@x402/stellar";
-
-const signer = createEd25519Signer(process.env.AGENT_SECRET!, "stellar:testnet");
-const client = new x402Client().register("stellar:*", new ExactStellarScheme(signer));
-const httpClient = new x402HTTPClient(client);
-
-const quoteRes = await fetch("http://localhost:4000/analysis/quote");
-const paymentRequired = await quoteRes.json();
-const paymentPayload = await httpClient.createPaymentPayload(paymentRequired);
-const signedHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
-
-const unlockRes = await fetch("http://localhost:4000/analysis/unlock-agent-paid", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    ...(signedHeaders as Record<string, string>)
-  },
-  body: JSON.stringify({
-    market: {
-      id: "m1",
-      question: "Will BTC close above $100k this year?",
-      outcomes: [{ name: "Yes", price: 54 }, { name: "No", price: 46 }]
+curl -X POST "http://localhost:4000/analysis/unlock" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "market": {
+      "id": "m1",
+      "question": "Will BTC close above $100k this year?",
+      "outcomes": [
+        { "name": "Yes", "price": 54 },
+        { "name": "No", "price": 46 }
+      ]
     }
-  })
-});
-
-console.log(await unlockRes.json());
+  }'
 ```
