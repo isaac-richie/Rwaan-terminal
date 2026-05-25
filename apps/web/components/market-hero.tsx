@@ -204,11 +204,17 @@ export function MarketHero() {
             onClick={() => goToMarket(activeMarket)}
             className="group relative flex-1 min-h-[220px] overflow-hidden text-left scanline"
           >
-            {/* Background image — scale on parent, not on img, to keep it crisp */}
+            {/* Background image
+                - object-contain keeps logos/icons fully visible instead of
+                  stretching them across the panel (which blurs small icons)
+                - Higher opacity (60%) so the image reads as a real image,
+                  not an invisible watermark
+                - Scale lives on the wrapper so the bitmap stays crisp */}
             {(activeMarket.image || activeMarket.icon) && (
               <div
                 key={activeMarket.id}
-                className="absolute inset-0 overflow-hidden opacity-35 transition-opacity duration-700 group-hover:opacity-45 group-hover:scale-105 transition-transform"
+                className="absolute inset-0 overflow-hidden transition-all duration-700 group-hover:scale-105"
+                style={{ opacity: 0.6 }}
               >
                 <Image
                   src={(activeMarket.image ?? activeMarket.icon) as string}
@@ -216,13 +222,14 @@ export function MarketHero() {
                   fill
                   priority
                   sizes="(max-width: 1024px) 100vw, 65vw"
-                  className="object-cover"
+                  className="object-contain"
+                  style={{ filter: "blur(0px)" }}
                 />
               </div>
             )}
 
-            {/* Layered overlay */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_0%,oklch(0.78_0.16_82/0.14),transparent_55%),linear-gradient(180deg,oklch(0.08_0.012_260/0.2)_0%,oklch(0.08_0.012_260/0.92)_100%)]" />
+            {/* Layered overlay — lightened bottom stop so the image shows through */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_0%,oklch(0.78_0.16_82/0.10),transparent_55%),linear-gradient(180deg,oklch(0.08_0.012_260/0.55)_0%,oklch(0.08_0.012_260/0.82)_100%)]" />
 
             {/* Amber glow line at top */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_82/0.6)] to-transparent" />
@@ -344,7 +351,7 @@ export function MarketHero() {
                               alt=""
                               fill
                               sizes="28px"
-                              className="object-cover"
+                              className="object-contain p-0.5"
                             />
                           ) : (
                             <Flame className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />

@@ -94,7 +94,8 @@ export function TradingCard({ market, index }: TradingCardProps) {
 
         {/* Zone 1: Image + Category + Title */}
         <div className="flex items-start gap-3">
-          {/* Scale applied to wrapper, never to the img — keeps bitmap crisp on GPU layer */}
+          {/* Scale on wrapper keeps the bitmap crisp; object-contain shows
+              full logo without cropping (market images are icons, not photos) */}
           <div className="relative h-11 w-11 rounded-xl bg-[oklch(0.16_0.014_255)] overflow-hidden flex-shrink-0 border border-[oklch(0.24_0.016_255)] group-hover:scale-105 transition-transform duration-500">
             {(market.image || market.icon) && !imgError ? (
               <Image
@@ -102,7 +103,7 @@ export function TradingCard({ market, index }: TradingCardProps) {
                 alt=""
                 fill
                 sizes="44px"
-                className="object-cover"
+                className="object-contain p-1"
                 onError={() => setImgError(true)}
               />
             ) : (
