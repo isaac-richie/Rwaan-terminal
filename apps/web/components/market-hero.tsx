@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import {
   ArrowUpRight,
@@ -203,14 +204,21 @@ export function MarketHero() {
             onClick={() => goToMarket(activeMarket)}
             className="group relative flex-1 min-h-[220px] overflow-hidden text-left scanline"
           >
-            {/* Background image */}
+            {/* Background image — scale on parent, not on img, to keep it crisp */}
             {(activeMarket.image || activeMarket.icon) && (
-              <img
+              <div
                 key={activeMarket.id}
-                src={activeMarket.image ?? activeMarket.icon}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover opacity-35 transition-all duration-700 group-hover:scale-105 group-hover:opacity-45"
-              />
+                className="absolute inset-0 overflow-hidden opacity-35 transition-opacity duration-700 group-hover:opacity-45 group-hover:scale-105 transition-transform"
+              >
+                <Image
+                  src={(activeMarket.image ?? activeMarket.icon) as string}
+                  alt=""
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 65vw"
+                  className="object-cover"
+                />
+              </div>
             )}
 
             {/* Layered overlay */}
@@ -329,9 +337,15 @@ export function MarketHero() {
                         onClick={() => goToMarket(market)}
                         className="flex w-[260px] items-center gap-2.5 rounded-xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.13_0.013_255/0.9)] px-3 py-2 text-left transition hover:border-[oklch(0.78_0.16_82/0.30)] hover:bg-[oklch(0.15_0.014_255)] btn-press"
                       >
-                        <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-[oklch(0.20_0.015_255)] bg-[oklch(0.16_0.014_255)]">
+                        <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-[oklch(0.20_0.015_255)] bg-[oklch(0.16_0.014_255)]">
                           {market.image || market.icon ? (
-                            <img src={market.image ?? market.icon} alt="" className="h-full w-full object-cover" />
+                            <Image
+                              src={(market.image ?? market.icon) as string}
+                              alt=""
+                              fill
+                              sizes="28px"
+                              className="object-cover"
+                            />
                           ) : (
                             <Flame className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
                           )}

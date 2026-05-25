@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { BookmarkPlus, Clock, TrendingUp, Droplets, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -93,16 +94,16 @@ export function TradingCard({ market, index }: TradingCardProps) {
 
         {/* Zone 1: Image + Category + Title */}
         <div className="flex items-start gap-3">
-          <div className="relative h-11 w-11 rounded-xl bg-[oklch(0.16_0.014_255)] overflow-hidden flex-shrink-0 border border-[oklch(0.24_0.016_255)]">
+          {/* Scale applied to wrapper, never to the img — keeps bitmap crisp on GPU layer */}
+          <div className="relative h-11 w-11 rounded-xl bg-[oklch(0.16_0.014_255)] overflow-hidden flex-shrink-0 border border-[oklch(0.24_0.016_255)] group-hover:scale-105 transition-transform duration-500">
             {(market.image || market.icon) && !imgError ? (
-              <img
-                src={market.image ?? market.icon}
+              <Image
+                src={(market.image ?? market.icon) as string}
                 alt=""
-                className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                fill
+                sizes="44px"
+                className="object-cover"
                 onError={() => setImgError(true)}
-                onLoad={(e) => {
-                  if ((e.target as HTMLImageElement).naturalWidth === 0) setImgError(true)
-                }}
               />
             ) : (
               <div

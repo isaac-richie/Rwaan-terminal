@@ -374,4 +374,16 @@
     from { opacity: 0; transform: translateX(-8px); }
     to   { opacity: 1; transform: translateX(0); }
   }
+
+  /* ─── Image sharpness ────────────────────────────────────────────────────
+     Prevents GPU compositor from blurring images when they are promoted to
+     their own layer (e.g. during scale/opacity transitions).
+     backface-visibility:hidden forces an independent composited layer that
+     is drawn at the image's natural pixel density rather than re-sampled. */
+  img,
+  [data-image-sharp] {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
 }
