@@ -1,8 +1,24 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json package-lock.json ./
+
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY apps/api/package.json ./apps/api/package.json
+COPY packages/config/package.json ./packages/config/package.json
+COPY packages/polymarket-sdk/package.json ./packages/polymarket-sdk/package.json
+COPY packages/types/package.json ./packages/types/package.json
+RUN npm ci
+
 COPY apps/api ./apps/api
 COPY packages ./packages
-RUN npm install --omit=dev
+RUN npm -w @smartmarket/types run build \
+  && npm -w @smartmarket/config run build \
+  && npm -w @smartmarket/polymarket-sdk run build \
+  && npm -w @smartmarket/api run build \
+  && npm prune --omit=dev
+
+ENV NODE_ENV=production
+ENV PORT=4000
+ENV HOST=0.0.0.0
+
 WORKDIR /app/apps/api
 CMD ["node", "dist/index.js"]

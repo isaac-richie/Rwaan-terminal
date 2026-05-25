@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Award, BarChart3, CheckCircle2, ChevronRight, Crown, Lock, Sparkles, Star, Target, TrendingUp, Trophy, Users, Zap } from "lucide-react";
-import { useWallets } from "@privy-io/react-auth";
+import { AlertTriangle, Award, BarChart3, CheckCircle2, ChevronRight, Copy, Crown, Loader2, Lock, Sparkles, Star, Target, TrendingUp, Trophy, Users, Wallet, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { Footer } from "@/components/footer";
+import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
 import { Navbar } from "@/components/navbar";
+import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet";
+import { usePolymarketDepositWallet } from "@/hooks/use-polymarket-deposit-wallet";
+import { useReferral } from "@/hooks/use-referral";
+import { useTradeReadiness } from "@/hooks/use-trade-readiness";
+import { useTradingProfile } from "@/hooks/use-trading-profile";
 import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -48,15 +54,15 @@ const TIERS = [
     min: 7500,
     max: Infinity,
     icon: Crown,
-    perks: ["Revenue share access", "Direct Rawali builder rewards", "Oracle badge + early features"],
+    perks: ["Revenue share access", "Direct Rawli builder rewards", "Oracle badge + early features"],
   },
 ];
 
 const EARNING_METHODS = [
   {
     icon: BarChart3,
-    title: "Trade on Rawali-routed markets",
-    detail: "Earn 1 point per $1 notional traded through Rawali CLOB routes.",
+    title: "Trade on Rawli-routed markets",
+    detail: "Earn 1 point per $1 notional traded through Rawli CLOB routes.",
     pts: "+1 pt / $1",
     color: "oklch(0.68_0.18_155)",
   },
@@ -70,8 +76,8 @@ const EARNING_METHODS = [
   {
     icon: Users,
     title: "Referrals",
-    detail: "Refer a wallet that executes its first trade through Rawali.",
-    pts: "+100 pts",
+    detail: "Refer a wallet that executes its first trade through Rawli.",
+    pts: "+500 pts",
     color: "oklch(0.72_0.22_45)",
   },
   {
@@ -83,13 +89,13 @@ const EARNING_METHODS = [
   },
 ];
 
-const LEADERBOARD_MOCK = [
-  { rank: 1, address: "0x3a9f...d21c", pts: 12440, tier: "Oracle", badge: Crown },
-  { rank: 2, address: "0x7c1e...90ab", pts: 9810, tier: "Oracle", badge: Crown },
-  { rank: 3, address: "0xb42d...ff03", pts: 7820, tier: "Oracle", badge: Crown },
-  { rank: 4, address: "0x14ac...3318", pts: 5500, tier: "Strategist", badge: TrendingUp },
-  { rank: 5, address: "0x89ff...aa72", pts: 3920, tier: "Strategist", badge: TrendingUp },
-];
+
+type LeaderboardRow = {
+  rank: number;
+  wallet: string;
+  points: number;
+  tier: string;
+};
 
 type PointsSummary = {
   wallet: string;
@@ -201,14 +207,29 @@ function TierCard({ tier, current = false }: { tier: (typeof TIERS)[0]; current?
 
 export default function PointsPage() {
   const [showAll, setShowAll] = useState(false);
-  const { wallets } = useWallets();
-  const connectedWallet = wallets[0]?.address ?? null;
+  const { walletAddress: connectedWalletAddress, wallet: connectedWallet } = useActivePrivyWallet();
+  const polymarketDepositWallet = usePolymarketDepositWallet(connectedWallet);
+  const profileConnectedWalletAddress = connectedWalletAddress && polymarketDepositWallet.address ? connectedWalletAddress : null;
+  const tradingProfile = useTradingProfile(
+    profileConnectedWalletAddress,
+    polymarketDepositWallet.address,
+    polymarketDepositWallet.address ? "deposit" : undefined
+  );
+  const readiness = useTradeReadiness({ connectedWalletAddress, profile: tradingProfile.profile });
+  const collateral = readiness.readiness?.collateral ?? null;
+  const depositAddress = tradingProfile.profile?.depositAddress?.evm ?? null;
+  const { stats: referralStats, referralLink } = useReferral(connectedWalletAddress);
   const [summary, setSummary] = useState<PointsSummary | null>(null);
   const [quests, setQuests] = useState<QuestSnapshot[]>(DEFAULT_QUESTS);
   const [questResetAt, setQuestResetAt] = useState<string | null>(null);
+  const [pointsLoading, setPointsLoading] = useState(false);
+  const [pointsError, setPointsError] = useState<string | null>(null);
+  const [fundingOpen, setFundingOpen] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[] | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
   useEffect(() => {
-    if (!connectedWallet) {
+    if (!connectedWalletAddress) {
       setSummary(null);
       setQuests(DEFAULT_QUESTS);
       setQuestResetAt(null);
@@ -216,10 +237,12 @@ export default function PointsPage() {
     }
 
     let alive = true;
+    setPointsLoading(true);
+    setPointsError(null);
     Promise.all([
-      fetch(`${API_BASE}/points/summary/${connectedWallet}`, { headers: { Accept: "application/json" } })
+      fetch(`${API_BASE}/points/summary/${connectedWalletAddress}`, { headers: { Accept: "application/json" } })
         .then((res) => (res.ok ? res.json() : null)),
-      fetch(`${API_BASE}/points/quests/${connectedWallet}`, { headers: { Accept: "application/json" } })
+      fetch(`${API_BASE}/points/quests/${connectedWalletAddress}`, { headers: { Accept: "application/json" } })
         .then((res) => (res.ok ? res.json() : null)),
     ])
       .then(([summaryData, questData]) => {
@@ -233,12 +256,40 @@ export default function PointsPage() {
         setSummary(null);
         setQuests(DEFAULT_QUESTS);
         setQuestResetAt(null);
+        setPointsError("Could not load points data. Check your connection and try refreshing.");
+      })
+      .finally(() => {
+        if (alive) setPointsLoading(false);
       });
 
     return () => {
       alive = false;
     };
-  }, [connectedWallet]);
+  }, [connectedWalletAddress]);
+
+  // Fetch leaderboard once on mount (cached server-side for 5 min)
+  useEffect(() => {
+    let alive = true;
+    setLeaderboardLoading(true);
+    fetch(`${API_BASE}/points/leaderboard`, { headers: { Accept: "application/json" } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!alive) return;
+        if (Array.isArray(data?.leaderboard)) {
+          setLeaderboard(
+            data.leaderboard.map((row: any, i: number) => ({
+              rank: i + 1,
+              wallet: row.wallet as string,
+              points: Number(row.points),
+              tier: row.tier as string,
+            }))
+          );
+        }
+      })
+      .catch(() => {/* leaderboard is non-critical */})
+      .finally(() => { if (alive) setLeaderboardLoading(false); });
+    return () => { alive = false; };
+  }, []);
 
   const totalPoints = summary?.totalPoints ?? 0;
   const currentTier = useMemo(() => tierForPoints(totalPoints), [totalPoints]);
@@ -262,13 +313,13 @@ export default function PointsPage() {
         <section className="pt-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.08)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.20em] text-[oklch(0.82_0.16_82)]">
             <Award className="h-3 w-3" />
-            Rawali Points — Season 1
+            Rawli Points — Season 1
           </div>
           <h1 className="mt-5 max-w-3xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
             Edge compounds over time.
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-            Rawali Points reward traders who move early, trade smart, and unlock intelligence. Stack points across seasons to climb tiers and unlock builder-level rewards.
+            Rawli Points reward traders who move early, trade smart, and unlock intelligence. Stack points across seasons to climb tiers and unlock builder-level rewards.
           </p>
         </section>
 
@@ -284,7 +335,7 @@ export default function PointsPage() {
               >
                 <CurrentTierIcon className="h-2.5 w-2.5" /> {currentTier.name}
               </div>
-              <span className="text-[11px] text-muted-foreground">{connectedWallet ? "Tracking live" : "Connect wallet"}</span>
+              <span className="text-[11px] text-muted-foreground">{connectedWalletAddress ? "Tracking live" : "Connect wallet"}</span>
             </div>
 
             <div className="mt-6">
@@ -298,10 +349,19 @@ export default function PointsPage() {
             </div>
 
             <div className="mt-5 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.65)] p-3 text-[11px] leading-5 text-muted-foreground">
-              {connectedWallet
+              {connectedWalletAddress
                 ? `Cashback credits accrued: ${formatCashback(summary?.cashbackCents ?? 0)}. Credits are pre-season rewards until claims open.`
                 : "Connect your wallet and execute your first trade to begin earning Season 1 points."}
             </div>
+            <button
+              type="button"
+              onClick={() => setFundingOpen(true)}
+              disabled={!connectedWalletAddress || tradingProfile.loading || !tradingProfile.profile}
+              className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[oklch(0.78_0.16_82)] px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-40"
+            >
+              <Wallet className="h-3.5 w-3.5" />
+              {connectedWalletAddress ? "Fund account" : "Connect to fund"}
+            </button>
           </div>
 
           {/* Countdown / Status */}
@@ -349,12 +409,23 @@ export default function PointsPage() {
           </div>
         </section>
 
+        {/* Points fetch error */}
+        {pointsError && (
+          <div className="mt-6 flex items-start gap-3 rounded-xl border border-[oklch(0.58_0.2_25/0.3)] bg-[oklch(0.58_0.2_25/0.07)] px-4 py-3 text-[12px] text-[oklch(0.74_0.14_25)]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{pointsError}</span>
+          </div>
+        )}
+
         {/* Daily Quests */}
         <section className="mt-10">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-muted-foreground">Daily quests</div>
-              <h2 className="mt-1.5 text-2xl font-bold text-foreground">Small actions. Daily rewards.</h2>
+            <div className="flex items-center gap-2">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-muted-foreground">Daily quests</div>
+                <h2 className="mt-1.5 text-2xl font-bold text-foreground">Small actions. Daily rewards.</h2>
+              </div>
+              {pointsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-5" />}
             </div>
             <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] px-3 py-2 text-[11px] font-semibold text-muted-foreground">
               <Target className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
@@ -492,9 +563,17 @@ export default function PointsPage() {
               <span>Points</span>
             </div>
 
-            {(showAll ? LEADERBOARD_MOCK : LEADERBOARD_MOCK.slice(0, 3)).map((row) => {
-              const TierBadge = row.badge;
-              const tierData = TIERS.find((t) => t.name === row.tier)!;
+            {leaderboardLoading && (
+              <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading leaderboard…
+              </div>
+            )}
+
+            {!leaderboardLoading && leaderboard && leaderboard.length > 0 && (showAll ? leaderboard : leaderboard.slice(0, 3)).map((row) => {
+              const tierData = TIERS.find((t) => t.name === row.tier) ?? TIERS[0];
+              const TierBadge = tierData.icon;
+              const shortWallet = `${row.wallet.slice(0, 6)}…${row.wallet.slice(-4)}`;
               return (
                 <div
                   key={row.rank}
@@ -515,7 +594,7 @@ export default function PointsPage() {
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[oklch(0.24_0.016_255)] bg-[oklch(0.15_0.014_255)]">
                       <TierBadge className="h-3 w-3" style={{ color: tierData.color }} />
                     </div>
-                    <span className="font-mono text-sm text-foreground truncate">{row.address}</span>
+                    <span className="font-mono text-sm text-foreground truncate">{shortWallet}</span>
                   </div>
                   <span
                     className="rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest"
@@ -524,15 +603,83 @@ export default function PointsPage() {
                     {row.tier}
                   </span>
                   <span className="font-mono text-sm font-bold text-foreground tabular-nums">
-                    {row.pts.toLocaleString()}
+                    {row.points.toLocaleString()}
                   </span>
                 </div>
               );
             })}
 
-            <div className="flex items-center justify-center gap-2 border-t border-[oklch(0.18_0.014_255)] py-4 text-xs text-muted-foreground">
+            {!leaderboardLoading && (!leaderboard || leaderboard.length === 0) && (
+              <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
+                <Trophy className="h-3.5 w-3.5" />
+                No traders yet — be the first to earn points.
+              </div>
+            )}
+
+            <div className="flex items-center justify-center gap-2 border-t border-[oklch(0.18_0.014_255)] py-3 text-xs text-muted-foreground">
               <Lock className="h-3 w-3" />
-              Live leaderboard unlocks at Season 1 launch
+              Full season rankings lock in at Season 1 launch
+            </div>
+          </div>
+        </section>
+
+        {/* Referral Programme */}
+        <section className="mt-10">
+          <div className="mb-5">
+            <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-muted-foreground">Referral programme</div>
+            <h2 className="mt-1.5 text-2xl font-bold text-foreground">Earn 500 points per trader you bring in.</h2>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Invite link */}
+            <div className="surface-card rounded-2xl p-5">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground mb-3">
+                <Users className="h-3.5 w-3.5 text-[oklch(0.72_0.22_45)]" />
+                Your referral link
+              </div>
+              {connectedWalletAddress && referralLink ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.013_255)] px-3 py-2.5">
+                    <p className="font-mono text-[11px] text-muted-foreground truncate">{referralLink}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(referralLink);
+                      toast.success("Referral link copied!");
+                    }}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.013_255)] hover:border-[oklch(0.78_0.16_82/0.4)] transition-colors shrink-0"
+                  >
+                    <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[12px] text-muted-foreground">Connect your wallet to generate your referral link.</p>
+              )}
+              <p className="mt-3 text-[11px] text-muted-foreground leading-5">
+                Share this link. When a referred wallet completes its first trade through Rawli, you earn <span className="text-[oklch(0.78_0.16_82)] font-semibold">+500 points</span>.
+              </p>
+            </div>
+
+            {/* Referral stats */}
+            <div className="surface-card rounded-2xl p-5">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground mb-4">
+                <Trophy className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
+                Your referrals
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: "Total referred", value: referralStats?.totalReferrals ?? "—" },
+                  { label: "Rewarded", value: referralStats?.rewardedReferrals ?? "—" },
+                  { label: "Pending", value: referralStats?.pendingReferrals ?? "—" },
+                ].map((stat) => (
+                  <div key={stat.label} className="rounded-xl border border-[oklch(0.20_0.014_255)] bg-[oklch(0.13_0.013_255)] p-3 text-center">
+                    <div className="font-mono text-2xl font-bold text-foreground">{stat.value}</div>
+                    <div className="mt-1 text-[9px] uppercase tracking-[0.12em] text-muted-foreground">{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground leading-5">
+                Rewards credit when a referred wallet executes its first Rawli-routed trade.
+              </p>
             </div>
           </div>
         </section>
@@ -544,7 +691,7 @@ export default function PointsPage() {
               <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-[oklch(0.82_0.16_82)]">Start earning now</div>
               <h2 className="mt-2 text-xl font-bold text-foreground">Pre-season trades count retroactively.</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Every trade you execute through Rawali before Season 1 launches will be counted toward your founding snapshot.
+                Every trade you execute through Rawli before Season 1 launches will be counted toward your founding snapshot.
               </p>
             </div>
             <a
@@ -558,6 +705,24 @@ export default function PointsPage() {
         </section>
 
       </main>
+      <BnbFundingModal
+        open={fundingOpen}
+        onOpenChange={setFundingOpen}
+        initialTab="deposit"
+        profile={tradingProfile.profile}
+        depositAddress={depositAddress}
+        loadingDeposit={tradingProfile.depositLoading}
+        onCreateDepositAddress={tradingProfile.createDepositAddress}
+        wallet={connectedWallet}
+        collateralBalance={collateral?.balance ?? null}
+        collateralAllowance={collateral?.allowance ?? null}
+        collateralSessionReady={Boolean(collateral)}
+        onRefreshCollateralBalance={readiness.refresh}
+        onFundingSent={() => {
+          void tradingProfile.refresh();
+          void readiness.refresh();
+        }}
+      />
       <Footer />
     </div>
   );

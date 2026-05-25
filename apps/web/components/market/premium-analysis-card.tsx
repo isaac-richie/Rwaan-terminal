@@ -15,7 +15,8 @@ import {
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { usePrivy, useWallets } from "@privy-io/react-auth"
+import { usePrivy } from "@privy-io/react-auth"
+import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet"
 import { usePremiumAnalysis } from "@/hooks/use-premium-analysis"
 import type { PremiumAnalysis } from "@smartmarket/types"
 
@@ -277,7 +278,7 @@ function UnlockedState({ analysis }: { analysis: PremiumAnalysis }) {
 
 export function PremiumAnalysisCard({ market }: PremiumAnalysisCardProps) {
   const { login, authenticated } = usePrivy()
-  const { wallets } = useWallets()
+  const activePrivyWallet = useActivePrivyWallet()
   const { status, analysis, unlockAnalysis } = usePremiumAnalysis(market.id)
 
   const handleUnlock = async () => {
@@ -285,7 +286,7 @@ export function PremiumAnalysisCard({ market }: PremiumAnalysisCardProps) {
       login()
       return
     }
-    const wallet = wallets[0]
+    const wallet = activePrivyWallet.wallet
     if (!wallet) return
     await unlockAnalysis(market, wallet)
   }

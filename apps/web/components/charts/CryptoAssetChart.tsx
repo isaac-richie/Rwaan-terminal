@@ -49,12 +49,12 @@ function formatUsd(value?: number | null) {
   if (!Number.isFinite(value ?? NaN)) return "$--";
   const price = Number(value);
   if (price >= 1000) {
-    return price.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+    return price.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   }
   if (price >= 1) {
-    return price.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+    return price.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
   }
-  return price.toLocaleString(undefined, { style: "currency", currency: "USD", maximumSignificantDigits: 4 });
+  return price.toLocaleString("en-US", { style: "currency", currency: "USD", maximumSignificantDigits: 4 });
 }
 
 function formatPct(value?: number | null) {
@@ -221,14 +221,16 @@ export function CryptoAssetChart({ asset, marketTitle }: { asset: CryptoAsset; m
             </div>
           </div>
 
-          <div className="grid min-w-[170px] grid-cols-2 gap-2 sm:text-right">
-            <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-3">
+          <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:w-auto sm:min-w-[210px] sm:text-right">
+            <div className="min-w-0 rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 px-2.5 py-3">
               <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Spot</div>
-              <div className="mt-1 font-mono text-lg font-bold text-foreground">{formatUsd(payload?.currentPrice)}</div>
+              <div className="mt-1 max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[clamp(0.95rem,1.2vw,1.125rem)] font-bold tabular-nums text-foreground">
+                {formatUsd(payload?.currentPrice)}
+              </div>
             </div>
-            <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-3">
+            <div className="min-w-0 rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 px-2.5 py-3">
               <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{range}</div>
-              <div className={cn("mt-1 font-mono text-lg font-bold", isUp ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.62_0.18_25)]")}>
+              <div className={cn("mt-1 max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[clamp(0.95rem,1.2vw,1.125rem)] font-bold tabular-nums", isUp ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.62_0.18_25)]")}>
                 {formatPct(payload?.changePct)}
               </div>
             </div>

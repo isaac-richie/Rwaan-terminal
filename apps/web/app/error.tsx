@@ -13,7 +13,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     // Surface to monitoring (Sentry/Vercel) when wired up
-    console.error("[Rawali] Unhandled error:", error);
+    console.error("[Rawli] Unhandled error:", error);
   }, [error]);
 
   return (

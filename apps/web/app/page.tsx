@@ -59,7 +59,7 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
       <HomeContent />
     </Suspense>
   )

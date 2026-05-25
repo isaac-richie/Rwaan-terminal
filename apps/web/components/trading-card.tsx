@@ -106,11 +106,15 @@ export function TradingCard({ market, index }: TradingCardProps) {
               />
             ) : (
               <div
-                className="h-full w-full"
+                className="h-full w-full flex items-center justify-center"
                 style={{
-                  background: `linear-gradient(135deg, oklch(0.18 0.018 ${index * 37 % 360} / 1) 0%, oklch(0.24 0.026 ${(index * 37 + 70) % 360} / 1) 100%)`,
+                  background: `linear-gradient(135deg, oklch(0.38 0.12 ${(index * 47) % 360}) 0%, oklch(0.28 0.10 ${(index * 47 + 80) % 360}) 100%)`,
                 }}
-              />
+              >
+                <span className="text-[13px] font-black text-white/70 select-none">
+                  {(market.question ?? market.category ?? "?").charAt(0).toUpperCase()}
+                </span>
+              </div>
             )}
           </div>
 

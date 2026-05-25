@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"
+const GEOBLOCK_GATE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_POLYMARKET_GEOBLOCK === "true"
 
 type GeoblockState = {
   /** true = user is in a restricted region */
@@ -18,9 +19,15 @@ const CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes — recheck after tab is idle
 export function useGeoblock(): GeoblockState {
   const [blocked, setBlocked] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(GEOBLOCK_GATE_ENABLED)
 
   useEffect(() => {
+    if (!GEOBLOCK_GATE_ENABLED) {
+      setBlocked(false)
+      setLoading(false)
+      return
+    }
+
     // Use cached result if recent
     if (_cached && Date.now() - _cached.ts < CACHE_TTL_MS) {
       setBlocked(_cached.blocked)

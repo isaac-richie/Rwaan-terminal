@@ -117,7 +117,7 @@ export async function fetchKalshiMarkets(
 
     return flattened.slice(offset, offset + limit)
   } catch (error) {
-    console.error("[rawali] Kalshi fetch error:", error)
+    console.error("[rawli] Kalshi fetch error:", error)
     return []
   }
 }

@@ -1,10 +1,18 @@
-import { recordRewardEvent } from "./db.js";
+import { recordRewardEvent, getTotalTradeCount, getReferrerForReferee, markReferralRewarded } from "./db.js";
 import type { RewardEventRow } from "./db.js";
 
 const PREMIUM_UNLOCK_POINTS = 25;
 const PREMIUM_UNLOCK_CASHBACK_CENTS = 5;
 const TRADE_CASHBACK_BPS = 25;
 const MAX_TRADE_CASHBACK_CENTS = 100;
+const REFERRAL_POINTS = 500;
+
+/**
+ * Season 1 has not launched. Set this to the actual launch timestamp (ISO string)
+ * when Season 1 goes live. All trades before this date are early-adopter trades.
+ * null = Season 1 not launched yet → every trade is currently pre-season.
+ */
+const SEASON_1_LAUNCH_DATE: string | null = null;
 
 export type TradeRewardInput = {
   wallet: string;
@@ -16,19 +24,27 @@ export type TradeRewardInput = {
   premium?: boolean;
 };
 
+function isEarlyAdopter(): boolean {
+  if (!SEASON_1_LAUNCH_DATE) return true; // Season 1 not launched yet — all trades are pre-season
+  return new Date().toISOString() < SEASON_1_LAUNCH_DATE;
+}
+
 export function tradeReward(input: TradeRewardInput) {
   const amountUsd = Math.max(0, Number(input.amountUsd) || 0);
   const basePoints = Math.floor(amountUsd);
   const quickBonus = input.quickSettle ? 15 : 0;
   const cryptoBonus = input.crypto ? Math.ceil(basePoints * 0.25) : 0;
   const premiumBonus = input.premium ? 10 : 0;
-  const points = Math.max(1, basePoints + quickBonus + cryptoBonus + premiumBonus);
+  const earlyAdopter = isEarlyAdopter();
+  // Early adopter 2× applies to base points only (not the flat bonuses)
+  const multipliedBase = earlyAdopter ? basePoints * 2 : basePoints;
+  const points = Math.max(1, multipliedBase + quickBonus + cryptoBonus + premiumBonus);
   const cashbackCents = Math.min(
     MAX_TRADE_CASHBACK_CENTS,
     Math.floor((amountUsd * 100 * TRADE_CASHBACK_BPS) / 10_000),
   );
 
-  return { points, cashbackCents, amountUsd };
+  return { points, cashbackCents, amountUsd, earlyAdopter };
 }
 
 export async function recordTradeReward(input: TradeRewardInput): Promise<void> {
@@ -46,8 +62,43 @@ export async function recordTradeReward(input: TradeRewardInput): Promise<void> 
       quickSettle: Boolean(input.quickSettle),
       crypto: Boolean(input.crypto),
       premium: Boolean(input.premium),
+      earlyAdopter: reward.earlyAdopter,
     },
   });
+
+  // After recording, check if this was the wallet's very first trade.
+  // If it was, and if they were referred, fire the referral reward for their referrer.
+  void triggerReferralRewardIfFirstTrade(input.wallet);
+}
+
+/**
+ * Called after every trade reward is recorded.
+ * If the wallet has exactly 1 trade event (the one just recorded) and was referred,
+ * award REFERRAL_POINTS to the referrer and mark the referral as rewarded.
+ * Fire-and-forget — never throws.
+ */
+async function triggerReferralRewardIfFirstTrade(wallet: string): Promise<void> {
+  try {
+    const tradeCount = await getTotalTradeCount(wallet);
+    if (tradeCount !== 1) return; // Not the first trade
+
+    const referrer = await getReferrerForReferee(wallet);
+    if (!referrer) return; // Not referred
+
+    await markReferralRewarded(wallet);
+    await recordRewardEvent({
+      wallet: referrer,
+      eventType: "referral_reward",
+      idempotencyKey: `referral:${wallet}`,
+      points: REFERRAL_POINTS,
+      cashbackCents: 0,
+      amountUsd: 0,
+      marketId: null,
+      metadata: { referee: wallet, source: "first_trade", earlyAdopter: isEarlyAdopter() },
+    });
+  } catch {
+    // Referral rewards are non-critical — never let them affect trade flow
+  }
 }
 
 export async function recordPremiumUnlockReward(input: {
@@ -117,7 +168,7 @@ export function buildDailyQuests(events: RewardEventRow[]): QuestSnapshot[] {
     {
       id: "daily_two_trades",
       title: "Place 2 trades today",
-      detail: "Build a small daily rhythm across any eligible Rawali-routed markets.",
+      detail: "Build a small daily rhythm across any eligible Rawli-routed markets.",
       reward: "+50 pts streak seed",
       progress: trades.length,
       target: 2,

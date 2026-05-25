@@ -25,7 +25,7 @@
   <g transform="translate(70 34)">
     <path d="M0 56 H1460" stroke="#232832"/>
     <path d="M0 34 C18 4 42 4 58 34 C74 64 98 64 116 34" fill="none" stroke="url(#logo)" stroke-width="13" stroke-linecap="round"/>
-    <text x="142" y="24" class="txt bold" font-size="22">Rawali <tspan class="gold">Analytic</tspan></text>
+    <text x="142" y="24" class="txt bold" font-size="22">Rawli <tspan class="gold">Analytic</tspan></text>
     <text x="142" y="43" class="txt muted tiny" letter-spacing="3">PREDICTION TERMINAL</text>
     <text x="420" y="34" class="txt muted small">Markets</text>
     <text x="500" y="34" class="txt muted small">Portfolio</text>
@@ -40,7 +40,7 @@
   </g>
 
   <g transform="translate(70 126)">
-    <text x="0" y="0" class="txt gold tiny bold">OPTION C - RECOMMENDED RAWALI-NATIVE HERO</text>
+    <text x="0" y="0" class="txt gold tiny bold">OPTION C - RECOMMENDED RAWLI-NATIVE HERO</text>
     <rect x="0" y="28" width="920" height="430" rx="20" fill="url(#card)" stroke="#2a2f3a" filter="url(#shadow)"/>
     <rect x="950" y="28" width="510" height="430" rx="20" fill="url(#card)" stroke="#2a2f3a" filter="url(#shadow)"/>
 

@@ -23,7 +23,7 @@ import {
   Unlock,
   Wallet,
 } from "lucide-react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy } from "@privy-io/react-auth";
 import type { TradePreviewResponse } from "@smartmarket/types";
 
 import { Navbar } from "@/components/navbar";
@@ -40,6 +40,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
+import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet";
 import { GasAssistButton } from "@/components/funding/gas-assist-button";
 import { useClobSession } from "@/hooks/use-clob-session";
 import { useDepositWalletApproval } from "@/hooks/use-deposit-wallet-approval";
@@ -162,6 +163,15 @@ function resolvesWithinHours(endDate: string | undefined, hours: number) {
   return diff >= 0 && diff <= hours * 60 * 60 * 1000;
 }
 
+function hasPremiumAnalysisCached(marketId: string | null | undefined): boolean {
+  if (!marketId || typeof window === "undefined") return false;
+  try {
+    return Boolean(localStorage.getItem(`smartmarket:premium:${marketId}`));
+  } catch {
+    return false;
+  }
+}
+
 async function recordTradeRewardEvent(input: {
   wallet: string | null;
   orderId?: string | null;
@@ -169,6 +179,7 @@ async function recordTradeRewardEvent(input: {
   amountUsd: number;
   quickSettle: boolean;
   crypto: boolean;
+  premium?: boolean;
 }) {
   if (!input.wallet || !input.marketId || !input.orderId || input.amountUsd <= 0) return;
   try {
@@ -182,6 +193,7 @@ async function recordTradeRewardEvent(input: {
         amountUsd: input.amountUsd,
         quickSettle: input.quickSettle,
         crypto: input.crypto,
+        premium: input.premium ?? false,
       }),
     });
   } catch {
@@ -280,7 +292,7 @@ function collateralGate(balanceAllowance: { balance: string; allowance: string }
       ready: false,
       needsApproval: false,
       needsFunding: false,
-      message: "Prepare the CLOB session so Rawali can check pUSD balance and allowance.",
+      message: "Prepare the CLOB session so Rawli can check pUSD balance and allowance.",
     };
   }
 
@@ -309,7 +321,7 @@ function positionTokenGate(balanceAllowance: { balance: string; allowance: strin
       ready: false,
       needsApproval: false,
       needsFunding: false,
-      message: "Prepare the CLOB session so Rawali can check your position balance and sell allowance.",
+      message: "Prepare the CLOB session so Rawli can check your position balance and sell allowance.",
     };
   }
 
@@ -362,7 +374,7 @@ export default function MarketDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { ready, authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
+  const activePrivyWallet = useActivePrivyWallet();
   const marketId = Array.isArray(params?.id) ? params?.id[0] : params?.id;
 
   const [market, setMarket] = useState<MarketDetail | null>(null);
@@ -387,8 +399,8 @@ export default function MarketDetailPage() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [tradePreview, setTradePreview] = useState<TradePreviewResponse | null>(null);
 
-  const connectedWalletAddress = authenticated ? wallets?.[0]?.address ?? null : null;
-  const connectedWallet = authenticated ? wallets?.[0] ?? null : null;
+  const connectedWalletAddress = activePrivyWallet.walletAddress;
+  const connectedWallet = activePrivyWallet.wallet;
   const polymarketDepositWallet = usePolymarketDepositWallet(connectedWallet);
   const profileConnectedWalletAddress = connectedWalletAddress && polymarketDepositWallet.address ? connectedWalletAddress : null;
   const tradingProfile = useTradingProfile(
@@ -505,7 +517,7 @@ export default function MarketDetailPage() {
   useEffect(() => {
     setTradePreview(null);
     setPreviewError(null);
-  }, [marketId, orderAmount, selectedOutcomeIdx, tradeSide, orderType, limitPrice, activePrice]);
+  }, [marketId, orderAmount, selectedOutcomeIdx, tradeSide, orderType, limitPrice]);
   const amountNumber = Number(orderAmount) || 0;
   const previewShares = tradePreview?.estimatedShares ?? null;
   const previewFilledAmount = tradePreview?.filledAmountUsd ?? amountNumber;
@@ -643,6 +655,11 @@ export default function MarketDetailPage() {
     signingOrder ||
     (requiresCollateral && !tradeCollateralGate.ready) ||
     (requiresPositionApproval && !tradePositionGate.ready);
+  const tradeActionBusy =
+    previewLoading ||
+    signingOrder ||
+    clobSession.status === "preparing" ||
+    clobSession.submitStatus === "submitting";
   const cancelTargetOrder = useMemo(
     () => clobSession.openOrders.find((order) => order.id === cancelOrderId) ?? null,
     [clobSession.openOrders, cancelOrderId]
@@ -692,7 +709,10 @@ export default function MarketDetailPage() {
 
     if (status === "MATCHED") {
       const orderSide = clobSession.signedOrderPreview?.side ?? "BUY";
-      const outcome = clobSession.signedOrderPreview?.tokenId === activeTokenId ? activeOutcomeName : activeOutcomeName;
+      // Derive the outcome name from the order's token ID (handles orders signed for the non-active outcome)
+      const previewTokenId = clobSession.signedOrderPreview?.tokenId;
+      const outcomeIdx = previewTokenId ? (market?.tokenIds?.indexOf(previewTokenId) ?? -1) : -1;
+      const outcome = outcomeIdx >= 0 ? (market?.outcomes?.[outcomeIdx] ?? activeOutcomeName) : activeOutcomeName;
       toast.success(`${orderSide === "BUY" ? "Buy" : "Sell"} order filled!`, {
         description: `Your ${outcome} position was matched on the CLOB · ${orderId.slice(0, 8)}…`,
         duration: 8000,
@@ -730,7 +750,6 @@ export default function MarketDetailPage() {
 
   const handlePreviewTrade = async () => {
     setPreviewError(null);
-    setTradePreview(null);
 
     if (!activeTokenId) {
       setPreviewError("Selected outcome is missing a CLOB token.");
@@ -739,6 +758,11 @@ export default function MarketDetailPage() {
 
     if (!amountNumber || amountNumber <= 0) {
       setPreviewError("Enter an amount above zero.");
+      return;
+    }
+
+    if (amountNumber < 1) {
+      setPreviewError("Minimum order size is $1.00.");
       return;
     }
 
@@ -883,11 +907,12 @@ export default function MarketDetailPage() {
         address: tradingWalletAddress,
       });
       const side = clobSession.signedOrderPreview?.side ?? "BUY";
+      // Always clear the signed order preview to prevent stale re-submissions
+      clobSession.clearSignedOrderPreview();
       if (side === "SELL") {
         setOrderAmount("");
         setTradePreview(null);
         setPreviewError(null);
-        clobSession.clearSignedOrderPreview();
         if (marketId) router.replace(`/markets/${encodeURIComponent(String(marketId))}`, { scroll: false });
       }
       const orderId = submission.orderId ? ` · ${submission.orderId.slice(0, 8)}…` : "";
@@ -898,6 +923,7 @@ export default function MarketDetailPage() {
         amountUsd: amountNumber,
         quickSettle: resolvesWithinHours(market?.endsAt, 24),
         crypto: Boolean(cryptoAsset),
+        premium: hasPremiumAnalysisCached(market?.id ?? marketId),
       });
       toast.success(`${side === "BUY" ? "Buy" : "Sell"} order submitted${orderId}`, {
         description: submission.takingAmount
@@ -1078,7 +1104,10 @@ export default function MarketDetailPage() {
 
           {/* Right: Trade Panel */}
           <div className="lg:col-span-4">
-            <div className="surface-card rounded-2xl p-4 sm:p-5 lg:sticky lg:top-24 space-y-4">
+            <div
+              className="surface-card rounded-2xl p-4 sm:p-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain space-y-4"
+              style={{ overflowAnchor: "none" }}
+            >
               {/* Header + Buy/Sell toggle */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1086,8 +1115,9 @@ export default function MarketDetailPage() {
                   <div className="flex rounded-lg border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] p-0.5">
                     <button
                       onClick={() => setTradeSide("buy")}
+                      disabled={tradeActionBusy}
                       className={cn(
-                        "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                        "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-60",
                         tradeSide === "buy"
                           ? "bg-[oklch(0.68_0.18_155/0.18)] text-[oklch(0.68_0.18_155)] shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
@@ -1097,8 +1127,9 @@ export default function MarketDetailPage() {
                     </button>
                     <button
                       onClick={() => setTradeSide("sell")}
+                      disabled={tradeActionBusy}
                       className={cn(
-                        "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                        "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-60",
                         tradeSide === "sell"
                           ? "bg-[oklch(0.58_0.2_25/0.18)] text-[oklch(0.62_0.18_25)] shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
@@ -1202,8 +1233,9 @@ export default function MarketDetailPage() {
                     <button
                       key={i}
                       onClick={() => setSelectedOutcomeIdx(i)}
+                      disabled={tradeActionBusy}
                       className={cn(
-                        "rounded-xl border p-3.5 text-left transition-all",
+                        "rounded-xl border p-3.5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-70",
                         selectedOutcomeIdx === i
                           ? tradeSide === "buy"
                             ? "border-[oklch(0.68_0.18_155/0.55)] bg-[oklch(0.68_0.18_155/0.12)] shadow-[0_0_12px_oklch(0.68_0.18_155/0.1)]"
@@ -1280,8 +1312,9 @@ export default function MarketDetailPage() {
                   <input
                     value={orderAmount}
                     onChange={(e) => setOrderAmount(e.target.value)}
+                    disabled={tradeActionBusy}
                     inputMode="decimal"
-                    className="h-10 flex-1 bg-transparent outline-none text-sm font-semibold text-foreground"
+                    className="h-10 flex-1 bg-transparent outline-none text-sm font-semibold text-foreground disabled:cursor-not-allowed"
                     placeholder="0.00"
                   />
                 </div>
@@ -1291,8 +1324,9 @@ export default function MarketDetailPage() {
                         <button
                           key={amt}
                           onClick={() => setOrderAmount(amt)}
+                          disabled={tradeActionBusy}
                           className={cn(
-                            "flex-1 h-7 rounded-lg text-[10px] font-bold transition-all",
+                            "flex-1 h-7 rounded-lg text-[10px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60",
                             orderAmount === amt
                               ? "bg-[oklch(0.78_0.16_82/0.15)] border border-[oklch(0.78_0.16_82/0.35)] text-[oklch(0.78_0.16_82)]"
                               : "bg-[oklch(0.15_0.013_255)] border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground hover:border-[oklch(0.28_0.018_255)]"
@@ -1308,7 +1342,7 @@ export default function MarketDetailPage() {
                           <button
                             key={item.label}
                             onClick={() => setSellPercentAmount(item.value)}
-                            disabled={!hasSellReferenceShares}
+                            disabled={!hasSellReferenceShares || tradeActionBusy}
                             className={cn(
                               "flex-1 h-7 rounded-lg text-[10px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-45",
                               active
@@ -1376,8 +1410,9 @@ export default function MarketDetailPage() {
                     <button
                       key={type}
                       onClick={() => setOrderType(type)}
+                      disabled={tradeActionBusy}
                       className={cn(
-                        "flex-1 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                        "flex-1 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-60",
                         orderType === type
                           ? "bg-[oklch(0.78_0.16_82/0.18)] text-[oklch(0.78_0.16_82)]"
                           : "text-muted-foreground hover:text-foreground"
@@ -1399,6 +1434,7 @@ export default function MarketDetailPage() {
                       step="0.1"
                       value={limitPrice}
                       onChange={(e) => setLimitPrice(e.target.value)}
+                      disabled={tradeActionBusy}
                       className="h-9 flex-1 bg-transparent outline-none text-sm font-semibold text-foreground"
                       placeholder={`Limit price (${activePrice.toFixed(1)}¢ market)`}
                     />
@@ -1412,6 +1448,7 @@ export default function MarketDetailPage() {
                       type="datetime-local"
                       value={gtdExpiry}
                       onChange={(e) => setGtdExpiry(e.target.value)}
+                      disabled={tradeActionBusy}
                       className="h-9 flex-1 bg-transparent outline-none text-xs font-semibold text-foreground"
                     />
                   </div>
@@ -1677,7 +1714,7 @@ export default function MarketDetailPage() {
                       )}
                     >
                       {signingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
-                      {signOrderPreviewDisabled ? "Resolve Approval to Sign" : "Sign Order Preview"}
+                      {signingOrder ? "Waiting for wallet signature" : signOrderPreviewDisabled ? "Resolve Approval to Sign" : "Sign Order Preview"}
                     </Button>
                   )}
 
@@ -2441,7 +2478,7 @@ export default function MarketDetailPage() {
                         : "bg-[oklch(0.58_0.2_25)] text-white hover:bg-[oklch(0.62_0.2_25)]"
                     )}
                     onClick={handlePreviewTrade}
-                    disabled={previewLoading || !activeTokenId || amountNumber <= 0 || readiness.readiness?.canPreview === false}
+                    disabled={tradeActionBusy || !activeTokenId || amountNumber <= 0 || readiness.readiness?.canPreview === false}
                   >
                     {previewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : tradeSide === "buy" ? <TrendingUp className="w-4 h-4" /> : <ArrowDownUp className="w-4 h-4" />}
                     Preview {tradeSide === "buy" ? "Buy" : "Sell"} {activeOutcomeName}

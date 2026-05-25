@@ -39,7 +39,7 @@ function approvalErrorMessage(error?: string) {
     case "deposit_wallet_deadline_too_soon":
       return "The relayer needs a longer approval window. Try approving again."
     case "deposit_wallet_signature_owner_mismatch":
-      return "The wallet signed from a different active account. Open your wallet, select the Rawali connected address, and approve again."
+      return "The wallet signed from a different active account. Open your wallet, select the Rawli connected address, and approve again."
     case "builder_relayer_not_configured":
       return "Relayer credentials are not configured on the backend."
     case "deposit_wallet_approval_submit_failed":

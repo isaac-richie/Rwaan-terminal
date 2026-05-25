@@ -70,7 +70,7 @@ export function GasAssistButton({ address, active = true, reason, onAssisted, cl
   return (
     <div className={cn("space-y-2", className)}>
       <div className="rounded-lg border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.08)] p-2.5 text-[11px] leading-snug text-[oklch(0.78_0.16_82)]">
-        This wallet has pUSD but low Polygon gas. Rawali can send {status.topupPol} POL for approval or withdrawal.
+        This wallet has pUSD but low Polygon gas. Rawli can send {status.topupPol} POL for approval or withdrawal.
       </div>
       <Button
         type="button"

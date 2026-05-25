@@ -19,7 +19,7 @@ async function withProfileStore<T>(fn: () => Promise<T>): Promise<T> {
   const originalDb = process.env.TRADING_PROFILE_DB_PATH;
   const originalSupabaseDb = process.env.SUPABASE_DB_URL;
   const originalDatabaseUrl = process.env.DATABASE_URL;
-  const dir = await mkdtemp(join(tmpdir(), "rawali-profile-test-"));
+  const dir = await mkdtemp(join(tmpdir(), "rawli-profile-test-"));
   closeTradingProfileDbForTests();
   process.env.TRADING_PROFILE_STORE_PATH = join(dir, "profiles.json");
   process.env.TRADING_PROFILE_DB_PATH = join(dir, "profiles.sqlite");

@@ -20,7 +20,7 @@ function assertEvmAddress(address: string, label: string) {
 function dbPath(): string {
   return process.env.TRADING_PROFILE_DB_PATH
     ? resolve(process.env.TRADING_PROFILE_DB_PATH)
-    : resolve(process.cwd(), "../../.data/rawali.db");
+    : resolve(process.cwd(), "../../.data/rawli.db");
 }
 
 function postgresUrl(): string {
@@ -92,6 +92,17 @@ const sqliteSchema = `
 
   CREATE INDEX IF NOT EXISTS idx_reward_events_wallet_created
     ON reward_events(wallet, created_at);
+
+  CREATE TABLE IF NOT EXISTS referrals (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    referrer     TEXT NOT NULL,
+    referee      TEXT NOT NULL UNIQUE,
+    rewarded     INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_referrals_referrer
+    ON referrals(referrer);
 `;
 
 const postgresSchema = `
@@ -145,6 +156,17 @@ const postgresSchema = `
 
   CREATE INDEX IF NOT EXISTS idx_reward_events_wallet_created
     ON reward_events(wallet, created_at);
+
+  CREATE TABLE IF NOT EXISTS referrals (
+    id         BIGSERIAL PRIMARY KEY,
+    referrer   TEXT NOT NULL,
+    referee    TEXT NOT NULL UNIQUE,
+    rewarded   BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_referrals_referrer
+    ON referrals(referrer);
 `;
 
 // ---------------------------------------------------------------------------
@@ -687,6 +709,98 @@ export async function getRewardSummary(walletInput: string): Promise<RewardSumma
   );
 }
 
+/**
+ * Returns the total number of trade_submitted events for a wallet across all time.
+ * Used to detect a wallet's first-ever trade so the referral reward can be triggered.
+ */
+export async function getTotalTradeCount(walletInput: string): Promise<number> {
+  assertEvmAddress(walletInput, "wallet");
+  const wallet = walletInput.toLowerCase();
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    const { rows } = await pool.query<{ count: string }>(
+      "SELECT COUNT(*) as count FROM reward_events WHERE wallet = $1 AND event_type = 'trade_submitted'",
+      [wallet],
+    );
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  const db = await getDb();
+  const row = db
+    .prepare("SELECT COUNT(*) as count FROM reward_events WHERE wallet = ? AND event_type = 'trade_submitted'")
+    .get(wallet) as { count: number } | undefined;
+  return Number(row?.count ?? 0);
+}
+
+export type LeaderboardRow = {
+  rank: number;
+  wallet: string;
+  totalPoints: number;
+  trades: number;
+  tier: string;
+};
+
+/**
+ * Returns the top N wallets by total points for the leaderboard.
+ */
+export async function getLeaderboard(limit = 50): Promise<LeaderboardRow[]> {
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    const { rows } = await pool.query<{ wallet: string; total_points: string; trades: string }>(
+      `
+        SELECT
+          wallet,
+          SUM(points)                                                             AS total_points,
+          COUNT(*) FILTER (WHERE event_type = 'trade_submitted')                 AS trades
+        FROM reward_events
+        GROUP BY wallet
+        ORDER BY total_points DESC
+        LIMIT $1
+      `,
+      [limit],
+    );
+    return rows.map((row, i) => ({
+      rank: i + 1,
+      wallet: row.wallet,
+      totalPoints: Number(row.total_points) || 0,
+      trades: Number(row.trades) || 0,
+      tier: tierLabel(Number(row.total_points) || 0),
+    }));
+  }
+
+  const db = await getDb();
+  const rows = db
+    .prepare(
+      `
+        SELECT
+          wallet,
+          SUM(points)                                                             AS total_points,
+          SUM(CASE WHEN event_type = 'trade_submitted' THEN 1 ELSE 0 END)        AS trades
+        FROM reward_events
+        GROUP BY wallet
+        ORDER BY total_points DESC
+        LIMIT ?
+      `,
+    )
+    .all(limit) as { wallet: string; total_points: number; trades: number }[];
+
+  return rows.map((row, i) => ({
+    rank: i + 1,
+    wallet: row.wallet,
+    totalPoints: Number(row.total_points) || 0,
+    trades: Number(row.trades) || 0,
+    tier: tierLabel(Number(row.total_points) || 0),
+  }));
+}
+
+function tierLabel(points: number): string {
+  if (points >= 7500) return "Oracle";
+  if (points >= 2000) return "Strategist";
+  if (points >= 500) return "Analyst";
+  return "Observer";
+}
+
 export async function getRewardEventsSince(walletInput: string, sinceIso: string): Promise<RewardEventRow[]> {
   assertEvmAddress(walletInput, "wallet");
   const wallet = walletInput.toLowerCase();
@@ -786,4 +900,130 @@ export async function recordGasAssist(input: {
     INSERT INTO gas_assists (wallet, amount_wei, tx_hash, reason, status, created_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(key, input.amountWei, input.txHash ?? null, input.reason ?? null, input.status, createdAt);
+}
+
+// ---------------------------------------------------------------------------
+// Referrals
+// ---------------------------------------------------------------------------
+
+export type ReferralStats = {
+  referrer: string;
+  totalReferrals: number;
+  rewardedReferrals: number;
+  pendingReferrals: number;
+};
+
+/**
+ * Record a new referee linking to a referrer.
+ * Returns false if the referee already has a referrer (idempotent).
+ */
+export async function recordReferral(input: {
+  referrer: string;
+  referee: string;
+}): Promise<{ recorded: boolean; alreadyReferred: boolean }> {
+  assertEvmAddress(input.referrer, "referrer");
+  assertEvmAddress(input.referee, "referee");
+  if (input.referrer.toLowerCase() === input.referee.toLowerCase()) {
+    return { recorded: false, alreadyReferred: false };
+  }
+
+  const referrer = input.referrer.toLowerCase();
+  const referee = input.referee.toLowerCase();
+  const createdAt = new Date().toISOString();
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    const result = await pool.query(
+      `
+        INSERT INTO referrals (referrer, referee, rewarded, created_at)
+        VALUES ($1, $2, FALSE, $3)
+        ON CONFLICT (referee) DO NOTHING
+      `,
+      [referrer, referee, createdAt],
+    );
+    const inserted = (result.rowCount ?? 0) > 0;
+    return { recorded: inserted, alreadyReferred: !inserted };
+  }
+
+  const db = await getDb();
+  const result = db
+    .prepare("INSERT OR IGNORE INTO referrals (referrer, referee, rewarded, created_at) VALUES (?, ?, 0, ?)")
+    .run(referrer, referee, createdAt);
+  const inserted = result.changes > 0;
+  return { recorded: inserted, alreadyReferred: !inserted };
+}
+
+export async function getReferralStats(walletInput: string): Promise<ReferralStats> {
+  assertEvmAddress(walletInput, "wallet");
+  const referrer = walletInput.toLowerCase();
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    const { rows } = await pool.query<{ total: string; rewarded: string }>(
+      `
+        SELECT
+          COUNT(*)                                     AS total,
+          COUNT(*) FILTER (WHERE rewarded = TRUE)      AS rewarded
+        FROM referrals
+        WHERE referrer = $1
+      `,
+      [referrer],
+    );
+    const total = Number(rows[0]?.total ?? 0);
+    const rewardedCount = Number(rows[0]?.rewarded ?? 0);
+    return {
+      referrer,
+      totalReferrals: total,
+      rewardedReferrals: rewardedCount,
+      pendingReferrals: total - rewardedCount,
+    };
+  }
+
+  const db = await getDb();
+  const row = db
+    .prepare("SELECT COUNT(*) as total, SUM(rewarded) as rewarded FROM referrals WHERE referrer = ?")
+    .get(referrer) as { total: number; rewarded: number | null };
+  const total = Number(row?.total ?? 0);
+  const rewardedCount = Number(row?.rewarded ?? 0);
+  return {
+    referrer,
+    totalReferrals: total,
+    rewardedReferrals: rewardedCount,
+    pendingReferrals: total - rewardedCount,
+  };
+}
+
+export async function markReferralRewarded(referee: string): Promise<void> {
+  const key = referee.toLowerCase();
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    await pool.query("UPDATE referrals SET rewarded = TRUE WHERE referee = $1", [key]);
+    return;
+  }
+
+  const db = await getDb();
+  db.prepare("UPDATE referrals SET rewarded = 1 WHERE referee = ?").run(key);
+}
+
+/**
+ * Look up who referred a given wallet. Returns null if not referred.
+ */
+export async function getReferrerForReferee(referee: string): Promise<string | null> {
+  const key = referee.toLowerCase();
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    const { rows } = await pool.query<{ referrer: string }>(
+      "SELECT referrer FROM referrals WHERE referee = $1 AND rewarded = FALSE LIMIT 1",
+      [key],
+    );
+    return rows[0]?.referrer ?? null;
+  }
+
+  const db = await getDb();
+  const row = db
+    .prepare("SELECT referrer FROM referrals WHERE referee = ? AND rewarded = 0 LIMIT 1")
+    .get(key) as { referrer: string } | undefined;
+  return row?.referrer ?? null;
 }

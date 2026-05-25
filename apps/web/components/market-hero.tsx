@@ -105,7 +105,7 @@ export function MarketHero() {
         setBreaking(newsMarkets.length ? newsMarkets : hotMarkets.slice(0, 8))
         setActiveIndex(0)
       } catch (err) {
-        console.error("[rawali] Hero load failed:", err)
+        console.error("[rawli] Hero load failed:", err)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -146,7 +146,7 @@ export function MarketHero() {
           style={{ animationDelay: "0ms" }}
         >
           <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
-          Rawali · prediction terminal · live
+          Rawli · prediction terminal · live
         </div>
 
         {/* Main heading — three visual lines */}
@@ -416,7 +416,7 @@ export function MarketHero() {
             <div className="rounded-xl border border-[oklch(0.78_0.16_82/0.18)] bg-[oklch(0.78_0.16_82/0.05)] p-3.5">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.82_0.16_82)]">Rawali intelligence</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.82_0.16_82)]">Rawli intelligence</span>
               </div>
               <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
                 Deep AI reports per market — live context, structural drivers, and a definitive YES/NO verdict. Unlock for $1 USDT.

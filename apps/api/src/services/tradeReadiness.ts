@@ -81,7 +81,7 @@ export function buildTradeReadiness(input: ReadinessInput): TradeReadinessRespon
       status: clobSessionReady ? "ready" : "auth_required",
       message: clobSessionReady
         ? "CLOB session headers are present for authenticated reads."
-        : "A wallet signature can create or derive the user's CLOB session inside Rawali."
+        : "A wallet signature can create or derive the user's CLOB session inside Rawli."
     },
     {
       code: "collateral_balance_allowance",

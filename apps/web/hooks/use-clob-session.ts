@@ -24,7 +24,7 @@ const POLYGON_CHAIN_ID = 137
 const CLOB_CHAIN = Chain.POLYGON
 const POLYGON_CHAIN_HEX = "0x89"
 const DEFAULT_CLOB_NONCE = 0
-const SESSION_STORAGE_KEY = "rawali.clob_session"
+const SESSION_STORAGE_KEY = "rawli.clob_session"
 const ZERO_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000000"
 const BUILDER_CODE = process.env.NEXT_PUBLIC_POLYMARKET_BUILDER_CODE?.trim()
 const PUSD_CONTRACT = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
@@ -251,7 +251,7 @@ function signatureTypeFor(profile?: TradingProfile | null) {
 function builderConfig() {
   if (!BUILDER_CODE) return undefined
   if (/^0x[a-fA-F0-9]{64}$/.test(BUILDER_CODE)) return { builderCode: BUILDER_CODE }
-  console.warn("[rawali] Ignoring invalid NEXT_PUBLIC_POLYMARKET_BUILDER_CODE. Expected bytes32 hex.")
+  console.warn("[rawli] Ignoring invalid NEXT_PUBLIC_POLYMARKET_BUILDER_CODE. Expected bytes32 hex.")
   return undefined
 }
 
@@ -416,11 +416,11 @@ function errorMessage(err: unknown, fallback: string) {
   const normalizedRaw = raw.toLowerCase()
 
   if (normalizedRaw.includes("maker address not allowed") || normalizedRaw.includes("deposit wallet flow")) {
-    return "Polymarket rejected this order because the signer is an EOA maker. This market now requires Polymarket Deposit Wallet trading, so Rawali must create/use the user's deposit wallet before live submission."
+    return "Polymarket rejected this order because the signer is an EOA maker. This market now requires Polymarket Deposit Wallet trading, so Rawli must create/use the user's deposit wallet before live submission."
   }
 
   if (isWrongChainError(err)) {
-    return "Rawali could not activate the Polygon execution context for the Polymarket signature. Approve the network request in your wallet and try again."
+    return "Rawli could not activate the Polygon execution context for the Polymarket signature. Approve the network request in your wallet and try again."
   }
 
   const rejection = userRejectedMessage(err)
@@ -446,7 +446,7 @@ function isChainMissingError(err: unknown) {
 
 function userRejectedMessage(err: unknown) {
   const code = err && typeof err === "object" && "code" in err ? Number((err as any).code) : undefined
-  if (code === 4001) return "Wallet rejected Rawali's Polygon execution request."
+  if (code === 4001) return "Wallet rejected Rawli's Polygon execution request."
   return null
 }
 
@@ -493,7 +493,7 @@ async function ensurePolygonForClob(provider: Eip1193Provider) {
     throw err
   }
 
-  throw new Error("Rawali could not activate Polygon execution context in this wallet.")
+  throw new Error("Rawli could not activate Polygon execution context in this wallet.")
 }
 
 async function getPolygonProvider(wallet: ConnectedWallet): Promise<Eip1193Provider> {
@@ -519,7 +519,7 @@ async function getPolygonProvider(wallet: ConnectedWallet): Promise<Eip1193Provi
 
   const activeChain = await provider.request({ method: "eth_chainId" }).catch(() => null)
   if (String(activeChain).toLowerCase() !== POLYGON_CHAIN_HEX) {
-    throw new Error("Rawali could not activate Polygon execution context in this wallet.")
+    throw new Error("Rawli could not activate Polygon execution context in this wallet.")
   }
 
   return provider
@@ -637,8 +637,10 @@ export function useClobSession(wallet?: ConnectedWallet | null, profile?: Tradin
         const collateral = await restoredClient.getBalanceAllowance({ asset_type: AssetType.COLLATERAL })
         setBalanceAllowance(normalizeBalanceAllowance(collateral))
         setStatus("ready")
-      } catch {
-        // Restoration failed — clear stale session. User can re-prepare manually.
+      } catch (err: unknown) {
+        // Restoration failed — clear stale session and surface a soft error.
+        // Do NOT set status to "error" (that blocks the whole UI); use a warning
+        // the trade panel can show in the onboarding stepper.
         clearStoredSession()
         clientRef.current = null
         providerRef.current = null
@@ -650,6 +652,11 @@ export function useClobSession(wallet?: ConnectedWallet | null, profile?: Tradin
         setConditionalBalanceAllowance(null)
         setOpenOrders([])
         setOpenOrdersStatus("idle")
+        // Surface the restoration failure so the UI can prompt the user to re-prepare
+        const msg = err instanceof Error ? err.message : "Session restore failed"
+        if (!msg.toLowerCase().includes("reject") && !msg.toLowerCase().includes("denied")) {
+          setError("Previous session could not be restored. Please prepare the CLOB session again.")
+        }
       }
     }
     restore()

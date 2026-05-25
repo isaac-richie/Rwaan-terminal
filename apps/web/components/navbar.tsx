@@ -7,7 +7,7 @@ import {
   ChevronDown, Copy, Menu, Search, Wallet, X, Briefcase,
   TrendingUp, ArrowUpRight, Activity, Award, Bell, CircleDollarSign
 } from "lucide-react"
-import { usePrivy, useWallets } from "@privy-io/react-auth"
+import { usePrivy } from "@privy-io/react-auth"
 import { BnbFundingModal } from "@/components/funding/bnb-funding-modal"
 import {
   formatPortfolioMoney,
@@ -16,6 +16,7 @@ import {
   usePolymarketPortfolio,
 } from "@/hooks/use-polymarket-portfolio"
 import { usePolymarketDepositWallet } from "@/hooks/use-polymarket-deposit-wallet"
+import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet"
 import { useTradeReadiness } from "@/hooks/use-trade-readiness"
 import { useTradingProfile } from "@/hooks/use-trading-profile"
 import { addAccountRefreshListener } from "@/lib/account-events"
@@ -80,10 +81,7 @@ function NavbarBalanceBreakdown() {
   const [fundingOpen, setFundingOpen] = useState(false)
   const [fundingInitialTab, setFundingInitialTab] = useState<"deposit" | "withdraw">("deposit")
   const panelRef = useRef<HTMLDivElement>(null)
-  const { authenticated } = usePrivy()
-  const { wallets } = useWallets()
-  const walletAddress = authenticated ? wallets?.[0]?.address ?? null : null
-  const connectedWallet = authenticated ? wallets?.[0] ?? null : null
+  const { walletAddress, wallet: connectedWallet } = useActivePrivyWallet()
   const polymarketDepositWallet = usePolymarketDepositWallet(connectedWallet)
   const profileConnectedWalletAddress = walletAddress && polymarketDepositWallet.address ? walletAddress : null
   const tradingProfile = useTradingProfile(
@@ -175,7 +173,7 @@ function NavbarBalanceBreakdown() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 mt-2 w-[min(360px,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-[oklch(0.28_0.018_255)] bg-[oklch(0.18_0.014_255/0.98)] shadow-[0_30px_90px_oklch(0_0_0/0.70)] backdrop-blur-2xl z-50">
+        <div className="absolute right-0 mt-2 w-[min(292px,calc(100vw-1rem))] overflow-hidden rounded-xl border border-[oklch(0.28_0.018_255)] bg-[oklch(0.18_0.014_255/0.98)] shadow-[0_22px_64px_oklch(0_0_0/0.62)] backdrop-blur-2xl z-50">
           <div
             className="absolute inset-0 opacity-[0.08] pointer-events-none"
             style={{
@@ -184,17 +182,17 @@ function NavbarBalanceBreakdown() {
               backgroundSize: "8px 8px",
             }}
           />
-          <div className="relative p-5">
-            <div className="flex items-start justify-between gap-4">
+          <div className="relative p-4">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                   Balance breakdown
                 </div>
-                <div className="mt-6 flex items-end gap-2">
-                  <span className="font-mono text-5xl font-semibold tracking-[-0.05em] text-foreground">
+                <div className="mt-3 flex items-end gap-1.5">
+                  <span className="font-mono text-4xl font-semibold text-foreground">
                     {formatPortfolioMoney(accountValue).replace(".00", "")}
                   </span>
-                  <span className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">USD</span>
+                  <span className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">USD</span>
                 </div>
               </div>
               <button
@@ -204,28 +202,28 @@ function NavbarBalanceBreakdown() {
                   readiness.refresh()
                 }}
                 disabled={!tradingWalletAddress || portfolio.loading || readiness.loading}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[oklch(0.24_0.016_255)] bg-[oklch(0.13_0.013_255)] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-[oklch(0.24_0.016_255)] bg-[oklch(0.13_0.013_255)] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                 aria-label="Refresh balance"
               >
-                <Activity className={cn("h-4 w-4", (portfolio.loading || readiness.loading) && "animate-pulse text-[oklch(0.78_0.16_82)]")} />
+                <Activity className={cn("h-3.5 w-3.5", (portfolio.loading || readiness.loading) && "animate-pulse text-[oklch(0.78_0.16_82)]")} />
               </button>
             </div>
 
-            <div className="my-6 border-t border-dashed border-[oklch(0.46_0.02_255/0.45)]" />
+            <div className="my-4 border-t border-dashed border-[oklch(0.46_0.02_255/0.40)]" />
 
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div>
-                <div className="text-xs font-bold text-muted-foreground">Overview</div>
-                <div className="mt-3 space-y-3">
-                  <div className="flex items-center justify-between gap-4 text-sm">
+                <div className="text-[11px] font-bold text-muted-foreground">Overview</div>
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center justify-between gap-4 text-xs">
                     <span className="underline decoration-dotted underline-offset-4 text-foreground">Available to trade</span>
                     <span className="font-mono font-bold text-foreground">{formatPortfolioMoney(availableToTrade)}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-4 text-sm">
+                  <div className="flex items-center justify-between gap-4 text-xs">
                     <span className="underline decoration-dotted underline-offset-4 text-foreground">pUSD balance</span>
                     <span className="font-mono font-bold text-foreground">{formatPusd(pUsdBalance)}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-4 text-sm">
+                  <div className="flex items-center justify-between gap-4 text-xs">
                     <span className="underline decoration-dotted underline-offset-4 text-foreground">In positions</span>
                     <span className="font-mono font-bold text-foreground">{formatPortfolioMoney(inPositions)}</span>
                   </div>
@@ -233,15 +231,15 @@ function NavbarBalanceBreakdown() {
               </div>
 
               <div>
-                <div className="text-xs font-bold text-muted-foreground">Profit & Loss</div>
-                <div className="mt-3 space-y-3">
-                  <div className="flex items-center justify-between gap-4 text-sm">
+                <div className="text-[11px] font-bold text-muted-foreground">Profit & Loss</div>
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center justify-between gap-4 text-xs">
                     <span className="underline decoration-dotted underline-offset-4 text-foreground">Realized P/L</span>
                     <span className={cn("font-mono font-bold", realizedPositive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.60_0.18_25)]")}>
                       {formatPortfolioPnl(realized)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-4 text-sm">
+                  <div className="flex items-center justify-between gap-4 text-xs">
                     <span className="underline decoration-dotted underline-offset-4 text-foreground">Unrealized P/L</span>
                     <span className={cn("font-mono font-bold", portfolio.summary.unrealizedRaw >= 0 ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.60_0.18_25)]")}>
                       {portfolio.summary.unrealized}
@@ -252,15 +250,15 @@ function NavbarBalanceBreakdown() {
             </div>
 
             {!walletAddress ? (
-              <div className="mt-5 rounded-xl border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.08)] px-3 py-2 text-xs leading-5 text-[oklch(0.82_0.16_82)]">
-                Connect wallet to load live Rawali trading balances.
+              <div className="mt-4 rounded-lg border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.08)] px-3 py-2 text-[11px] leading-5 text-[oklch(0.82_0.16_82)]">
+                Connect wallet to load live Rawli trading balances.
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => openFundingModal()}
                 disabled={!tradingProfile.profile || tradingProfile.depositLoading}
-                className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[oklch(0.78_0.16_82)] px-3 text-xs font-bold uppercase tracking-[0.12em] text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-4 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[oklch(0.78_0.16_82)] px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Wallet className="h-3.5 w-3.5" />
                 Manage funds
@@ -342,8 +340,8 @@ function PrivyDesktopWallet() {
   const [copied, setCopied] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
   const { ready, authenticated, login, logout, connectWallet } = usePrivy()
-  const { wallets } = useWallets()
-  const walletAddress = authenticated ? wallets?.[0]?.address ?? null : null
+  const activePrivyWallet = useActivePrivyWallet()
+  const walletAddress = activePrivyWallet.walletAddress
   const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : ""
 
   useEffect(() => {
@@ -385,7 +383,7 @@ function PrivyDesktopWallet() {
     }
   }
 
-  if (!walletAddress) {
+  if (!activePrivyWallet.ready || !walletAddress) {
     return (
       <button
         onClick={handleConnect}
@@ -396,7 +394,7 @@ function PrivyDesktopWallet() {
         {/* Inner shine */}
         <span className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
         <Wallet className="w-3.5 h-3.5 relative z-10" />
-        <span className="relative z-10">{!ready ? "Loading…" : "Connect Wallet"}</span>
+        <span className="relative z-10">{!ready || !activePrivyWallet.ready ? "Loading…" : "Connect Wallet"}</span>
       </button>
     )
   }
@@ -489,8 +487,8 @@ function PrivyDesktopWallet() {
 
 function PrivyMobileWallet({ onDone }: { onDone: () => void }) {
   const { ready, authenticated, login, connectWallet } = usePrivy()
-  const { wallets } = useWallets()
-  const walletAddress = authenticated ? wallets?.[0]?.address ?? null : null
+  const activePrivyWallet = useActivePrivyWallet()
+  const walletAddress = activePrivyWallet.walletAddress
   const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : ""
 
   return (
@@ -500,12 +498,12 @@ function PrivyMobileWallet({ onDone }: { onDone: () => void }) {
         else await login()
         onDone()
       }}
-      disabled={!ready}
+      disabled={!ready || !activePrivyWallet.ready}
       className="w-full mt-2 flex items-center justify-center gap-2 h-11 px-3 rounded-xl text-sm font-bold text-[oklch(0.12_0.01_255)] disabled:opacity-60"
       style={{ background: "linear-gradient(135deg, oklch(0.82 0.16 82), oklch(0.72 0.18 75))" }}
     >
       <Wallet className="w-4 h-4" />
-      {walletAddress ? shortAddress : !ready ? "Loading…" : "Connect Wallet"}
+      {walletAddress ? shortAddress : !ready || !activePrivyWallet.ready ? "Loading…" : "Connect Wallet"}
     </button>
   )
 }
@@ -548,6 +546,22 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 
 const TRENDING_TERMS = ["Bitcoin", "Ethereum", "BNB", "Champions League", "GTA VI", "Ukraine"]
 
+function SearchResultImage({ src }: { src?: string | null }) {
+  const [errored, setErrored] = useState(false)
+  if (!src || errored) {
+    return <div className="w-8 h-8 rounded-lg bg-[oklch(0.18_0.014_255)] shrink-0 border border-[oklch(0.24_0.016_255)]" />
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      className="w-8 h-8 rounded-lg object-cover shrink-0"
+      onError={() => setErrored(true)}
+      onLoad={(e) => { if ((e.target as HTMLImageElement).naturalWidth === 0) setErrored(true) }}
+    />
+  )
+}
+
 export function Navbar() {
   const router = useRouter()
   const [scrolled, setScrolled] = useState(false)
@@ -557,6 +571,7 @@ export function Navbar() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchResults, setSearchResults] = useState<PolymarketMarket[]>([])
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
   const privyEnabled = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
 
@@ -575,10 +590,23 @@ export function Navbar() {
       if (e.key === "Escape" && searchOpen) {
         setSearchOpen(false)
       }
+      if (searchOpen && searchResults.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault()
+          setSelectedIndex((i) => Math.min(i + 1, searchResults.length - 1))
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault()
+          setSelectedIndex((i) => Math.max(i - 1, 0))
+        } else if (e.key === "Enter" && selectedIndex >= 0) {
+          e.preventDefault()
+          const market = searchResults[selectedIndex]
+          if (market) { setSearchOpen(false); router.push(`/markets/${market.id}`) }
+        }
+      }
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [searchOpen])
+  }, [searchOpen, searchResults, selectedIndex])
 
   useEffect(() => {
     if (searchOpen) {
@@ -587,8 +615,12 @@ export function Navbar() {
       setSearchValue("")
       setSearchResults([])
       setSearchError(null)
+      setSelectedIndex(-1)
     }
   }, [searchOpen])
+
+  // Reset selection when results change
+  useEffect(() => { setSelectedIndex(-1) }, [searchResults])
 
   useEffect(() => {
     if (!searchOpen || !searchValue.trim()) {
@@ -641,14 +673,14 @@ export function Navbar() {
               style={{ filter: "drop-shadow(0 0 6px oklch(0.78 0.16 82 / 0.18))" }}
             >
               <img
-                src="/rawali-brand.png"
-                alt="Rawali Analytic"
+                src="/rawli-brand.png"
+                alt="Rawli Analytic"
                 className="h-full w-full object-contain"
               />
             </div>
             <div className="leading-none hidden sm:block">
               <div className="text-[15px] font-extrabold tracking-tight">
-                <span className="text-foreground">Rawali</span>{" "}
+                <span className="text-foreground">Rawli</span>{" "}
                 <span className="text-[oklch(0.82_0.16_82)]">Analytic</span>
               </div>
               <div className="text-[9px] uppercase tracking-[0.22em] text-muted-foreground/70 mt-[3px]">
@@ -831,24 +863,31 @@ export function Navbar() {
                 <div className="py-1">
                   <p className="px-4 pt-1.5 pb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">
                     {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
+                    <span className="ml-2 text-muted-foreground/40">↑↓ to navigate · ↵ to open</span>
                   </p>
-                  {searchResults.map((market) => {
+                  {searchResults.map((market, idx) => {
                     const price = getYesPrice(market)
                     const isUp = price >= 50
+                    const isSelected = idx === selectedIndex
                     return (
                       <button
                         key={market.id}
                         onClick={() => { setSearchOpen(false); router.push(`/markets/${market.id}`) }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-[oklch(0.17_0.014_255)] transition-colors group/r"
+                        onMouseEnter={() => setSelectedIndex(idx)}
+                        className={cn(
+                          "w-full text-left px-4 py-2.5 transition-colors group/r",
+                          isSelected
+                            ? "bg-[oklch(0.78_0.16_82/0.08)] border-l-2 border-[oklch(0.78_0.16_82/0.6)]"
+                            : "hover:bg-[oklch(0.17_0.014_255)] border-l-2 border-transparent"
+                        )}
                       >
                         <div className="flex items-center gap-3">
-                          {market.image ? (
-                            <img src={market.image} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-lg bg-[oklch(0.18_0.014_255)] shrink-0" />
-                          )}
+                          <SearchResultImage src={market.image ?? market.icon} />
                           <div className="flex-1 min-w-0">
-                            <div className="text-[12px] font-semibold text-foreground line-clamp-1 group-hover/r:text-[oklch(0.92_0.01_90)] transition-colors">
+                            <div className={cn(
+                              "text-[12px] font-semibold line-clamp-1 transition-colors",
+                              isSelected ? "text-[oklch(0.92_0.01_90)]" : "text-foreground group-hover/r:text-[oklch(0.92_0.01_90)]"
+                            )}>
                               {market.question}
                             </div>
                             <div className="text-[9px] uppercase tracking-widest text-muted-foreground/70 mt-0.5">

@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Rawali Analytic — Dark Gold Theme (always dark) */
+/* Rawli Analytic — Dark Gold Theme (always dark) */
 :root {
   /* Deep navy-charcoal base — institutional dark */
   --background: oklch(0.11 0.012 260);

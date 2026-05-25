@@ -53,7 +53,7 @@ function messageForPhase(phase: FundingStatusPhase): string {
   if (phase === "failed") return "The bridge reported a failed transaction. Verify the source transaction before funding again.";
   if (phase === "processing") return "The bridge has detected funds and is processing the route into Polymarket pUSD.";
   if (phase === "detected") return "A deposit has been detected and is waiting for bridge processing.";
-  return "Send a supported BNB Chain asset to the deposit address, then Rawali will track the bridge status here.";
+  return "Send a supported BNB Chain asset to the deposit address, then Rawli will track the bridge status here.";
 }
 
 export function normalizeFundingStatus(depositAddress: string, rawStatus: unknown, now = new Date()): FundingStatusResponse {

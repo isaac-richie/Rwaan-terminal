@@ -26,16 +26,19 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy } from "@privy-io/react-auth";
 
 import { Footer } from "@/components/footer";
+import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { fundingStatusTone, useFundingStatus } from "@/hooks/use-funding-status";
+import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet";
 import {
   formatPortfolioMoney,
   formatPortfolioNumber,
   formatPortfolioPnl,
+  getPositionCostBasis,
   getPositionPnl,
   getPositionPnlPercent,
   getPositionValue,
@@ -132,7 +135,9 @@ function formatPusd(value?: number | null) {
 
 function formatTime(value?: number | string | null) {
   if (!value) return "Just now";
-  const date = typeof value === "number" ? new Date(value) : new Date(value);
+  const raw = typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value)) ? Number(value) : value;
+  const millis = typeof raw === "number" && raw > 0 && raw < 10_000_000_000 ? raw * 1000 : raw;
+  const date = typeof millis === "number" ? new Date(millis) : new Date(millis);
   if (Number.isNaN(date.getTime())) return "Just now";
   return date.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
@@ -397,9 +402,9 @@ function TimelineItem({ item }: { item: TimelineItemData }) {
 function PortfolioContent() {
   const router = useRouter();
   const { ready, authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
-  const walletAddress = authenticated ? wallets?.[0]?.address ?? null : null;
-  const connectedWallet = authenticated ? wallets?.[0] ?? null : null;
+  const activePrivyWallet = useActivePrivyWallet();
+  const walletAddress = activePrivyWallet.walletAddress;
+  const connectedWallet = activePrivyWallet.wallet;
   const polymarketDepositWallet = usePolymarketDepositWallet(connectedWallet);
   const profileConnectedWalletAddress = walletAddress && polymarketDepositWallet.address ? walletAddress : null;
   const tradingProfile = useTradingProfile(
@@ -416,6 +421,7 @@ function PortfolioContent() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PortfolioTab>("positions");
   const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null);
+  const [fundingOpen, setFundingOpen] = useState(false);
 
   const data = portfolio.data;
   const openPositions = data?.positions ?? [];
@@ -426,10 +432,15 @@ function PortfolioContent() {
   const stats = useMemo(() => {
     const openValue = openPositions.reduce((t: number, p: any) => t + getPositionValue(p), 0);
     const shares = openPositions.reduce((t: number, p: any) => t + valueOf(p?.size, p?.position_size), 0);
-    const avgPnlPercent = openPositions.length
-      ? openPositions.reduce((t: number, p: any) => t + getPositionPnlPercent(p), 0) / openPositions.length : 0;
+    const openPnl = openPositions.reduce((t: number, p: any) => t + getPositionPnl(p), 0);
+    const costBasis = openPositions.reduce((t: number, p: any) => t + getPositionCostBasis(p), 0);
+    const avgPnlPercent = costBasis
+      ? (openPnl / costBasis) * 100
+      : openPositions.length
+      ? openPositions.reduce((t: number, p: any) => t + getPositionPnlPercent(p), 0) / openPositions.length
+      : 0;
     return {
-      openValue, shares, avgPnlPercent,
+      openValue, shares, openPnl, costBasis, avgPnlPercent,
       unrealizedPositive: portfolio.summary.unrealizedRaw >= 0,
       realizedPositive: portfolio.summary.realizedRaw >= 0,
     };
@@ -482,7 +493,7 @@ function PortfolioContent() {
         meta: "Wallet", tone: "green", icon: ShieldCheck });
     } else {
       items.push({ id: "trading-wallet-pending", title: "Trading wallet pending",
-        detail: "Connect your wallet so Rawali can resolve the Polymarket trading wallet.",
+        detail: "Connect your wallet so Rawli can resolve the Polymarket trading wallet.",
         meta: "Wallet", tone: "gold", icon: Wallet });
     }
     if (collateral) {
@@ -566,6 +577,13 @@ function PortfolioContent() {
     if (clobSession.status === "ready") void clobSession.refreshOpenOrders();
   };
 
+  const handleFundingSent = () => {
+    void tradingProfile.refresh();
+    void fundingStatus.refresh();
+    void readiness.refresh();
+    void portfolio.refresh();
+  };
+
   return (
     <div className="terminal-grid-bg ambient-glow flex min-h-screen flex-col bg-background">
       <Navbar />
@@ -618,6 +636,15 @@ function PortfolioContent() {
 
           <div className="flex shrink-0 items-center gap-2">
             <button
+              type="button"
+              onClick={() => setFundingOpen(true)}
+              disabled={!walletAddress || tradingProfile.loading || !tradingProfile.profile}
+              className="flex h-9 items-center gap-2 rounded-xl border border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.08)] px-3 text-[11px] font-bold uppercase tracking-[0.10em] text-[oklch(0.82_0.16_82)] transition-colors hover:bg-[oklch(0.78_0.16_82/0.14)] disabled:opacity-40"
+            >
+              <Wallet className="h-3.5 w-3.5" />
+              Fund account
+            </button>
+            <button
               onClick={handleRefreshAll}
               disabled={portfolio.loading || !tradingWalletAddress}
               className="flex h-9 items-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-transparent px-3 text-[11px] font-bold uppercase tracking-[0.10em] text-muted-foreground transition-colors hover:border-[oklch(0.78_0.16_82/0.35)] hover:text-foreground disabled:opacity-40"
@@ -652,7 +679,7 @@ function PortfolioContent() {
               </div>
               <div>
                 <div className="text-sm font-semibold text-foreground">Connect wallet to load portfolio</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">Rawali resolves your trading wallet and pulls live positions from Polymarket.</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">Rawli resolves your trading wallet and pulls live positions from Polymarket.</div>
               </div>
             </div>
             <Button
@@ -1122,6 +1149,21 @@ function PortfolioContent() {
         </div>
 
       </main>
+      <BnbFundingModal
+        open={fundingOpen}
+        onOpenChange={setFundingOpen}
+        initialTab="deposit"
+        profile={tradingProfile.profile}
+        depositAddress={depositAddress}
+        loadingDeposit={tradingProfile.depositLoading}
+        onCreateDepositAddress={tradingProfile.createDepositAddress}
+        wallet={connectedWallet}
+        collateralBalance={collateral?.balance ?? null}
+        collateralAllowance={collateral?.allowance ?? null}
+        collateralSessionReady={Boolean(collateral)}
+        onRefreshCollateralBalance={readiness.refresh}
+        onFundingSent={handleFundingSent}
+      />
       <Footer />
     </div>
   );

@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import { analysisRoutes } from "./routes/analysis.js";
 import { bridgeRoutes } from "./routes/bridge.js";
@@ -20,9 +21,23 @@ import { tradingProfileRoutes } from "./routes/tradingProfiles.js";
 import { wsRoutes } from "./routes/ws.js";
 import { catalystRoutes } from "./routes/catalyst.js";
 import { cryptoRoutes } from "./routes/crypto.js";
+import { referralRoutes } from "./routes/referral.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
+
+  // Global rate limiting — generous limits, mainly to stop hammering
+  app.register(rateLimit, {
+    global: true,
+    max: 120,          // 120 requests per minute per IP (2 req/s baseline)
+    timeWindow: "1 minute",
+    // Premium / analysis routes get tighter limits set per-route
+    errorResponseBuilder: () => ({
+      ok: false,
+      error: "rate_limited",
+      message: "Too many requests. Please slow down.",
+    }),
+  });
 
   app.register(cors, {
     origin: true,
@@ -78,6 +93,7 @@ export function buildServer() {
   app.register(wsRoutes);
   app.register(catalystRoutes);
   app.register(cryptoRoutes);
+  app.register(referralRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     app.log.error(err);

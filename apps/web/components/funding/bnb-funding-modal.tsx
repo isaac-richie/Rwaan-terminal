@@ -9,6 +9,16 @@ import { encodeErc20Transfer } from "@/lib/abi"
 
 import { Button } from "@/components/ui/button"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -30,7 +40,7 @@ import { shortAddress } from "@/hooks/use-trading-profile"
 import { scheduleAccountRefresh } from "@/lib/account-events"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"
-const PREFERRED_SYMBOLS = ["BNB", "USDC", "USDT", "DAI", "BTCB", "ETH", "BUSD"]
+const PREFERRED_SYMBOLS = ["USDT", "USDC", "DAI", "BNB", "BTCB", "ETH", "BUSD"]
 const POLYGON_CHAIN_ID = "137"
 const POLYGON_CHAIN_NUMBER = 137
 const POLYGON_CHAIN_HEX = "0x89"
@@ -188,6 +198,7 @@ export function BnbFundingModal({
 
   // Withdraw state
   const [withdrawAmount, setWithdrawAmount] = useState("")
+  const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false)
   const [withdrawStatus, setWithdrawStatus] = useState<"idle" | "preparing" | "switching" | "sending" | "confirming" | "done" | "error">("idle")
   const [withdrawResult, setWithdrawResult] = useState<any>(null)
   const [withdrawError, setWithdrawError] = useState<string | null>(null)
@@ -492,6 +503,7 @@ export function BnbFundingModal({
         setWithdrawAmount("")
         await onRefreshCollateralBalance?.()
         scheduleAccountRefresh({ reason: "withdrawal_submitted", address: tradingWalletAddr })
+        onFundingSent?.()   // trigger full account refresh (profile, portfolio, funding status)
         return
       }
 
@@ -533,6 +545,7 @@ export function BnbFundingModal({
       setWithdrawAmount("")
       await onRefreshCollateralBalance?.()
       scheduleAccountRefresh({ reason: "withdrawal_submitted", address: tradingWalletAddr })
+      onFundingSent?.()   // trigger full account refresh (profile, portfolio, funding status)
     } catch (err: any) {
       if (err?.code === "ACTION_REJECTED") {
         setWithdrawError("Withdrawal transaction rejected by wallet.")
@@ -585,6 +598,7 @@ export function BnbFundingModal({
   }, [open, activeTab])
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-1.5rem)] max-w-[min(38rem,calc(100vw-1.5rem))] flex-col overflow-hidden border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260)] p-0 sm:max-w-[38rem]">
         <DialogHeader className="shrink-0 border-b border-[oklch(0.22_0.015_255)] px-5 pb-4 pt-5 pr-10">
@@ -699,7 +713,7 @@ export function BnbFundingModal({
                 </Button>
                 {!collateralSessionReady && !depositWalletWithdrawMode ? (
                   <p className="text-[11px] leading-snug text-[oklch(0.78_0.16_82)]">
-                    Prepare the CLOB session first so Rawali can read your live Polymarket pUSD balance before withdrawal.
+                    Prepare the CLOB session first so Rawli can read your live Polymarket pUSD balance before withdrawal.
                   </p>
                 ) : !hasKnownWithdrawBalance ? (
                   <p className="text-[11px] leading-snug text-muted-foreground">
@@ -715,7 +729,7 @@ export function BnbFundingModal({
                   </p>
                 ) : depositWalletWithdrawMode ? (
                   <p className="text-[11px] leading-snug text-muted-foreground">
-                    Enter an amount or choose Max. Rawali will relay the Polygon pUSD transfer after your wallet signs.
+                    Enter an amount or choose Max. Rawli will relay the Polygon pUSD transfer after your wallet signs.
                   </p>
                 ) : (
                   <p className="text-[11px] leading-snug text-muted-foreground">
@@ -764,7 +778,7 @@ export function BnbFundingModal({
                     {withdrawGasAssist.loading && !withdrawGasAssist.status
                       ? "Checking Polygon gas before withdrawal..."
                       : withdrawGasAssist.status?.eligible
-                      ? `This wallet has pUSD but no Polygon gas. Rawali will send ${withdrawGasAssist.status.topupPol} POL before withdrawal.`
+                      ? `This wallet has pUSD but no Polygon gas. Rawli will send ${withdrawGasAssist.status.topupPol} POL before withdrawal.`
                       : withdrawGasAssist.error ?? "Polygon gas assist is not currently available."}
                   </div>
                   {withdrawGasAssist.status?.eligible ? (
@@ -803,7 +817,7 @@ export function BnbFundingModal({
               </div>
 
               <p className="text-[11px] leading-snug text-muted-foreground">
-                Rawali first creates a Polymarket withdrawal route, then your wallet sends the selected pUSD amount to that route on Polygon. The bridge returns it to your connected BNB wallet as USDT.
+                Rawli first creates a Polymarket withdrawal route, then your wallet sends the selected pUSD amount to that route on Polygon. The bridge returns it to your connected BNB wallet as USDT.
               </p>
 
               {withdrawStatus === "done" && withdrawResult && (
@@ -832,7 +846,14 @@ export function BnbFundingModal({
 
               <Button
                 type="button"
-                onClick={handleWithdraw}
+                onClick={() => {
+                  // Ask for confirmation on large withdrawals (> $50)
+                  if (withdrawAmountNumber > 50) {
+                    setWithdrawConfirmOpen(true)
+                  } else {
+                    void handleWithdraw()
+                  }
+                }}
                 disabled={withdrawDisabled}
                 className="w-full h-10 gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold"
               >
@@ -985,5 +1006,31 @@ export function BnbFundingModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Large withdrawal confirmation dialog */}
+    <AlertDialog open={withdrawConfirmOpen} onOpenChange={setWithdrawConfirmOpen}>
+      <AlertDialogContent className="bg-[oklch(0.13_0.013_255)] border-[oklch(0.22_0.015_255)]">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-foreground">Confirm withdrawal</AlertDialogTitle>
+          <AlertDialogDescription className="text-muted-foreground">
+            You are about to withdraw{" "}
+            <span className="font-semibold text-foreground">{withdrawAmount} pUSD</span>{" "}
+            from your Polymarket trading account to your {depositWalletWithdrawMode ? "connected" : "Polygon"} wallet.
+            <br /><br />
+            This transaction is irreversible once submitted. Ensure the destination address is correct.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="border-[oklch(0.22_0.015_255)]">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-[oklch(0.58_0.2_25)] hover:bg-[oklch(0.62_0.18_25)] text-white"
+            onClick={() => { setWithdrawConfirmOpen(false); void handleWithdraw() }}
+          >
+            Yes, withdraw {withdrawAmount} pUSD
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }

@@ -1,4 +1,4 @@
-# Rawali Analytic Prediction Terminal
+# Rawli Analytic Prediction Terminal
 
 BNB-native prediction trading terminal that routes Polymarket markets, orderbook liquidity, portfolio data, and funding flows into one interface.
 

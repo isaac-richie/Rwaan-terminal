@@ -21,7 +21,7 @@ const withdrawSchema = z.object({
   address: evmAddressSchema,
   toChainId: z.string().min(1),
   toTokenAddress: z.string().min(1),
-  recipientAddr: z.string().min(1)
+  recipientAddr: evmAddressSchema,   // must be a valid EVM address — malformed address = unrecoverable tx
 });
 
 export async function bridgeRoutes(app: FastifyInstance): Promise<void> {
@@ -54,7 +54,13 @@ export async function bridgeRoutes(app: FastifyInstance): Promise<void> {
     return postWithdraw(body.data);
   });
 
-  app.get<{ Params: { address: string } }>("/bridge/status/:address", async (req) => {
-    return getStatus(req.params.address);
+  app.get<{ Params: { address: string } }>("/bridge/status/:address", async (req, reply) => {
+    try {
+      return await getStatus(req.params.address);
+    } catch (err) {
+      req.log.warn({ err }, "bridge status upstream error");
+      reply.status(503);
+      return { ok: false, error: "upstream_unavailable" };
+    }
   });
 }

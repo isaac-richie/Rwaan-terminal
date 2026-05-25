@@ -24,7 +24,7 @@ export function GeoblockBanner() {
           <h1 className="text-xl font-bold text-foreground">Region not supported</h1>
           <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
             Polymarket prediction markets are not available in your region due to local
-            regulations. Rawali routes all trades through the Polymarket CLOB and must
+            regulations. Rawli routes all trades through the Polymarket CLOB and must
             respect the same restrictions.
           </p>
         </div>

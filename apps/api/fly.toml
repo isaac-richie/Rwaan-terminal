@@ -1,0 +1,47 @@
+# Rawli Analytic — API (Fastify)
+# Deploy from the repo root with:
+#   fly deploy . --config apps/api/fly.toml --app rawli-api
+# Secrets:     fly secrets set KEY=value --app rawli-api
+
+app = "rawli-api"
+primary_region = "sin"   # Singapore — closest to most crypto users outside US/UK
+
+[build]
+  dockerfile = "../../infra/docker/Dockerfile.api"
+
+  [build.args]
+    NODE_VERSION = "20"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4000"
+  HOST = "0.0.0.0"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 200
+    soft_limit = 150
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+# Required secrets (set via `fly secrets set`):
+#   OPENAI_API_KEY
+#   SUPABASE_DB_URL
+#   POLYMARKET_BUILDER_API_KEY
+#   POLYMARKET_BUILDER_SECRET
+#   POLYMARKET_BUILDER_PASSPHRASE
+#   PAYMENT_RECEIVER_ADDRESS
+#   BSC_RPC_URL
+#   POLYGON_RPC_URL
+#   POLYGON_GAS_RELAYER_PRIVATE_KEY
+#   REFERRAL_REWARD_SECRET

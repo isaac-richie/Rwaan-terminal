@@ -25,7 +25,7 @@ type FundingStatusState = {
 const DEFAULT_STATUS: Pick<FundingStatusState, "phase" | "label" | "message"> = {
   phase: "not_started",
   label: "Waiting for deposit",
-  message: "Send a supported BNB Chain asset to the deposit address, then Rawali will track bridge progress.",
+  message: "Send a supported BNB Chain asset to the deposit address, then Rawli will track bridge progress.",
 }
 
 export function formatFundingStatus(status?: string | null) {

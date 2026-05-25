@@ -59,11 +59,11 @@ export function Footer() {
             <div className="space-y-6">
               <Link href="/" className="inline-flex items-center gap-3 group">
                 <div className="relative flex h-10 w-16 items-center justify-center">
-                  <img src="/rawali-brand.png" alt="Rawali Analytic" className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105" />
+                  <img src="/rawli-brand.png" alt="Rawli Analytic" className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105" />
                 </div>
                 <div className="leading-none">
                   <p className="text-[15px] font-bold tracking-tight text-foreground">
-                    Rawali <span className="text-[oklch(0.78_0.16_82)]">Analytic</span>
+                    Rawli <span className="text-[oklch(0.78_0.16_82)]">Analytic</span>
                   </p>
                   <p className="mt-1 text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
                     prediction terminal
@@ -124,12 +124,29 @@ export function Footer() {
 
           {/* Bottom bar */}
           <div className="mt-12 pt-6 border-t border-[oklch(0.18_0.014_255)] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <p className="text-[11px] text-muted-foreground/60">
-              © {new Date().getFullYear()} Rawali Analytic.{" "}
-              <span className="text-muted-foreground/40">
-                Prediction markets routing. Not financial advice.
-              </span>
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <p className="text-[11px] text-muted-foreground/60">
+                © {new Date().getFullYear()} Rawli Analytic.{" "}
+                <span className="text-muted-foreground/40">
+                  Not financial advice.
+                </span>
+              </p>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/terms"
+                  className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  Terms
+                </Link>
+                <span className="text-[oklch(0.20_0.014_255)]">·</span>
+                <Link
+                  href="/privacy"
+                  className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  Privacy
+                </Link>
+              </div>
+            </div>
 
             <div className="flex items-center gap-4">
               {/* Chain status */}

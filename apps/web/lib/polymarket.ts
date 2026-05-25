@@ -555,7 +555,7 @@ export async function fetchPolymarketMarkets(
     const mergedEvents = new Map<string, GammaEventRaw>()
     for (const result of eventResults) {
       if (result.status !== "fulfilled") {
-        console.warn("[rawali] Polymarket category feed skipped:", result.reason)
+        console.warn("[rawli] Polymarket category feed skipped:", result.reason)
         continue
       }
       for (const event of result.value) {
@@ -707,7 +707,7 @@ export async function fetchPolymarketMarkets(
       feedBadges: m.feedBadges,
     }))
   } catch (err) {
-    console.error("[rawali] Polymarket fetch error:", err)
+    console.error("[rawli] Polymarket fetch error:", err)
     throw err
   }
 }

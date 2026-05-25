@@ -5,10 +5,10 @@ import { polygon, bsc } from "viem/chains";
 import { Toaster } from "@/components/ui/sonner";
 import type { ReactNode } from "react";
 
-const RawaliPrivyLogo = (
+const RawliPrivyLogo = (
   <img
-    src="/rawali-brand.png"
-    alt="Rawali Analytic"
+    src="/rawli-brand.png"
+    alt="Rawli Analytic"
     style={{ width: 96, height: 56, objectFit: "contain" }}
   />
 );
@@ -46,7 +46,7 @@ export default function Providers({ children }: { children: ReactNode }) {
         appearance: {
           theme: "dark",
           accentColor: "#f0b90b",
-          logo: RawaliPrivyLogo,
+          logo: RawliPrivyLogo,
           walletChainType: "ethereum-only",
         },
         embeddedWallets: {

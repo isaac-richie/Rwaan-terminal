@@ -36,7 +36,7 @@
     <g transform="translate(0 0)">
       <path d="M0 34 C18 4 42 4 58 34 C74 64 98 64 116 34" fill="none" stroke="#7d37ff" stroke-width="13" stroke-linecap="round"/>
       <path d="M0 34 C18 64 42 64 58 34 C74 4 98 4 116 34" fill="none" stroke="#15b8ff" stroke-width="13" stroke-linecap="round" opacity="0.75"/>
-      <text x="142" y="24" class="txt bold" font-size="22">Rawali <tspan class="gold">Analytic</tspan></text>
+      <text x="142" y="24" class="txt bold" font-size="22">Rawli <tspan class="gold">Analytic</tspan></text>
       <text x="142" y="43" class="txt muted tiny" letter-spacing="3">PREDICTION TERMINAL</text>
     </g>
     <text x="420" y="34" class="txt muted small">Markets</text>

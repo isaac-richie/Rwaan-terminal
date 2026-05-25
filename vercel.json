@@ -1,0 +1,15 @@
+{
+  "buildCommand": "npm run build --workspace=apps/web",
+  "outputDirectory": "apps/web/.next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/" }
+  ],
+  "env": {
+    "NEXT_PUBLIC_PRIVY_APP_ID": "@privy_app_id",
+    "NEXT_PUBLIC_API_BASE_URL": "@api_base_url",
+    "NEXT_PUBLIC_ENABLE_KALSHI": "false",
+    "NEXT_PUBLIC_ENABLE_POLYMARKET_GEOBLOCK": "false"
+  }
+}

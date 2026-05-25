@@ -1,23 +1,23 @@
 "use client"
 
-export const RAWALI_ACCOUNT_REFRESH_EVENT = "rawali:account-refresh"
+export const RAWLI_ACCOUNT_REFRESH_EVENT = "rawli:account-refresh"
 
-export type RawaliAccountRefreshDetail = {
+export type RawliAccountRefreshDetail = {
   address?: string | null
   reason?: string
 }
 
-export function emitAccountRefresh(detail: RawaliAccountRefreshDetail = {}) {
+export function emitAccountRefresh(detail: RawliAccountRefreshDetail = {}) {
   if (typeof window === "undefined") return
   window.dispatchEvent(
-    new CustomEvent<RawaliAccountRefreshDetail>(RAWALI_ACCOUNT_REFRESH_EVENT, {
+    new CustomEvent<RawliAccountRefreshDetail>(RAWLI_ACCOUNT_REFRESH_EVENT, {
       detail,
     })
   )
 }
 
 export function scheduleAccountRefresh(
-  detail: RawaliAccountRefreshDetail = {},
+  detail: RawliAccountRefreshDetail = {},
   delaysMs: number[] = [0, 2_500, 8_000]
 ) {
   if (typeof window === "undefined") return
@@ -26,13 +26,13 @@ export function scheduleAccountRefresh(
   })
 }
 
-export function addAccountRefreshListener(listener: (detail: RawaliAccountRefreshDetail) => void) {
+export function addAccountRefreshListener(listener: (detail: RawliAccountRefreshDetail) => void) {
   if (typeof window === "undefined") return () => {}
 
   const handler = (event: Event) => {
-    listener((event as CustomEvent<RawaliAccountRefreshDetail>).detail ?? {})
+    listener((event as CustomEvent<RawliAccountRefreshDetail>).detail ?? {})
   }
 
-  window.addEventListener(RAWALI_ACCOUNT_REFRESH_EVENT, handler)
-  return () => window.removeEventListener(RAWALI_ACCOUNT_REFRESH_EVENT, handler)
+  window.addEventListener(RAWLI_ACCOUNT_REFRESH_EVENT, handler)
+  return () => window.removeEventListener(RAWLI_ACCOUNT_REFRESH_EVENT, handler)
 }
