@@ -360,12 +360,12 @@ const STATUS_CONFIG: Record<ActivityStatus, { dot: string; label: string }> = {
 
 type FilterType = "all" | "trades" | "funding" | "positions" | "orders"
 
-const FILTERS: { key: FilterType; label: string; types: ActivityEventType[] }[] = [
-  { key: "all",       label: "All",       types: [] },
-  { key: "trades",    label: "Trades",    types: ["buy", "sell"] },
-  { key: "funding",   label: "Funding",   types: ["deposit", "withdrawal", "bridge"] },
-  { key: "positions", label: "Positions", types: ["position_open", "position_closed"] },
-  { key: "orders",    label: "Orders",    types: ["order_placed", "order_cancelled"] },
+const FILTERS: { key: FilterType; label: string; short: string; types: ActivityEventType[] }[] = [
+  { key: "all",       label: "All",       short: "All",    types: [] },
+  { key: "trades",    label: "Trades",    short: "Trades", types: ["buy", "sell"] },
+  { key: "funding",   label: "Funding",   short: "Fund",   types: ["deposit", "withdrawal", "bridge"] },
+  { key: "positions", label: "Positions", short: "Pos.",   types: ["position_open", "position_closed"] },
+  { key: "orders",    label: "Orders",    short: "Orders", types: ["order_placed", "order_cancelled"] },
 ]
 
 // ─── Single event card ────────────────────────────────────────────────────────
@@ -595,7 +595,8 @@ export function ActivityFeed({
                   : "text-muted-foreground hover:bg-[oklch(0.16_0.014_255)] hover:text-foreground",
               )}
             >
-              {f.label}
+              <span className="sm:hidden">{f.short}</span>
+              <span className="hidden sm:inline">{f.label}</span>
               {count > 0 && (
                 <span className={cn(
                   "rounded px-1 py-0 text-[9px] font-bold tabular-nums",
