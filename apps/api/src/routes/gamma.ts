@@ -28,12 +28,36 @@ function pickFields(source: UnknownRecord, keys: string[]) {
 }
 
 function compactDescription(value: unknown) {
-  return typeof value === "string" ? value.slice(0, 240) : undefined;
+  return typeof value === "string" ? value.slice(0, 120) : undefined;
+}
+
+function compactTags(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .map((tag) => {
+      if (typeof tag === "string") return { label: tag };
+      if (!tag || typeof tag !== "object") return null;
+      const record = tag as UnknownRecord;
+      const label = record.label ?? record.name ?? record.slug;
+      return typeof label === "string" && label ? { label } : null;
+    })
+    .filter(Boolean);
+}
+
+function dropDuplicateIcon(record: UnknownRecord) {
+  if (record.icon && record.image && record.icon === record.image) delete record.icon;
+  return record;
+}
+
+function isOpenGammaMarket(raw: unknown) {
+  if (!raw || typeof raw !== "object") return false;
+  const market = raw as UnknownRecord;
+  return market.active !== false && market.closed !== true;
 }
 
 function compactGammaMarket(raw: unknown) {
   const market = raw && typeof raw === "object" ? (raw as UnknownRecord) : {};
-  return {
+  return dropDuplicateIcon({
     ...pickFields(market, [
       "id",
       "question",
@@ -53,7 +77,6 @@ function compactGammaMarket(raw: unknown) {
       "slug",
       "conditionId",
       "tokens",
-      "tags",
       "outcomes",
       "outcomePrices",
       "outcome_prices",
@@ -63,13 +86,16 @@ function compactGammaMarket(raw: unknown) {
       "startDate",
     ]),
     description: compactDescription(market.description),
-  };
+    tags: compactTags(market.tags),
+  });
 }
 
 function compactGammaEvent(raw: unknown) {
   const event = raw && typeof raw === "object" ? (raw as UnknownRecord) : {};
-  const markets = Array.isArray(event.markets) ? event.markets.map(compactGammaMarket) : [];
-  return {
+  const markets = Array.isArray(event.markets)
+    ? event.markets.filter(isOpenGammaMarket).map(compactGammaMarket)
+    : [];
+  return dropDuplicateIcon({
     ...pickFields(event, [
       "id",
       "title",
@@ -87,12 +113,12 @@ function compactGammaEvent(raw: unknown) {
       "new",
       "featured",
       "slug",
-      "tags",
       "createdAt",
       "startDate",
     ]),
+    tags: compactTags(event.tags),
     markets,
-  };
+  });
 }
 
 function compactGammaEvents(raw: unknown) {
