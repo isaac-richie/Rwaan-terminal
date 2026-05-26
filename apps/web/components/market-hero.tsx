@@ -11,7 +11,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react"
-import { fetchMarkets } from "@/lib/markets"
+import { fetchMarkets, getCachedMarkets } from "@/lib/markets"
 import type { PolymarketMarket } from "@/lib/polymarket"
 import { cn } from "@/lib/utils"
 
@@ -87,10 +87,15 @@ function HeroSkeleton() {
 
 export function MarketHero() {
   const router = useRouter()
-  const [trending, setTrending] = useState<PolymarketMarket[]>([])
-  const [breaking, setBreaking] = useState<PolymarketMarket[]>([])
+  // Hydrate from cache — instant render on re-navigation, no shimmers
+  const cachedTrending = getCachedMarkets("all", 10, "trending", 0)
+  const cachedBreaking = getCachedMarkets("News", 14, "newest", 0)
+  const [trending, setTrending] = useState<PolymarketMarket[]>(cachedTrending ?? [])
+  const [breaking, setBreaking] = useState<PolymarketMarket[]>(
+    cachedBreaking?.length ? cachedBreaking : cachedTrending?.slice(0, 8) ?? []
+  )
   const [activeIndex, setActiveIndex] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!cachedTrending)
   const touchStartX = useRef<number>(0)
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -108,7 +113,6 @@ export function MarketHero() {
   useEffect(() => {
     let cancelled = false
     async function load() {
-      setLoading(true)
       try {
         const [hotMarkets, newsMarkets] = await Promise.all([
           fetchMarkets("all", 10, "trending", 0),
@@ -117,7 +121,6 @@ export function MarketHero() {
         if (cancelled) return
         setTrending(hotMarkets)
         setBreaking(newsMarkets.length ? newsMarkets : hotMarkets.slice(0, 8))
-        setActiveIndex(0)
       } catch (err) {
         console.error("[rawli] Hero load failed:", err)
       } finally {

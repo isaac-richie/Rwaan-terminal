@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { Loader2, RefreshCw, AlertCircle } from "lucide-react"
 import { TradingCard } from "./trading-card"
-import { fetchMarkets } from "@/lib/markets"
+import { fetchMarkets, getCachedMarkets } from "@/lib/markets"
 import type { PolymarketMarket } from "@/lib/polymarket"
 
 interface MarketsGridProps {
@@ -36,10 +36,12 @@ function dedupeMarkets(markets: PolymarketMarket[]) {
 }
 
 export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
-  const [markets, setMarkets] = useState<PolymarketMarket[]>([])
-  const [loading, setLoading] = useState(true)
+  // Hydrate from module-level cache so re-navigation never shows shimmers
+  const initial = getCachedMarkets(category, 12, sortBy, 0, search)
+  const [markets, setMarkets] = useState<PolymarketMarket[]>(initial ?? [])
+  const [loading, setLoading] = useState(!initial)
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
+  const [page, setPage] = useState(initial ? 1 : 0)
   const [hasMore, setHasMore] = useState(true)
   const fetchKey = useRef<string>("")
 
