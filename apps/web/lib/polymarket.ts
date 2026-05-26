@@ -491,6 +491,36 @@ function parseTokenIds(raw: GammaMarketRaw): string[] {
   }
 }
 
+// ─── In-flight request dedup ─────────────────────────────────────────────────
+// Prevents hero + grid from firing duplicate API requests for the same data.
+const inflightGamma = new Map<string, Promise<GammaEventRaw[]>>()
+
+function fetchGammaEventsDeduped(url: string): Promise<GammaEventRaw[]> {
+  const existing = inflightGamma.get(url)
+  if (existing) return existing
+
+  const promise = (async () => {
+    let res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" })
+    if (!res.ok) {
+      // Retry with "volume" order if volume_24hr fails
+      const retryUrl = url.replace("order=volume_24hr", "order=volume")
+      if (retryUrl !== url) {
+        res = await fetch(retryUrl, { headers: { Accept: "application/json" }, cache: "no-store" })
+      }
+    }
+    if (!res.ok) throw new Error(`Gamma API error: ${res.status}`)
+    return (await res.json()) as GammaEventRaw[]
+  })()
+  inflightGamma.set(url, promise)
+  // Remove after 8s so next load gets fresh data
+  promise.finally(() => setTimeout(() => inflightGamma.delete(url), 8000))
+  return promise
+}
+
+// For "all" + trending/volume, use only the 4 highest-traffic tags instead of 14.
+// Covers crypto, news, entertainment, sports — the scoring system fills in the rest.
+const FAST_ALL_TAG_IDS = ["21", "2", "596", "1"] // crypto, news, entertainment, sports
+
 export async function fetchPolymarketMarkets(
   category?: string,
   limit = 24,
@@ -520,35 +550,23 @@ export async function fetchPolymarketMarkets(
     })
     if (search) {
       baseParams.set("search", search)
-      // broaden limit for search to improve match rate
       baseParams.set("limit", Math.max(limit * 8, 120).toString())
       baseParams.set("offset", "0")
     }
 
-    const tagIds = getCategoryFeedTagIds(category)
+    const normalizedCat = normalizeCategory(category)
+    // Fast path: "all" with trending/volume uses only 4 broad tags (not 14)
+    const tagIds = normalizedCat === "all" && (sortBy === "trending" || sortBy === "volume") && !search
+      ? FAST_ALL_TAG_IDS
+      : getCategoryFeedTagIds(category)
     if (tagIds.length === 0) return []
 
     const eventResults = await Promise.allSettled(
-      tagIds.map(async (tagId) => {
+      tagIds.map((tagId) => {
         const params = new URLSearchParams(baseParams)
         params.set("tag_id", tagId)
         params.set("related_tags", "true")
-        let res = await fetch(`${API_BASE}/gamma/events?${params.toString()}`, {
-          headers: { Accept: "application/json" },
-          cache: "no-store",
-        })
-        if (!res.ok) {
-          const retryParams = new URLSearchParams(params)
-          if (retryParams.get("order") === "volume_24hr") {
-            retryParams.set("order", "volume")
-          }
-          res = await fetch(`${API_BASE}/gamma/events?${retryParams.toString()}`, {
-            headers: { Accept: "application/json" },
-            cache: "no-store",
-          })
-        }
-        if (!res.ok) throw new Error(`Polymarket API error for tag ${tagId}: ${res.status}`)
-        return (await res.json()) as GammaEventRaw[]
+        return fetchGammaEventsDeduped(`${API_BASE}/gamma/events?${params.toString()}`)
       })
     )
 

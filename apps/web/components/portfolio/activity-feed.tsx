@@ -379,15 +379,15 @@ function ActivityCard({ event }: { event: ActivityEvent }) {
 
   return (
     <div className={cn(
-      "group flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[oklch(0.14_0.012_260/0.6)]",
+      "group flex items-start gap-2.5 sm:gap-3 rounded-xl border p-2.5 sm:p-3 transition-colors active:bg-[oklch(0.14_0.012_260/0.6)] sm:hover:bg-[oklch(0.14_0.012_260/0.6)]",
       cfg.borderColor,
     )}>
       {/* Icon pill */}
       <div className={cn(
-        "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+        "mt-0.5 flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg border",
         cfg.bgColor, cfg.borderColor,
       )}>
-        <Icon className={cn("h-3.5 w-3.5", cfg.iconColor)} />
+        <Icon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5", cfg.iconColor)} />
       </div>
 
       {/* Body */}
@@ -402,13 +402,13 @@ function ActivityCard({ event }: { event: ActivityEvent }) {
             )}>
               {cfg.label}
             </span>
-            <span className="text-[12px] font-semibold text-foreground leading-snug">
+            <span className="text-[11px] sm:text-[12px] font-semibold text-foreground leading-snug">
               {event.title}
             </span>
           </div>
           {event.amount && (
             <span className={cn(
-              "shrink-0 font-mono text-[11px] font-bold",
+              "shrink-0 font-mono text-[10px] sm:text-[11px] font-bold",
               event.type === "buy" || event.type === "deposit" || (event.type === "position_closed" && event.raw?.profit > 0)
                 ? "text-[oklch(0.68_0.18_155)]"
                 : event.type === "sell" || event.type === "withdrawal"
@@ -424,7 +424,7 @@ function ActivityCard({ event }: { event: ActivityEvent }) {
         {(event.market || event.outcome) && (
           <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
             {event.market && (
-              <span className="text-[11px] text-muted-foreground leading-snug truncate max-w-[280px]">
+              <span className="text-[10px] sm:text-[11px] text-muted-foreground leading-snug truncate max-w-[200px] sm:max-w-[280px]">
                 {event.market}
               </span>
             )}
