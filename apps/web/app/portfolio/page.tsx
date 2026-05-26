@@ -602,7 +602,75 @@ function PortfolioContent() {
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-20 pt-24 sm:px-6 lg:px-8">
 
         {/* ── Header ─────────────────────────────────────── */}
-        <div className="flex items-start justify-between gap-4 pt-6">
+
+        {/* ─ Mobile header ─ */}
+        <div className="sm:hidden pt-4">
+          {/* Title row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">My Portfolio</span>
+              {walletAddress && (
+                <span className="rounded-full border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.012_260)] px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                  {shortAddress(walletAddress)}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={handleRefreshAll}
+              disabled={portfolio.loading || !tradingWalletAddress}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[oklch(0.22_0.015_255)] text-muted-foreground disabled:opacity-40"
+              aria-label="Refresh"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", portfolio.loading && "animate-spin")} />
+            </button>
+          </div>
+
+          {/* Account value */}
+          <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground">
+            {data || pUsdBalance !== null ? formatPortfolioMoney(accountValue) : "$0.00"}
+          </h1>
+
+          {/* P/L row */}
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
+            <span className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+              stats.unrealizedPositive
+                ? "border-[oklch(0.68_0.18_155/0.30)] bg-[oklch(0.68_0.18_155/0.08)] text-[oklch(0.72_0.18_155)]"
+                : "border-[oklch(0.60_0.18_25/0.30)] bg-[oklch(0.60_0.18_25/0.08)] text-[oklch(0.64_0.18_25)]"
+            )}>
+              {stats.unrealizedPositive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+              Unrealized {data ? portfolio.summary.unrealized : "$0.00"}
+            </span>
+            <span className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+              stats.realizedPositive
+                ? "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.05)] text-[oklch(0.72_0.18_155)]"
+                : "border-[oklch(0.60_0.18_25/0.20)] bg-[oklch(0.60_0.18_25/0.05)] text-[oklch(0.64_0.18_25)]"
+            )}>
+              Realized {data ? portfolio.summary.realized : "$0.00"}
+            </span>
+            {portfolio.loading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+            {!portfolio.loading && portfolio.lastUpdated && (
+              <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" /> Live
+              </span>
+            )}
+          </div>
+
+          {/* Fund button — full width CTA */}
+          <button
+            type="button"
+            onClick={() => setFundingOpen(true)}
+            disabled={!walletAddress || tradingProfile.loading || !tradingProfile.profile}
+            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[oklch(0.78_0.16_82)] text-sm font-bold text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-40"
+          >
+            <Wallet className="h-4 w-4" />
+            Fund Account
+          </button>
+        </div>
+
+        {/* ─ Desktop header ─ */}
+        <div className="hidden sm:flex items-start justify-between gap-4 pt-6">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-muted-foreground">My Portfolio</span>
@@ -684,23 +752,25 @@ function PortfolioContent() {
 
         {/* ── Connect wallet prompt ───────────────────────── */}
         {!walletAddress && (
-          <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.6)] px-5 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.014_255)]">
-                <Wallet className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
+          <div className="mt-5 rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.6)] px-4 py-4 sm:px-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.014_255)]">
+                  <Wallet className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Connect wallet to load portfolio</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">Rawli resolves your trading wallet and pulls live positions from Polymarket.</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-semibold text-foreground">Connect wallet to load portfolio</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">Rawli resolves your trading wallet and pulls live positions from Polymarket.</div>
-              </div>
+              <Button
+                onClick={handleConnectWallet}
+                disabled={!ready}
+                className="h-11 sm:h-9 w-full sm:w-auto shrink-0 rounded-xl bg-[oklch(0.78_0.16_82)] px-4 text-sm sm:text-xs font-bold text-[oklch(0.10_0.012_260)] hover:bg-[oklch(0.83_0.16_82)]"
+              >
+                {ready ? "Connect Wallet" : <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              </Button>
             </div>
-            <Button
-              onClick={handleConnectWallet}
-              disabled={!ready}
-              className="h-9 shrink-0 rounded-xl bg-[oklch(0.78_0.16_82)] px-4 text-xs font-bold text-[oklch(0.10_0.012_260)] hover:bg-[oklch(0.83_0.16_82)]"
-            >
-              {ready ? "Connect" : <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            </Button>
           </div>
         )}
 
@@ -712,16 +782,16 @@ function PortfolioContent() {
             { label: "Closed positions", value: data ? String(closedPositions.length) : "—", icon: CheckCircle2, tone: stats.realizedPositive ? "positive" as const : "negative" as const },
             { label: "Avg P/L", value: data ? formatPercent(stats.avgPnlPercent) : "—", icon: stats.avgPnlPercent >= 0 ? TrendingUp : TrendingDown, tone: stats.avgPnlPercent >= 0 ? "positive" as const : "negative" as const },
           ].map(({ label, value, icon: Icon, tone }) => (
-            <div key={label} className="surface-card rounded-2xl p-4">
+            <div key={label} className="surface-card rounded-xl sm:rounded-2xl p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
-                <Icon className={cn("h-3.5 w-3.5",
+                <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
+                <Icon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5",
                   tone === "positive" && "text-[oklch(0.68_0.18_155)]",
                   tone === "negative" && "text-[oklch(0.60_0.18_25)]",
                   tone === "gold" && "text-[oklch(0.78_0.16_82)]",
                 )} />
               </div>
-              <div className="mt-3 text-xl font-bold tracking-tight text-foreground">{value}</div>
+              <div className="mt-2 sm:mt-3 text-lg sm:text-xl font-bold tracking-tight text-foreground">{value}</div>
             </div>
           ))}
         </div>
@@ -744,19 +814,19 @@ function PortfolioContent() {
 
         {/* ── Wallet / funding strip ──────────────────────── */}
         {walletAddress && (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
             {[
               { label: "Connected wallet", value: shortAddress(walletAddress) },
               { label: "Trading wallet", value: shortAddress(tradingWalletAddress) },
               { label: "BNB deposit", value: shortAddress(depositAddress) },
             ].map((item) => (
-              <div key={item.label} className="surface-card flex items-center justify-between rounded-xl px-4 py-3">
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{item.label}</span>
-                <span className="font-mono text-xs text-foreground">{item.value}</span>
+              <div key={item.label} className="surface-card flex items-center justify-between rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{item.label}</span>
+                <span className="font-mono text-[11px] sm:text-xs text-foreground">{item.value}</span>
               </div>
             ))}
-            <div className="surface-card flex items-center justify-between rounded-xl px-4 py-3 sm:col-span-2 lg:col-span-1">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Bridge</span>
+            <div className="surface-card flex items-center justify-between rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 sm:col-span-2 lg:col-span-1">
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Bridge</span>
               <button
                 type="button"
                 onClick={fundingStatus.refresh}
@@ -1103,8 +1173,8 @@ function PortfolioContent() {
         )}
 
         {/* ── Activity feed ─────────────────────────────────── */}
-        <div className="mt-8 grid gap-4 lg:grid-cols-12">
-          <div className="surface-card rounded-2xl lg:col-span-7 flex flex-col min-h-[420px]">
+        <div className="mt-6 sm:mt-8 grid gap-4 lg:grid-cols-12">
+          <div className="surface-card rounded-2xl lg:col-span-7 flex flex-col min-h-[320px] sm:min-h-[420px]">
             <ActivityFeed
               trades={trades}
               bridgeTxs={fundingStatus.transactions}
