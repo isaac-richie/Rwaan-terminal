@@ -69,8 +69,8 @@ const EARNING_METHODS = [
   {
     icon: Sparkles,
     title: "Unlock premium intelligence",
-    detail: "Each $1 deep analysis purchase earns a 25-point bonus.",
-    pts: "+25 pts",
+    detail: "Each paid analysis unlock earns a larger premium reward because users pay for the signal.",
+    pts: "+150 pts",
     color: "oklch(0.78_0.16_82)",
   },
   {
@@ -337,7 +337,7 @@ export default function PointsPage() {
             Edge compounds over time.
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-            Rawli Points reward traders who move early, trade smart, and unlock intelligence. Stack points across seasons to climb tiers and unlock builder-level rewards.
+            Rawli Points reward traders who move early, trade smart, and unlock intelligence. Stack points across seasons to climb tiers and qualify for future governance-token rewards.
           </p>
         </section>
 
@@ -368,7 +368,7 @@ export default function PointsPage() {
 
             <div className="mt-5 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.65)] p-3 text-[11px] leading-5 text-muted-foreground">
               {connectedWalletAddress
-                ? `Cashback credits accrued: ${formatCashback(summary?.cashbackCents ?? 0)}. Quest bonuses are credited automatically when completed.`
+                ? `Cashback credits accrued: ${formatCashback(summary?.cashbackCents ?? 0)}. Quest bonuses are credited automatically, and points will help determine governance-token rewards.`
                 : "Connect your wallet and execute your first trade to begin earning Season 1 points."}
             </div>
             <button
@@ -404,7 +404,7 @@ export default function PointsPage() {
                 </div>
               </div>
               <p className="mt-4 text-xs text-muted-foreground">
-                Season 1 has not launched yet. All trades, analysis unlocks, and referrals from now are being tracked for the retroactive points snapshot.
+                Season 1 has not launched yet. All trades, analysis unlocks, and referrals from now are being tracked for the retroactive points and governance-token snapshot.
               </p>
             </div>
 
@@ -636,7 +636,7 @@ export default function PointsPage() {
 
             <div className="flex items-center justify-center gap-2 border-t border-[oklch(0.18_0.014_255)] py-3 text-xs text-muted-foreground">
               <Lock className="h-3 w-3" />
-              Full season rankings lock in at Season 1 launch
+              Rankings feed future governance-token reward calculations
             </div>
           </div>
         </section>
@@ -709,7 +709,7 @@ export default function PointsPage() {
               <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-[oklch(0.82_0.16_82)]">Start earning now</div>
               <h2 className="mt-2 text-xl font-bold text-foreground">Pre-season trades count retroactively.</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Every trade you execute through Rawli before Season 1 launches will be counted toward your founding snapshot.
+                Every trade and paid analysis unlock before Season 1 launches will count toward your founding points and governance-token reward snapshot.
               </p>
             </div>
             <a

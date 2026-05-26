@@ -14,6 +14,7 @@ vi.mock("./services/polymarket.js", async () => {
 const { buildServer } = await import("./server.js");
 const { closeTradingProfileDbForTests } = await import("./services/db.js");
 const { getClobAuthenticated } = await import("./services/polymarket.js");
+const { recordPremiumUnlockReward } = await import("./services/rewards.js");
 
 const walletA = "0x0000000000000000000000000000000000000001";
 const walletB = "0x0000000000000000000000000000000000000002";
@@ -165,6 +166,29 @@ describe("points routes", () => {
 
       expect(res.statusCode).toBe(403);
       expect(res.json().error).toBe("order_owner_mismatch");
+    });
+  });
+
+  it("credits paid premium analysis unlocks with the higher reward", async () => {
+    await withRewardStore(async () => {
+      const app = buildServer();
+      await recordPremiumUnlockReward({
+        wallet: walletA,
+        txHash: "0xabc123",
+        marketId: "market-premium",
+        amountRaw: "1000000000000000000",
+      });
+
+      const summaryRes = await app.inject({ method: "GET", url: `/points/summary/${walletA}` });
+      const summary = summaryRes.json().summary;
+
+      expect(summaryRes.statusCode).toBe(200);
+      expect(summary.totalPoints).toBe(175);
+      expect(summary.premiumUnlocks).toBe(1);
+      expect(summary.cashbackCents).toBe(5);
+      expect(summary.events.map((event: any) => event.eventType)).toEqual(
+        expect.arrayContaining(["premium_unlock", "daily_quest_completed"]),
+      );
     });
   });
 });

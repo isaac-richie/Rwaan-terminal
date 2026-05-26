@@ -1,7 +1,7 @@
 import { recordRewardEvent, getTotalTradeCount, getReferrerForReferee, markReferralRewarded, getRewardEventsSince } from "./db.js";
 import type { RewardEventRow } from "./db.js";
 
-const PREMIUM_UNLOCK_POINTS = 25;
+const PREMIUM_UNLOCK_POINTS = 150;
 const PREMIUM_UNLOCK_CASHBACK_CENTS = 5;
 const TRADE_CASHBACK_BPS = 25;
 const MAX_TRADE_CASHBACK_CENTS = 100;
