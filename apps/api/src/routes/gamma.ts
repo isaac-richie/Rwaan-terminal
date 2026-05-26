@@ -18,7 +18,12 @@ export async function gammaRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/gamma/events", async (req) => {
     const query = gammaQuerySchema.parse(req.query ?? {});
-    return getGamma("/events", query);
+    const cacheKey = buildCacheKey("gamma:events", query);
+    const cached = await getJsonCache(cacheKey);
+    if (cached) return cached;
+    const events = await getGamma("/events", query);
+    await setJsonCache(cacheKey, events, 30);
+    return events;
   });
 
   app.get("/gamma/tags", async (req) => {

@@ -563,7 +563,7 @@ export function ActivityFeed({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-[oklch(0.16_0.014_255)] px-5 py-4">
+      <div className="flex items-center justify-between gap-2 border-b border-[oklch(0.16_0.014_255)] px-4 sm:px-5 py-3 sm:py-4">
         <div className="flex items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
@@ -578,8 +578,8 @@ export function ActivityFeed({
         {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
       </div>
 
-      {/* Filter pills */}
-      <div className="flex items-center gap-1.5 overflow-x-auto px-5 py-3 scrollbar-none border-b border-[oklch(0.14_0.012_260)]">
+      {/* Filter pills — horizontally scrollable on mobile */}
+      <div className="flex items-center gap-1.5 overflow-x-auto [-webkit-overflow-scrolling:touch] no-scrollbar px-4 sm:px-5 py-2.5 sm:py-3 border-b border-[oklch(0.14_0.012_260)]">
         {FILTERS.map((f) => {
           const count = counts[f.key] ?? 0
           const active = filter === f.key
@@ -589,7 +589,7 @@ export function ActivityFeed({
               type="button"
               onClick={() => setFilter(f.key)}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-all duration-150",
+                "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 sm:py-1.5 text-[11px] sm:text-[10px] font-bold uppercase tracking-[0.12em] transition-all duration-150",
                 active
                   ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] shadow-[0_4px_12px_oklch(0.78_0.16_82/0.25)]"
                   : "text-muted-foreground hover:bg-[oklch(0.16_0.014_255)] hover:text-foreground",
@@ -610,7 +610,7 @@ export function ActivityFeed({
       </div>
 
       {/* Event list */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-2.5 sm:py-3 space-y-2">
         {visible.length === 0 && !loading && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.012_260)] mb-3">
