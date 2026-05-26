@@ -578,8 +578,8 @@ export function ActivityFeed({
         {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
       </div>
 
-      {/* Filter pills — horizontally scrollable on mobile */}
-      <div className="flex items-center gap-1.5 overflow-x-auto [-webkit-overflow-scrolling:touch] no-scrollbar px-4 sm:px-5 py-2.5 sm:py-3 border-b border-[oklch(0.14_0.012_260)]">
+      {/* Filter pills — all visible on mobile, no scrolling needed */}
+      <div className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-[oklch(0.14_0.012_260)]">
         {FILTERS.map((f) => {
           const count = counts[f.key] ?? 0
           const active = filter === f.key
@@ -589,7 +589,7 @@ export function ActivityFeed({
               type="button"
               onClick={() => setFilter(f.key)}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 sm:py-1.5 text-[11px] sm:text-[10px] font-bold uppercase tracking-[0.12em] transition-all duration-150",
+                "flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-[10px] font-bold uppercase tracking-[0.04em] sm:tracking-[0.12em] transition-all duration-150",
                 active
                   ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] shadow-[0_4px_12px_oklch(0.78_0.16_82/0.25)]"
                   : "text-muted-foreground hover:bg-[oklch(0.16_0.014_255)] hover:text-foreground",
