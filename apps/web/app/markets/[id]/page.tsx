@@ -71,12 +71,11 @@ interface MarketDetail {
   description?: string;
 }
 
-const QUICK_AMOUNTS = ["3", "5", "10", "25"];
-const SELL_PERCENT_AMOUNTS = [
+const PERCENT_PRESETS = [
   { label: "25%", value: 0.25 },
   { label: "50%", value: 0.5 },
   { label: "75%", value: 0.75 },
-  { label: "Max", value: 1 },
+  { label: "100%", value: 1 },
 ];
 
 function parseStringArray(raw: unknown): string[] {
@@ -659,6 +658,13 @@ export default function MarketDetailPage() {
     if (availableShares <= 0) return;
     setOrderAmount(formatShareInput(availableShares * percent));
   };
+  const setBuyPercentAmount = (percent: number) => {
+    const available = spendablePusd ?? availablePusd;
+    if (!available || available <= 0) return;
+    const value = Math.floor(available * percent * 100) / 100; // floor to 2 decimals
+    setOrderAmount(value.toFixed(2));
+  };
+  const hasBuyReferenceBalance = (spendablePusd ?? availablePusd ?? 0) > 0;
   const signOrderPreviewDisabled =
     signingOrder ||
     (requiresCollateral && !tradeCollateralGate.ready) ||
@@ -1337,41 +1343,30 @@ export default function MarketDetailPage() {
                   />
                 </div>
                 <div className="flex gap-1.5">
-                  {tradeSide === "buy"
-                    ? QUICK_AMOUNTS.map((amt) => (
-                        <button
-                          key={amt}
-                          onClick={() => setOrderAmount(amt)}
-                          disabled={tradeActionBusy}
-                          className={cn(
-                            "flex-1 h-7 rounded-lg text-[10px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60",
-                            orderAmount === amt
-                              ? "bg-[oklch(0.78_0.16_82/0.15)] border border-[oklch(0.78_0.16_82/0.35)] text-[oklch(0.78_0.16_82)]"
-                              : "bg-[oklch(0.15_0.013_255)] border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground hover:border-[oklch(0.28_0.018_255)]"
-                          )}
-                        >
-                          ${amt}
-                        </button>
-                      ))
-                    : SELL_PERCENT_AMOUNTS.map((item) => {
-                        const targetShares = sellReferenceShares * item.value;
-                        const active = targetShares > 0 && Math.abs(amountNumber - targetShares) < 0.0001;
-                        return (
-                          <button
-                            key={item.label}
-                            onClick={() => setSellPercentAmount(item.value)}
-                            disabled={!hasSellReferenceShares || tradeActionBusy}
-                            className={cn(
-                              "flex-1 h-7 rounded-lg text-[10px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-45",
-                              active
-                                ? "bg-[oklch(0.78_0.16_82/0.15)] border border-[oklch(0.78_0.16_82/0.35)] text-[oklch(0.78_0.16_82)]"
-                                : "bg-[oklch(0.15_0.013_255)] border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground hover:border-[oklch(0.28_0.018_255)]"
-                            )}
-                          >
-                            {item.label}
-                          </button>
-                        );
-                      })}
+                  {PERCENT_PRESETS.map((item) => {
+                    const isBuy = tradeSide === "buy";
+                    const refBalance = isBuy ? (spendablePusd ?? availablePusd ?? 0) : sellReferenceShares;
+                    const targetAmount = refBalance * item.value;
+                    const active = targetAmount > 0 && Math.abs(amountNumber - targetAmount) < (isBuy ? 0.015 : 0.0001);
+                    const disabled = isBuy
+                      ? !hasBuyReferenceBalance || tradeActionBusy
+                      : !hasSellReferenceShares || tradeActionBusy;
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={() => isBuy ? setBuyPercentAmount(item.value) : setSellPercentAmount(item.value)}
+                        disabled={disabled}
+                        className={cn(
+                          "flex-1 h-7 rounded-lg text-[10px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-45",
+                          active
+                            ? "bg-[oklch(0.78_0.16_82/0.15)] border border-[oklch(0.78_0.16_82/0.35)] text-[oklch(0.78_0.16_82)]"
+                            : "bg-[oklch(0.15_0.013_255)] border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground hover:border-[oklch(0.28_0.018_255)]"
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
                 </div>
                 {connectedWalletAddress && (
                   <div className="grid grid-cols-3 gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] p-2.5">
