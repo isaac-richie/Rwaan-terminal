@@ -117,10 +117,26 @@ export async function deployDepositWallet(owner: string): Promise<DepositWalletD
   }
 
   const response = await relayClient.deployDepositWallet();
-  const mined = await response.wait();
+
+  // Wait for mining with a 45s timeout — the relayer can be slow
+  const DEPLOY_TIMEOUT_MS = 45_000;
+  let mined: any = null;
+  try {
+    mined = await Promise.race([
+      response.wait(),
+      new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error("deploy_wait_timeout")), DEPLOY_TIMEOUT_MS)
+      ),
+    ]);
+  } catch (waitErr: any) {
+    // Timeout or wait error — still check if it deployed
+    if (waitErr?.message !== "deploy_wait_timeout") throw waitErr;
+  }
+
+  // Check deploy status regardless of whether wait() succeeded or timed out
   const deployedAfter = await relayClient.getDeployed(depositWallet, "WALLET").catch(() => false);
   return {
-    ok: true,
+    ok: deployedAfter ? true : (mined != null),
     owner: normalizedOwner,
     depositWallet,
     deployed: deployedAfter,
@@ -128,7 +144,7 @@ export async function deployDepositWallet(owner: string): Promise<DepositWalletD
     builderConfigured,
     transactionID: response.transactionID,
     transactionHash: mined?.transactionHash ?? response.transactionHash,
-    state: mined?.state ?? response.state,
+    state: mined?.state ?? response.state ?? (deployedAfter ? "mined" : "pending"),
   };
 }
 

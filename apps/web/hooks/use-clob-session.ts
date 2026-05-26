@@ -458,10 +458,10 @@ async function readChainId(provider: Eip1193Provider) {
   return String(chainId ?? "").toLowerCase()
 }
 
-async function waitForPolygonChain(provider: Eip1193Provider) {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+async function waitForPolygonChain(provider: Eip1193Provider, maxAttempts = 15, delayMs = 250) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if ((await readChainId(provider)) === POLYGON_CHAIN_HEX) return true
-    await sleep(150)
+    await sleep(delayMs)
   }
   return false
 }
@@ -470,28 +470,46 @@ async function ensurePolygonForClob(provider: Eip1193Provider) {
   const currentChain = await provider.request({ method: "eth_chainId" }).catch(() => null)
   if (String(currentChain).toLowerCase() === POLYGON_CHAIN_HEX) return
 
-  try {
-    await provider.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: POLYGON_CHAIN_HEX }],
-    })
-    if (await waitForPolygonChain(provider)) return
-  } catch (err) {
-    if (isChainMissingError(err)) {
-      await provider.request({
-        method: "wallet_addEthereumChain",
-        params: [POLYGON_CHAIN_PARAMS],
-      })
+  // Try switching with retries — Privy embedded wallets can be slow to settle
+  for (let retry = 0; retry < 3; retry += 1) {
+    try {
       await provider.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: POLYGON_CHAIN_HEX }],
       })
+      // Give the provider extra time to settle after switch
+      await sleep(300)
       if (await waitForPolygonChain(provider)) return
+    } catch (err) {
+      if (isChainMissingError(err)) {
+        try {
+          await provider.request({
+            method: "wallet_addEthereumChain",
+            params: [POLYGON_CHAIN_PARAMS],
+          })
+          await sleep(200)
+          await provider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: POLYGON_CHAIN_HEX }],
+          })
+          await sleep(300)
+          if (await waitForPolygonChain(provider)) return
+        } catch (addErr) {
+          const addRejection = userRejectedMessage(addErr)
+          if (addRejection) throw new Error(addRejection)
+          // Fall through to retry
+        }
+      } else {
+        const rejection = userRejectedMessage(err)
+        if (rejection) throw new Error(rejection)
+        // Non-rejection error — wait and retry
+        if (retry < 2) {
+          await sleep(500)
+          continue
+        }
+        throw err
+      }
     }
-
-    const rejection = userRejectedMessage(err)
-    if (rejection) throw new Error(rejection)
-    throw err
   }
 
   throw new Error("Rawli could not activate Polygon execution context in this wallet.")
@@ -502,21 +520,34 @@ async function getPolygonProvider(wallet: ConnectedWallet): Promise<Eip1193Provi
   let provider = (await wallet.getEthereumProvider()) as Eip1193Provider
   const currentChain = await readChainId(provider)
 
-  if (currentChain !== POLYGON_CHAIN_HEX && typeof switchableWallet.switchChain === "function") {
-    try {
-      await switchableWallet.switchChain(POLYGON_CHAIN_ID)
-      provider = (await wallet.getEthereumProvider()) as Eip1193Provider
-      if (!(await waitForPolygonChain(provider))) {
-        await ensurePolygonForClob(provider)
+  if (currentChain !== POLYGON_CHAIN_HEX) {
+    // Strategy 1: Use Privy's native switchChain (most reliable for embedded wallets)
+    if (typeof switchableWallet.switchChain === "function") {
+      try {
+        await switchableWallet.switchChain(POLYGON_CHAIN_ID)
+        // Critical: re-fetch the provider after Privy switch and give it time to settle
+        await sleep(500)
+        provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+        if (await waitForPolygonChain(provider)) {
+          return provider
+        }
+      } catch (err) {
+        const rejection = userRejectedMessage(err)
+        if (rejection) throw new Error(rejection)
+        // Privy switchChain failed non-fatally — fall through to EIP-1193 methods
+        console.warn("[rawli] Privy switchChain failed, trying EIP-1193 fallback:", err)
       }
-    } catch (err) {
-      const rejection = userRejectedMessage(err)
-      if (rejection) throw new Error(rejection)
     }
-  }
 
-  await ensurePolygonForClob(provider)
-  provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+    // Strategy 2: EIP-1193 wallet_switchEthereumChain
+    // Re-fetch provider in case Privy's switchChain partially updated state
+    provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+    await ensurePolygonForClob(provider)
+
+    // Re-fetch provider one final time after EIP-1193 switch
+    await sleep(300)
+    provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+  }
 
   const activeChain = await provider.request({ method: "eth_chainId" }).catch(() => null)
   if (String(activeChain).toLowerCase() !== POLYGON_CHAIN_HEX) {
@@ -531,6 +562,48 @@ async function getPolygonSigner(wallet: ConnectedWallet) {
   const ethersProvider = new BrowserProvider(provider as any)
   const signer = await ethersProvider.getSigner()
   return { provider, signer }
+}
+
+/** Create a resilient _signTypedData wrapper that re-acquires Polygon context before every sign attempt */
+function createResilientTypedDataSigner(
+  wallet: ConnectedWallet,
+  baseSigner: { getAddress: () => Promise<string> }
+): { signer: EthersTypedDataSigner, refreshSigner: () => Promise<{ provider: Eip1193Provider; signer: any }> } {
+  let latestSigner: { provider: Eip1193Provider; signer: any } | null = null
+
+  const refreshSigner = async () => {
+    latestSigner = await getPolygonSigner(wallet)
+    return latestSigner
+  }
+
+  const signer: EthersTypedDataSigner = {
+    getAddress: () => baseSigner.getAddress(),
+    _signTypedData: async (domain, types, value) => {
+      // Always re-acquire Polygon context before signing to avoid stale chain state
+      const fresh = await refreshSigner()
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          return await fresh.signer.signTypedData(domain as any, types as any, value as any)
+        } catch (err) {
+          if (isWrongChainError(err) && attempt < 2) {
+            // Chain drifted — re-acquire and retry
+            await sleep(300)
+            const retried = await refreshSigner()
+            try {
+              return await retried.signer.signTypedData(domain as any, types as any, value as any)
+            } catch (retryErr) {
+              if (attempt < 1) continue
+              throw retryErr
+            }
+          }
+          throw err
+        }
+      }
+      throw new Error("Rawli could not sign after multiple Polygon context attempts.")
+    },
+  }
+
+  return { signer, refreshSigner }
 }
 
 export function useClobSession(wallet?: ConnectedWallet | null, profile?: TradingProfile | null): ClobSessionState {
@@ -599,24 +672,8 @@ export function useClobSession(wallet?: ConnectedWallet | null, profile?: Tradin
       setStatus("preparing")
       setError(null)
       try {
-        let polygonSigner = await getPolygonSigner(wallet)
-        const signer = polygonSigner.signer
-
-        const typedDataSigner: EthersTypedDataSigner = {
-          getAddress: () => signer.getAddress(),
-          _signTypedData: async (domain, types, value) => {
-            polygonSigner = await getPolygonSigner(wallet)
-            try {
-              return await polygonSigner.signer.signTypedData(domain as any, types as any, value as any)
-            } catch (err) {
-              if (isWrongChainError(err)) {
-                polygonSigner = await getPolygonSigner(wallet)
-                return await polygonSigner.signer.signTypedData(domain as any, types as any, value as any)
-              }
-              throw err
-            }
-          },
-        }
+        const polygonSigner = await getPolygonSigner(wallet)
+        const { signer: typedDataSigner, refreshSigner } = createResilientTypedDataSigner(wallet, polygonSigner.signer)
 
         const creds = { key: stored.key, secret: stored.secret, passphrase: stored.passphrase }
         const funderAddress = stored.funderAddress
@@ -674,30 +731,15 @@ export function useClobSession(wallet?: ConnectedWallet | null, profile?: Tradin
     setError(null)
 
     try {
-      let polygonSigner = await getPolygonSigner(wallet)
-      const signer = polygonSigner.signer
-      const signerAddress = (await signer.getAddress()).toLowerCase()
+      const polygonSigner = await getPolygonSigner(wallet)
+      const signerAddress = (await polygonSigner.signer.getAddress()).toLowerCase()
       const walletAddress = wallet.address.toLowerCase()
 
       if (signerAddress !== walletAddress) {
         throw new Error("The active wallet signer does not match the connected wallet.")
       }
 
-      const typedDataSigner: EthersTypedDataSigner = {
-        getAddress: () => signer.getAddress(),
-        _signTypedData: async (domain, types, value) => {
-          polygonSigner = await getPolygonSigner(wallet)
-          try {
-            return await polygonSigner.signer.signTypedData(domain as any, types as any, value as any)
-          } catch (err) {
-            if (isWrongChainError(err)) {
-              polygonSigner = await getPolygonSigner(wallet)
-              return await polygonSigner.signer.signTypedData(domain as any, types as any, value as any)
-            }
-            throw err
-          }
-        },
-      }
+      const { signer: typedDataSigner } = createResilientTypedDataSigner(wallet, polygonSigner.signer)
 
       const signatureType = signatureTypeFor(profile)
       const funderAddress = signatureType === 0 ? undefined : profile?.tradingWalletAddress

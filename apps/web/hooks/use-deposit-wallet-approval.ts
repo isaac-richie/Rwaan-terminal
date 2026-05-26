@@ -49,22 +49,71 @@ function approvalErrorMessage(error?: string) {
   }
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+async function waitForChain(provider: Eip1193Provider, targetHex: string, attempts = 15) {
+  for (let i = 0; i < attempts; i++) {
+    const id = await provider.request({ method: "eth_chainId" }).catch(() => null)
+    if (String(id).toLowerCase() === targetHex) return true
+    await sleep(250)
+  }
+  return false
+}
+
 async function ensurePolygon(wallet: ConnectedWallet): Promise<Eip1193Provider> {
   const switchable = wallet as SwitchableWallet
   let provider = (await wallet.getEthereumProvider()) as Eip1193Provider
   const chainId = await provider.request({ method: "eth_chainId" }).catch(() => null)
   if (String(chainId).toLowerCase() === POLYGON_CHAIN_HEX) return provider
 
+  // Strategy 1: Use Privy's native switchChain
   if (typeof switchable.switchChain === "function") {
-    await switchable.switchChain(POLYGON_CHAIN_ID)
-    provider = (await wallet.getEthereumProvider()) as Eip1193Provider
-  } else {
+    try {
+      await switchable.switchChain(POLYGON_CHAIN_ID)
+      await sleep(500)
+      provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+      if (await waitForChain(provider, POLYGON_CHAIN_HEX)) return provider
+    } catch {
+      // Fall through to EIP-1193
+    }
+  }
+
+  // Strategy 2: EIP-1193 wallet_switchEthereumChain
+  provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+  try {
     await provider.request({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: POLYGON_CHAIN_HEX }],
     })
+    await sleep(300)
+    provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+    if (await waitForChain(provider, POLYGON_CHAIN_HEX)) return provider
+  } catch {
+    // Try adding the chain first
+    try {
+      await provider.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: POLYGON_CHAIN_HEX,
+          chainName: "Polygon",
+          nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
+          rpcUrls: ["https://polygon-rpc.com"],
+          blockExplorerUrls: ["https://polygonscan.com"],
+        }],
+      })
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: POLYGON_CHAIN_HEX }],
+      })
+      await sleep(300)
+      provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+      if (await waitForChain(provider, POLYGON_CHAIN_HEX)) return provider
+    } catch {
+      // Fall through to error
+    }
   }
-  return provider
+
+  throw new Error("Could not switch wallet to Polygon for deposit wallet approval.")
 }
 
 export function useDepositWalletApproval(

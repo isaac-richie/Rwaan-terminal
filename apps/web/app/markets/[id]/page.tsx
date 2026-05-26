@@ -2334,13 +2334,17 @@ export default function MarketDetailPage() {
                       <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
                         {clobSession.status === "ready"
                           ? "Ready to sign orders."
+                          : tradingProfile.profile?.tradingWalletKind === "deposit" && depositWalletStatus.deploying
+                          ? "Deploying your trading wallet on Polygon..."
                           : tradingProfile.profile?.tradingWalletKind === "deposit" && depositWalletStatus.status?.deployed !== true
-                          ? "Deploy your Polymarket trading wallet once before signing."
+                          ? "Setting up your Polymarket trading wallet..."
                           : "Prepare your secure trading session before signing."}
                       </p>
                     </div>
                     {clobSession.status === "ready" ? (
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-[oklch(0.68_0.18_155)]" />
+                    ) : depositWalletStatus.deploying ? (
+                      <Loader2 className="h-4 w-4 shrink-0 text-[oklch(0.78_0.16_82)] animate-spin" />
                     ) : (
                       <ShieldAlert className="h-4 w-4 shrink-0 text-[oklch(0.78_0.16_82)]" />
                     )}
@@ -2357,7 +2361,7 @@ export default function MarketDetailPage() {
                       className="h-9 w-full gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] text-xs font-semibold"
                     >
                       {depositWalletStatus.deploying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldAlert className="h-3.5 w-3.5" />}
-                      {depositWalletStatus.deploying ? "Deploying..." : "Deploy trading wallet"}
+                      {depositWalletStatus.deploying ? "Deploying wallet..." : "Deploy trading wallet"}
                     </Button>
                   ) : clobSession.status !== "ready" ? (
                     <Button
