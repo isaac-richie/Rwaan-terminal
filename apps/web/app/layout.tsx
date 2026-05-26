@@ -23,6 +23,13 @@ export const metadata: Metadata = {
   description:
     "BNB-native prediction terminal routing live Polymarket markets, liquidity, and trading data.",
   keywords: ["prediction terminal", "rawli analytic", "polymarket", "bnb", "trading"],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-icon.png",
+  },
   openGraph: {
     title: "Rawli Analytic — Prediction Terminal",
     description: "BNB-native prediction terminal for live markets, liquidity, and trading data.",
