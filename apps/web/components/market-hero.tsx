@@ -208,7 +208,7 @@ export function MarketHero() {
 
       {/* ── Main two-column layout ───────────────────────── */}
       <div
-        className="hero-enter grid items-stretch gap-4 lg:grid-cols-[1fr_minmax(320px,0.48fr)]"
+        className="hero-enter grid items-start gap-4 lg:grid-cols-[1fr_minmax(320px,0.48fr)]"
         style={{ animationDelay: "240ms" }}
       >
         {/* Featured market card */}
@@ -222,7 +222,7 @@ export function MarketHero() {
           <button
             type="button"
             onClick={() => goToMarket(activeMarket)}
-            className="group relative flex-1 min-h-[220px] overflow-hidden text-left scanline"
+            className="group relative h-[240px] sm:h-[280px] overflow-hidden text-left scanline"
           >
             {/* Full-strength artwork treatment keeps market thumbnails bright and crisp. */}
             {(activeMarket.image || activeMarket.icon) && (
@@ -398,7 +398,7 @@ export function MarketHero() {
 
         {/* ── Breaking news sidebar — desktop only ── */}
         <aside
-          className="hidden lg:flex flex-col rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260/0.95)] overflow-hidden hero-card-glow"
+          className="hidden lg:flex flex-col max-h-[480px] rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260/0.95)] overflow-hidden hero-card-glow"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[oklch(0.18_0.014_255)] px-4 py-3">
