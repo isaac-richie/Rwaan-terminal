@@ -22,9 +22,12 @@ import { wsRoutes } from "./routes/ws.js";
 import { catalystRoutes } from "./routes/catalyst.js";
 import { cryptoRoutes } from "./routes/crypto.js";
 import { referralRoutes } from "./routes/referral.js";
+import { opsRoutes } from "./routes/ops.js";
+import { recordBackendError } from "./services/errorLog.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
+  const loggedErrorRequests = new Set<string>();
 
   // Global rate limiting — generous limits, mainly to stop hammering
   app.register(rateLimit, {
@@ -94,10 +97,41 @@ export function buildServer() {
   app.register(catalystRoutes);
   app.register(cryptoRoutes);
   app.register(referralRoutes);
+  app.register(opsRoutes);
 
-  app.setErrorHandler((err, _req, reply) => {
-    app.log.error(err);
-    reply.status(500).send({ error: "internal_error" });
+  app.addHook("onResponse", async (req, reply) => {
+    if (reply.statusCode < 500) return;
+    if (loggedErrorRequests.delete(String(req.id))) return;
+    recordBackendError({
+      level: "error",
+      message: `HTTP ${reply.statusCode}`,
+      statusCode: reply.statusCode,
+      method: req.method,
+      url: req.url,
+      ip: req.ip,
+      requestId: req.id,
+    });
+  });
+
+  app.setErrorHandler((err: Error & { code?: string; statusCode?: number }, req, reply) => {
+    const statusCode = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
+    const isServerError = statusCode >= 500;
+    const publicError = isServerError ? "internal_error" : (err.code ?? "request_error");
+    const event = recordBackendError({
+      level: isServerError ? "error" : "warn",
+      message: err.message || publicError,
+      code: err.code,
+      statusCode,
+      method: req.method,
+      url: req.url,
+      ip: req.ip,
+      requestId: req.id,
+      stack: isServerError ? err.stack : undefined,
+    });
+    loggedErrorRequests.add(String(req.id));
+
+    app.log[isServerError ? "error" : "warn"]({ err, errorEventId: event.id }, "Request failed");
+    reply.status(statusCode).send({ ok: false, error: publicError, errorId: event.id });
   });
 
   return app;

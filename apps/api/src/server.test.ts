@@ -61,6 +61,44 @@ describe("api routes", () => {
     expect(res.json()).toEqual({ ok: true });
   });
 
+  it("records backend errors behind the ops endpoint", async () => {
+    const originalToken = process.env.OPS_TOKEN;
+    process.env.OPS_TOKEN = "test-ops-token";
+    try {
+      const app = buildServer();
+      app.get("/test/error-logger", async () => {
+        throw new Error("synthetic backend failure");
+      });
+
+      const failed = await app.inject({ method: "GET", url: "/test/error-logger" });
+      expect(failed.statusCode).toBe(500);
+      expect(failed.json().error).toBe("internal_error");
+      expect(failed.json().errorId).toBeTruthy();
+
+      const unauthorized = await app.inject({ method: "GET", url: "/ops/errors/recent" });
+      expect(unauthorized.statusCode).toBe(404);
+
+      const recent = await app.inject({
+        method: "GET",
+        url: "/ops/errors/recent?limit=5",
+        headers: { authorization: "Bearer test-ops-token" },
+      });
+      expect(recent.statusCode).toBe(200);
+      expect(recent.json().errors[0]).toMatchObject({
+        message: "synthetic backend failure",
+        statusCode: 500,
+        method: "GET",
+        url: "/test/error-logger",
+      });
+    } finally {
+      if (originalToken === undefined) {
+        delete process.env.OPS_TOKEN;
+      } else {
+        process.env.OPS_TOKEN = originalToken;
+      }
+    }
+  });
+
   it("geoblock route returns json", async () => {
     const app = buildServer();
     const res = await app.inject({ method: "GET", url: "/geoblock" });
