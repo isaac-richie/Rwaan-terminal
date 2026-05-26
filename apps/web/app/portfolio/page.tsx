@@ -9,7 +9,6 @@ import {
   AlertCircle,
   ArrowDownUp,
   ArrowUpRight,
-  BarChart3,
   Briefcase,
   CheckCircle2,
   ChevronRight,
@@ -1118,47 +1117,80 @@ function PortfolioContent() {
             />
           </div>
 
-          <div className="surface-card rounded-2xl p-5 lg:col-span-5">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Exposure pulse</span>
-            </div>
-            <div className="grid grid-cols-12 items-end gap-1">
-              {[34, 44, 28, 56, 48, 72, 63, 82, 68, 88, 74, 92].map((h, i) => (
-                <div
-                  key={i}
-                  className="rounded-t bg-gradient-to-t from-[oklch(0.78_0.16_82/0.15)] to-[oklch(0.78_0.16_82/0.65)]"
-                  style={{ height: `${h}px` }}
-                />
-              ))}
-            </div>
-            <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
-              <span>30-day exposure</span>
-              <span className="font-mono font-semibold text-foreground">{data ? formatPortfolioMoney(stats.openValue) : "—"} open</span>
+          <div className="surface-card rounded-2xl p-5 lg:col-span-5 flex flex-col gap-5">
+
+            {/* Header */}
+            <div className="flex items-center gap-2">
+              <Layers3 className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Position Summary</span>
             </div>
 
-            <div className="mt-5 space-y-3 border-t border-[oklch(0.16_0.014_255)] pt-4">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground">Open positions</span>
-                <span className="font-mono font-semibold text-foreground">{data ? openPositions.length : "—"}</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground">Total shares</span>
-                <span className="font-mono font-semibold text-foreground">{data ? formatPortfolioNumber(stats.shares) : "—"}</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground">Avg P/L</span>
-                <span className={cn("font-mono font-semibold", stats.avgPnlPercent >= 0 ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.60_0.18_25)]")}>
-                  {data ? formatPercent(stats.avgPnlPercent) : "—"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground">Realized P/L</span>
-                <span className={cn("font-mono font-semibold", stats.realizedPositive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.60_0.18_25)]")}>
-                  {data ? portfolio.summary.realized : "—"}
-                </span>
-              </div>
+            {/* 2×2 stat grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  label: "Open value",
+                  value: data ? formatPortfolioMoney(stats.openValue) : "—",
+                  sub: `${data ? openPositions.length : "—"} position${openPositions.length === 1 ? "" : "s"}`,
+                  positive: true,
+                },
+                {
+                  label: "Total shares",
+                  value: data ? formatPortfolioNumber(stats.shares) : "—",
+                  sub: "across all markets",
+                  positive: true,
+                },
+                {
+                  label: "Unrealized P/L",
+                  value: data ? formatPercent(stats.avgPnlPercent) : "—",
+                  sub: "avg per position",
+                  positive: stats.avgPnlPercent >= 0,
+                },
+                {
+                  label: "Realized P/L",
+                  value: data ? portfolio.summary.realized : "—",
+                  sub: `${data ? closedPositions.length : "—"} closed`,
+                  positive: stats.realizedPositive,
+                },
+              ].map(({ label, value, sub, positive }) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-[oklch(0.16_0.014_255)] bg-[oklch(0.11_0.012_260/0.6)] p-3 flex flex-col gap-1"
+                >
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</span>
+                  <span className={cn(
+                    "font-mono text-[15px] font-bold leading-none",
+                    label.includes("P/L") && data
+                      ? positive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.60_0.18_25)]"
+                      : "text-foreground"
+                  )}>{value}</span>
+                  <span className="text-[9px] text-muted-foreground">{sub}</span>
+                </div>
+              ))}
             </div>
+
+            {/* Position allocation bar */}
+            {data && (openPositions.length + closedPositions.length) > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5 text-[9px] text-muted-foreground">
+                  <span>Open</span>
+                  <span>Closed</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full overflow-hidden bg-[oklch(0.16_0.014_255)]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[oklch(0.78_0.16_82/0.8)] to-[oklch(0.78_0.16_82)]"
+                    style={{
+                      width: `${Math.round((openPositions.length / (openPositions.length + closedPositions.length)) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-1 text-[9px] font-mono text-muted-foreground">
+                  <span>{openPositions.length}</span>
+                  <span>{closedPositions.length}</span>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
 
