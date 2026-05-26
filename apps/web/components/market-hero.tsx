@@ -204,20 +204,12 @@ export function MarketHero() {
             onClick={() => goToMarket(activeMarket)}
             className="group relative flex-1 min-h-[220px] overflow-hidden text-left scanline"
           >
-            {/* Hero background image
-                Strategy: two-layer approach for premium clarity
-                Layer 1 (back): full-bleed object-cover at high quality — fills the
-                  panel without letterboxing. opacity 0.75 so it reads as a real
-                  image, not a watermark. quality=90 avoids Next.js default 75% JPEG.
-                Layer 2 (front): sharp centered foreground icon — gives a crisp focal
-                  point even when the background src is a low-res thumbnail.
-                Scale lives on the outer wrapper, never on <Image>, to keep crisp. */}
+            {/* Full-strength artwork treatment keeps market thumbnails bright and crisp. */}
             {(activeMarket.image || activeMarket.icon) && (
               <div
                 key={activeMarket.id}
-                className="absolute inset-0 overflow-hidden transition-transform duration-700 group-hover:scale-105"
+                className="absolute inset-0 overflow-hidden bg-[oklch(0.18_0.04_82)] transition-transform duration-700 group-hover:scale-[1.035]"
               >
-                {/* Layer 1 — full-bleed background fill */}
                 <Image
                   src={(activeMarket.image ?? activeMarket.icon) as string}
                   alt=""
@@ -225,40 +217,28 @@ export function MarketHero() {
                   priority
                   quality={90}
                   sizes="(max-width: 1024px) 100vw, 900px"
-                  className="object-cover"
-                  style={{ opacity: 0.75 }}
+                  data-image-sharp
+                  className="scale-[1.01] object-cover brightness-[1.22] contrast-[1.16] saturate-[1.24]"
                 />
-                {/* Layer 2 — sharp foreground icon, pinned top-right */}
-                <div className="absolute top-3 right-3 h-14 w-14 rounded-xl overflow-hidden border border-white/10 shadow-lg bg-black/20">
-                  <Image
-                    src={(activeMarket.image ?? activeMarket.icon) as string}
-                    alt=""
-                    fill
-                    priority
-                    quality={95}
-                    sizes="56px"
-                    className="object-contain p-1"
-                  />
-                </div>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_48%_42%,transparent_0%,transparent_36%,oklch(0.08_0.012_260/0.10)_72%)]" />
               </div>
             )}
 
-            {/* Layered overlay — lighter stops so image detail shows through */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_0%,oklch(0.78_0.16_82/0.08),transparent_55%),linear-gradient(180deg,oklch(0.08_0.012_260/0.35)_0%,oklch(0.08_0.012_260/0.78)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_28%_0%,oklch(0.88_0.17_82/0.12),transparent_52%),linear-gradient(180deg,oklch(0.08_0.012_260/0.08)_0%,oklch(0.08_0.012_260/0.20)_48%,oklch(0.08_0.012_260/0.74)_100%)]" />
 
             {/* Amber glow line at top */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_82/0.6)] to-transparent" />
 
             <div className="relative flex h-full flex-col justify-between p-5 sm:p-6">
               <div className="flex items-center justify-between gap-2">
-                <span className="rounded-lg border border-[oklch(0.78_0.16_82/0.22)] bg-[oklch(0.78_0.16_82/0.09)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.82_0.16_82)]">
+                <span className="rounded-lg border border-[oklch(0.78_0.16_82/0.34)] bg-[oklch(0.09_0.012_260/0.42)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.88_0.16_82)] shadow-[0_8px_24px_oklch(0_0_0/0.20)] backdrop-blur-sm">
                   {activeMarket.category ?? "Market"}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-lg border border-[oklch(0.68_0.18_155/0.22)] bg-[oklch(0.68_0.18_155/0.08)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">
+                  <span className="rounded-lg border border-[oklch(0.68_0.18_155/0.34)] bg-[oklch(0.09_0.012_260/0.42)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[oklch(0.74_0.18_155)] shadow-[0_8px_24px_oklch(0_0_0/0.20)] backdrop-blur-sm">
                     Live
                   </span>
-                  <span className="rounded-lg border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.012_260/0.7)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <span className="rounded-lg border border-[oklch(0.22_0.015_255/0.75)] bg-[oklch(0.09_0.012_260/0.48)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[oklch(0.82_0.01_255)] shadow-[0_8px_24px_oklch(0_0_0/0.20)] backdrop-blur-sm">
                     Closes {formatEndDate(activeMarket.endDate)}
                   </span>
                 </div>

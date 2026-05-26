@@ -36,6 +36,118 @@ function sumPortfolioValues(items: any[] | undefined, mapper: (item: any) => num
   return (items ?? []).reduce((total, item) => total + mapper(item), 0)
 }
 
+function normalizedText(value: any) {
+  return typeof value === "string" ? value.trim().toLowerCase() : ""
+}
+
+function firstPositionDateValue(position: any) {
+  return (
+    position?.endDate ??
+    position?.end_date ??
+    position?.endDateIso ??
+    position?.end_date_iso ??
+    position?.marketEndDate ??
+    position?.market_end_date ??
+    position?.expiration ??
+    position?.expiry ??
+    position?.closedAt ??
+    position?.closed_at ??
+    position?.resolvedAt ??
+    position?.resolved_at ??
+    null
+  )
+}
+
+function parsePositionTimestamp(value: any) {
+  if (value === undefined || value === null || value === "") return null
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const millis = value > 0 && value < 10_000_000_000 ? value * 1000 : value
+    return Number.isFinite(millis) ? millis : null
+  }
+  if (typeof value === "string" && value.trim()) {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) return parsePositionTimestamp(numeric)
+    const parsed = Date.parse(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+export function getPositionEndTime(position: any) {
+  return parsePositionTimestamp(firstPositionDateValue(position))
+}
+
+export function isPositionExpired(position: any, now = Date.now()) {
+  const endTime = getPositionEndTime(position)
+  return endTime !== null && endTime <= now
+}
+
+export function isPortfolioPositionClosed(position: any, now = Date.now()) {
+  if (!position) return false
+  if (position.settled || position.resolved || position.closed || position.redeemed) return true
+  if (position.active === false || position.marketActive === false || position.market_active === false) return true
+  if (position.archived === true || position.marketArchived === true || position.market_archived === true) return true
+  if (position.resolution || position.winner || position.winningOutcome || position.winning_outcome) return true
+
+  const status = normalizedText(position.status ?? position.marketStatus ?? position.market_status)
+  if (/(closed|settled|resolved|redeemed|expired|cancelled|canceled|complete|completed|won|lost)/.test(status)) {
+    return true
+  }
+
+  return isPositionExpired(position, now)
+}
+
+function positionIdentity(position: any) {
+  const parts = [
+    position?.asset,
+    position?.assetId,
+    position?.asset_id,
+    position?.tokenId,
+    position?.token_id,
+    position?.conditionId,
+    position?.condition_id,
+    position?.marketId,
+    position?.market_id,
+    position?.marketSlug,
+    position?.market_slug,
+    position?.slug,
+    position?.outcome,
+    position?.outcomeIndex,
+    position?.outcome_index,
+  ]
+    .filter((value) => value !== undefined && value !== null && value !== "")
+    .map(String)
+
+  return parts.length ? parts.join(":") : null
+}
+
+export function normalizePortfolioResponse(payload: PortfolioResponse, now = Date.now()): PortfolioResponse {
+  const positions = payload.positions ?? []
+  const closedPositions = payload.closedPositions ?? []
+  const normalizedOpen: any[] = []
+  const normalizedClosed = [...closedPositions]
+  const closedKeys = new Set(closedPositions.map(positionIdentity).filter(Boolean) as string[])
+
+  for (const position of positions) {
+    if (!isPortfolioPositionClosed(position, now)) {
+      normalizedOpen.push(position)
+      continue
+    }
+
+    const key = positionIdentity(position)
+    if (!key || !closedKeys.has(key)) {
+      normalizedClosed.push(position)
+      if (key) closedKeys.add(key)
+    }
+  }
+
+  return {
+    ...payload,
+    positions: normalizedOpen,
+    closedPositions: normalizedClosed,
+  }
+}
+
 export function formatPortfolioNumber(value: any) {
   if (value === undefined || value === null) return "—"
   const numeric = Number(value)
@@ -125,7 +237,7 @@ export function usePolymarketPortfolio(address?: string | null, pollingMs?: numb
       const res = await fetch(`${API_BASE}/portfolio/${address}`)
       const payload = await res.json()
       if (!res.ok) throw new Error(payload?.error ?? "Failed to load portfolio")
-      setData(payload as PortfolioResponse)
+      setData(normalizePortfolioResponse(payload as PortfolioResponse))
       setLastUpdated(new Date())
     } catch (err: any) {
       setData(null)

@@ -39,9 +39,12 @@ import {
   formatPortfolioNumber,
   formatPortfolioPnl,
   getPositionCostBasis,
+  getPositionEndTime,
   getPositionPnl,
   getPositionPnlPercent,
   getPositionValue,
+  isPortfolioPositionClosed,
+  isPositionExpired,
   usePolymarketPortfolio,
 } from "@/hooks/use-polymarket-portfolio";
 import { useClobSession, type OpenOrderSnapshot } from "@/hooks/use-clob-session";
@@ -73,6 +76,11 @@ function positionOutcome(pos: any) {
 }
 
 function positionStatus(pos: any) {
+  if (isPortfolioPositionClosed(pos)) {
+    if (pos?.settled || pos?.resolved || pos?.resolution) return "Settled";
+    if (isPositionExpired(pos)) return "Expired";
+    return "Closed";
+  }
   if (pos?.settled || pos?.resolved) return "Settled";
   if (pos?.status) return String(pos.status);
   if (pos?.resolution) return "Resolved";
@@ -81,11 +89,15 @@ function positionStatus(pos: any) {
 
 function closedPositionStatus(pos: any) {
   if (pos?.settled || pos?.resolved) return "Settled";
+  if (pos?.resolution) return "Resolved";
+  if (isPositionExpired(pos)) {
+    return getPositionValue(pos) > 0 ? "Redeemable" : "Expired";
+  }
   if (pos?.status) {
     const status = String(pos.status);
     return status.toLowerCase() === "open" ? "Closed" : status;
   }
-  if (pos?.resolution) return "Resolved";
+  if (getPositionEndTime(pos)) return "Closed";
   return "Closed";
 }
 
