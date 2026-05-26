@@ -235,13 +235,13 @@ export function MarketHero() {
                   quality={90}
                   sizes="(max-width: 1024px) 100vw, 900px"
                   data-image-sharp
-                  className="scale-[1.01] object-cover brightness-[1.22] contrast-[1.16] saturate-[1.24]"
+                  className="scale-[1.01] object-cover brightness-[1.05] sm:brightness-[1.22] contrast-[1.16] saturate-[1.24]"
                 />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_48%_42%,transparent_0%,transparent_36%,oklch(0.08_0.012_260/0.10)_72%)]" />
               </div>
             )}
 
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_28%_0%,oklch(0.88_0.17_82/0.12),transparent_52%),linear-gradient(180deg,oklch(0.08_0.012_260/0.08)_0%,oklch(0.08_0.012_260/0.20)_48%,oklch(0.08_0.012_260/0.74)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_28%_0%,oklch(0.88_0.17_82/0.10),transparent_52%),linear-gradient(180deg,oklch(0.08_0.012_260/0.18)_0%,oklch(0.08_0.012_260/0.52)_40%,oklch(0.08_0.012_260/0.88)_100%)]" />
 
             {/* Amber glow line at top */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_82/0.6)] to-transparent" />
@@ -262,10 +262,13 @@ export function MarketHero() {
               </div>
 
               <div>
-                <h2 className="line-clamp-3 text-xl font-bold leading-tight text-foreground transition-colors group-hover:text-[oklch(0.95_0.01_90)] sm:text-2xl">
+                <h2
+                  className="line-clamp-3 text-xl font-bold leading-tight text-foreground transition-colors group-hover:text-[oklch(0.95_0.01_90)] sm:text-2xl"
+                  style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7), 0 2px 12px rgba(0,0,0,0.5)" }}
+                >
                   {activeMarket.question}
                 </h2>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}>
                   <span className="font-mono">{activeMarket.volume} Vol.</span>
                   <span className="text-[oklch(0.24_0.015_255)]">·</span>
                   <span className="font-mono">{activeMarket.liquidity} Liq.</span>
