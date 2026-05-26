@@ -659,12 +659,14 @@ export default function MarketDetailPage() {
     setOrderAmount(formatShareInput(availableShares * percent));
   };
   const setBuyPercentAmount = (percent: number) => {
-    const available = spendablePusd ?? availablePusd;
+    // Use actual balance for percent calculation — allowance gates are handled separately
+    const available = availablePusd ?? spendablePusd;
     if (!available || available <= 0) return;
     const value = Math.floor(available * percent * 100) / 100; // floor to 2 decimals
     setOrderAmount(value.toFixed(2));
   };
-  const hasBuyReferenceBalance = (spendablePusd ?? availablePusd ?? 0) > 0;
+  // Enable presets based on balance (not spendable) — user may need to approve first
+  const hasBuyReferenceBalance = (availablePusd ?? 0) > 0;
   const signOrderPreviewDisabled =
     signingOrder ||
     (requiresCollateral && !tradeCollateralGate.ready) ||
@@ -1731,7 +1733,7 @@ export default function MarketDetailPage() {
                         disabled={
                           clobSession.status === "preparing" ||
                           !connectedWallet ||
-                          (tradingProfile.profile?.tradingWalletKind === "deposit" && depositWalletStatus.status?.deployed !== true)
+                          (tradingProfile.profile?.tradingWalletKind === "deposit" && depositWalletStatus.status?.deployed === false)
                         }
                         className="h-10 w-full gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)]"
                       >
@@ -1764,7 +1766,7 @@ export default function MarketDetailPage() {
                                   depositWalletApproval.status === "preparing" ||
                                   depositWalletApproval.status === "signing" ||
                                   depositWalletApproval.status === "submitting" ||
-                                  depositWalletStatus.status?.deployed !== true
+                                  depositWalletStatus.status?.deployed === false
                                 }
                                 className="w-full h-10 gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)]"
                               >
@@ -1860,7 +1862,7 @@ export default function MarketDetailPage() {
                                   depositWalletApproval.status === "preparing" ||
                                   depositWalletApproval.status === "signing" ||
                                   depositWalletApproval.status === "submitting" ||
-                                  depositWalletStatus.status?.deployed !== true
+                                  depositWalletStatus.status?.deployed === false
                                 }
                                 className="w-full h-10 gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)]"
                               >
