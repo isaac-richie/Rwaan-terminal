@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Space_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import Providers from "./providers";
+import { MobileNav } from "@/components/mobile-nav";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,7 +31,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#F0B90B",
+  themeColor: "#0E0E12",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",   // enables safe-area-inset for iOS home bar
 };
 
 export default function RootLayout({
@@ -43,6 +47,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <Providers>
           {children}
+          <MobileNav />
         </Providers>
         <Analytics />
       </body>

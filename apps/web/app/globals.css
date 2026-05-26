@@ -386,4 +386,27 @@
     backface-visibility: hidden;
     -webkit-font-smoothing: antialiased;
   }
+
+  /* ─── Mobile performance: disable heavy effects on small screens ─────────
+     terminal-grid-bg uses background-attachment:fixed which forces a repaint
+     on every scroll on iOS — kill it on mobile. Same for scanline overlay,
+     ambient glow pseudo-element, and card entrance animations. */
+  /* iOS safe area for bottom nav */
+  .h-safe-bottom {
+    height: env(safe-area-inset-bottom, 0px);
+  }
+
+  @media (max-width: 639px) {
+    .terminal-grid-bg {
+      background-image: linear-gradient(180deg, oklch(0.11 0.012 260), oklch(0.095 0.012 260));
+      background-size: auto;
+      background-attachment: scroll;
+    }
+    .ambient-glow::before { display: none; }
+    .scanline::after { display: none; }
+    .hero-card-glow { box-shadow: none; }
+    .card-enter { animation: none; opacity: 1; transform: none; }
+    .hero-enter  { animation: none; opacity: 1; transform: none; }
+    .ticker-scroll { animation-duration: 60s; }
+  }
 }

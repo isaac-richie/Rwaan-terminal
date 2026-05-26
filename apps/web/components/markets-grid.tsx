@@ -84,7 +84,7 @@ export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
 
   if (loading && markets.length === 0) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="surface-card rounded-2xl overflow-hidden" style={{ animationDelay: `${i * 60}ms` }}>
             <div className="h-24 shimmer" />
@@ -134,7 +134,7 @@ export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {filteredMarkets.map((market, i) => (
           <TradingCard
             key={marketRenderKey(market, i)}
