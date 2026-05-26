@@ -102,6 +102,7 @@ export function TradingCard({ market, index }: TradingCardProps) {
                 src={(market.image ?? market.icon) as string}
                 alt=""
                 fill
+                quality={90}
                 sizes="44px"
                 className="object-contain p-1"
                 onError={() => setImgError(true)}

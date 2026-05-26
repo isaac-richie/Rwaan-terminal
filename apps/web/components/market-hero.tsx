@@ -204,32 +204,47 @@ export function MarketHero() {
             onClick={() => goToMarket(activeMarket)}
             className="group relative flex-1 min-h-[220px] overflow-hidden text-left scanline"
           >
-            {/* Background image
-                - object-contain keeps logos/icons fully visible instead of
-                  stretching them across the panel (which blurs small icons)
-                - Higher opacity (60%) so the image reads as a real image,
-                  not an invisible watermark
-                - Scale lives on the wrapper so the bitmap stays crisp */}
+            {/* Hero background image
+                Strategy: two-layer approach for premium clarity
+                Layer 1 (back): full-bleed object-cover at high quality — fills the
+                  panel without letterboxing. opacity 0.75 so it reads as a real
+                  image, not a watermark. quality=90 avoids Next.js default 75% JPEG.
+                Layer 2 (front): sharp centered foreground icon — gives a crisp focal
+                  point even when the background src is a low-res thumbnail.
+                Scale lives on the outer wrapper, never on <Image>, to keep crisp. */}
             {(activeMarket.image || activeMarket.icon) && (
               <div
                 key={activeMarket.id}
-                className="absolute inset-0 overflow-hidden transition-all duration-700 group-hover:scale-105"
-                style={{ opacity: 0.6 }}
+                className="absolute inset-0 overflow-hidden transition-transform duration-700 group-hover:scale-105"
               >
+                {/* Layer 1 — full-bleed background fill */}
                 <Image
                   src={(activeMarket.image ?? activeMarket.icon) as string}
                   alt=""
                   fill
                   priority
-                  sizes="(max-width: 1024px) 100vw, 65vw"
-                  className="object-contain"
-                  style={{ filter: "blur(0px)" }}
+                  quality={90}
+                  sizes="(max-width: 1024px) 100vw, 900px"
+                  className="object-cover"
+                  style={{ opacity: 0.75 }}
                 />
+                {/* Layer 2 — sharp foreground icon, pinned top-right */}
+                <div className="absolute top-3 right-3 h-14 w-14 rounded-xl overflow-hidden border border-white/10 shadow-lg bg-black/20">
+                  <Image
+                    src={(activeMarket.image ?? activeMarket.icon) as string}
+                    alt=""
+                    fill
+                    priority
+                    quality={95}
+                    sizes="56px"
+                    className="object-contain p-1"
+                  />
+                </div>
               </div>
             )}
 
-            {/* Layered overlay — lightened bottom stop so the image shows through */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_0%,oklch(0.78_0.16_82/0.10),transparent_55%),linear-gradient(180deg,oklch(0.08_0.012_260/0.55)_0%,oklch(0.08_0.012_260/0.82)_100%)]" />
+            {/* Layered overlay — lighter stops so image detail shows through */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_0%,oklch(0.78_0.16_82/0.08),transparent_55%),linear-gradient(180deg,oklch(0.08_0.012_260/0.35)_0%,oklch(0.08_0.012_260/0.78)_100%)]" />
 
             {/* Amber glow line at top */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_82/0.6)] to-transparent" />
@@ -350,6 +365,7 @@ export function MarketHero() {
                               src={(market.image ?? market.icon) as string}
                               alt=""
                               fill
+                              quality={90}
                               sizes="28px"
                               className="object-contain p-0.5"
                             />
