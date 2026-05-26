@@ -31,6 +31,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { Footer } from "@/components/footer";
 import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
 import { Navbar } from "@/components/navbar";
+import { ActivityFeed } from "@/components/portfolio/activity-feed";
 import { Button } from "@/components/ui/button";
 import { fundingStatusTone, useFundingStatus } from "@/hooks/use-funding-status";
 import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet";
@@ -1102,18 +1103,19 @@ function PortfolioContent() {
           </div>
         )}
 
-        {/* ── Activity timeline ────────────────────────────── */}
+        {/* ── Activity feed ─────────────────────────────────── */}
         <div className="mt-8 grid gap-4 lg:grid-cols-12">
-          <div className="surface-card rounded-2xl lg:col-span-7">
-            <div className="border-b border-[oklch(0.16_0.014_255)] px-5 py-4">
-              <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Activity feed</span>
-              </div>
-            </div>
-            <div className="px-5 py-2">
-              {timelineItems.map((item) => <TimelineItem key={item.id} item={item} />)}
-            </div>
+          <div className="surface-card rounded-2xl lg:col-span-7 flex flex-col min-h-[420px]">
+            <ActivityFeed
+              trades={trades}
+              bridgeTxs={fundingStatus.transactions}
+              bridgePhase={fundingStatus.phase}
+              openPositions={openPositions}
+              closedPositions={closedPositions}
+              openOrders={clobSession.openOrders}
+              loading={portfolio.loading || fundingStatus.loading}
+              walletAddress={walletAddress}
+            />
           </div>
 
           <div className="surface-card rounded-2xl p-5 lg:col-span-5">
