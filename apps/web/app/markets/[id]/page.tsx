@@ -1712,28 +1712,19 @@ export default function MarketDetailPage() {
                 </div>
               )}
 
-              {tradePreview && (
-                <div className="space-y-2">
-                  {!previewError && clobSession.status === "ready" && !clobSession.signedOrderPreview && (
-                    <Button
-                      type="button"
-                      onClick={handleCreateSignedOrder}
-                      disabled={signOrderPreviewDisabled}
-                      className={cn(
-                        "w-full h-10 gap-2 font-semibold transition-all",
-                        signOrderPreviewDisabled
-                          ? "border border-[oklch(0.26_0.016_255)] bg-[oklch(0.16_0.014_255)] text-muted-foreground opacity-75"
-                          : "border border-[oklch(0.78_0.16_82/0.55)] bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)] hover:bg-[oklch(0.82_0.16_82)]"
-                      )}
-                    >
-                      {signingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
-                      {signingOrder ? "Waiting for wallet signature" : signOrderPreviewDisabled ? "Resolve Approval to Sign" : "Sign Order Preview"}
-                    </Button>
-                  )}
-
-                  {clobSession.status !== "ready" && (
-                    <div className="space-y-2 rounded-lg border border-[oklch(0.78_0.16_82/0.2)] bg-[oklch(0.78_0.16_82/0.07)] p-2.5 text-[11px] leading-snug text-[oklch(0.78_0.16_82)]">
-                      <p>Prepare your trading session once, then sign this order.</p>
+              {/* ── Progressive trade steps — only show the CURRENT step ── */}
+              {tradePreview && (() => {
+                // Step 1: Session not ready → "Prepare trading session"
+                if (clobSession.status !== "ready") {
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-[oklch(0.78_0.16_82/0.15)] text-[oklch(0.78_0.16_82)] text-[9px]">1</span>
+                        Prepare trading session
+                      </div>
+                      <div className="rounded-lg border border-[oklch(0.78_0.16_82/0.2)] bg-[oklch(0.78_0.16_82/0.07)] p-2.5 text-[11px] leading-snug text-[oklch(0.78_0.16_82)]">
+                        <p>Prepare your trading session once, then sign this order.</p>
+                      </div>
                       <Button
                         type="button"
                         onClick={clobSession.prepareSession}
@@ -1742,16 +1733,23 @@ export default function MarketDetailPage() {
                           !connectedWallet ||
                           (tradingProfile.profile?.tradingWalletKind === "deposit" && depositWalletStatus.status?.deployed !== true)
                         }
-                        className="h-9 w-full gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] text-xs font-semibold"
+                        className="h-10 w-full gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)]"
                       >
-                        {clobSession.status === "preparing" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldAlert className="w-3.5 h-3.5" />}
-                        {clobSession.status === "preparing" ? "Preparing..." : "Prepare trading session"}
+                        {clobSession.status === "preparing" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
+                        {clobSession.status === "preparing" ? "Preparing..." : "Prepare Trading Session"}
                       </Button>
                     </div>
-                  )}
+                  );
+                }
 
-                  {clobSession.status === "ready" && requiresCollateral && !tradeCollateralGate.ready && (
+                // Step 2 (buy): Collateral approval needed
+                if (requiresCollateral && !tradeCollateralGate.ready) {
+                  return (
                     <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-[oklch(0.78_0.16_82/0.15)] text-[oklch(0.78_0.16_82)] text-[9px]">2</span>
+                        {tradeCollateralGate.needsApproval ? "Approve Trading" : "Fund Account"}
+                      </div>
                       <div className="rounded-lg border border-[oklch(0.58_0.2_25/0.3)] bg-[oklch(0.58_0.2_25/0.08)] p-2.5 text-[11px] leading-snug text-[oklch(0.74_0.14_25)]">
                         {tradeCollateralGate.message}
                       </div>
@@ -1768,7 +1766,7 @@ export default function MarketDetailPage() {
                                   depositWalletApproval.status === "submitting" ||
                                   depositWalletStatus.status?.deployed !== true
                                 }
-                                className="w-full h-9 gap-2 border border-[oklch(0.78_0.16_82/0.35)] bg-[oklch(0.78_0.16_82/0.1)] text-[oklch(0.78_0.16_82)] hover:bg-[oklch(0.78_0.16_82/0.16)] font-semibold"
+                                className="w-full h-10 gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)]"
                               >
                                 {depositWalletApproval.status === "preparing" ||
                                 depositWalletApproval.status === "signing" ||
@@ -1807,7 +1805,7 @@ export default function MarketDetailPage() {
                                 type="button"
                                 onClick={clobSession.approveCollateral}
                                 disabled={clobSession.approvalStatus === "approving"}
-                                className="w-full h-9 gap-2 border border-[oklch(0.78_0.16_82/0.35)] bg-[oklch(0.78_0.16_82/0.1)] text-[oklch(0.78_0.16_82)] hover:bg-[oklch(0.78_0.16_82/0.16)] font-semibold"
+                                className="w-full h-10 gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)]"
                               >
                                 {clobSession.approvalStatus === "approving" ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1830,16 +1828,24 @@ export default function MarketDetailPage() {
                         <Button
                           type="button"
                           onClick={() => openFundingModal("deposit")}
-                          className="w-full h-9 gap-2 border border-[oklch(0.78_0.16_82/0.35)] bg-[oklch(0.78_0.16_82/0.1)] text-[oklch(0.78_0.16_82)] hover:bg-[oklch(0.78_0.16_82/0.16)] font-semibold"
+                          className="w-full h-10 gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)]"
                         >
                           <Wallet className="w-4 h-4" />
                           Fund pUSD from BNB
                         </Button>
                       )}
                     </div>
-                  )}
-                  {clobSession.status === "ready" && requiresPositionApproval && !tradePositionGate.ready && (
+                  );
+                }
+
+                // Step 2 (sell): Position approval needed
+                if (requiresPositionApproval && !tradePositionGate.ready) {
+                  return (
                     <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-[oklch(0.78_0.16_82/0.15)] text-[oklch(0.78_0.16_82)] text-[9px]">2</span>
+                        {tradePositionGate.needsApproval ? "Approve Selling" : "Insufficient Shares"}
+                      </div>
                       <div className="rounded-lg border border-[oklch(0.58_0.2_25/0.3)] bg-[oklch(0.58_0.2_25/0.08)] p-2.5 text-[11px] leading-snug text-[oklch(0.74_0.14_25)]">
                         {tradePositionGate.message}
                       </div>
@@ -1856,7 +1862,7 @@ export default function MarketDetailPage() {
                                   depositWalletApproval.status === "submitting" ||
                                   depositWalletStatus.status?.deployed !== true
                                 }
-                                className="w-full h-9 gap-2 border border-[oklch(0.78_0.16_82/0.35)] bg-[oklch(0.78_0.16_82/0.1)] text-[oklch(0.78_0.16_82)] hover:bg-[oklch(0.78_0.16_82/0.16)] font-semibold"
+                                className="w-full h-10 gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)]"
                               >
                                 {depositWalletApproval.status === "preparing" ||
                                 depositWalletApproval.status === "signing" ||
@@ -1874,7 +1880,7 @@ export default function MarketDetailPage() {
                                   : depositWalletApproval.status === "submitting"
                                   ? "Relaying approval..."
                                   : depositWalletApproval.status === "approved"
-                                  ? "Trading Permissions Relayed ✓"
+                                  ? "Selling Permissions Relayed ✓"
                                   : "Approve Selling via Relayer"}
                               </Button>
                               {depositWalletApproval.error && (
@@ -1904,7 +1910,7 @@ export default function MarketDetailPage() {
                                   if (approved && activeTokenId) await clobSession.refreshConditionalBalanceAllowance(activeTokenId);
                                 }}
                                 disabled={clobSession.approvalStatus === "approving"}
-                                className="w-full h-9 gap-2 border border-[oklch(0.78_0.16_82/0.35)] bg-[oklch(0.78_0.16_82/0.1)] text-[oklch(0.78_0.16_82)] hover:bg-[oklch(0.78_0.16_82/0.16)] font-semibold"
+                                className="w-full h-10 gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)]"
                               >
                                 {clobSession.approvalStatus === "approving" ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1929,9 +1935,33 @@ export default function MarketDetailPage() {
                         </p>
                       )}
                     </div>
-                  )}
-                </div>
-              )}
+                  );
+                }
+
+                // Step 3: All approvals done → Sign order (only if not already signed)
+                if (!previewError && !clobSession.signedOrderPreview) {
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-[oklch(0.68_0.18_155/0.18)] text-[oklch(0.68_0.18_155)] text-[9px]">✓</span>
+                        Approved — sign your order
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={handleCreateSignedOrder}
+                        disabled={signOrderPreviewDisabled}
+                        className="w-full h-10 gap-2 font-semibold border border-[oklch(0.78_0.16_82/0.55)] bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] shadow-[0_0_22px_oklch(0.78_0.16_82/0.22)] hover:bg-[oklch(0.82_0.16_82)] transition-all"
+                      >
+                        {signingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
+                        {signingOrder ? "Waiting for wallet signature..." : "Sign Order Preview"}
+                      </Button>
+                    </div>
+                  );
+                }
+
+                // No action needed at this point (signed order is shown separately below)
+                return null;
+              })()}
 
               {clobSession.signedOrderPreview && (
                 <div className="rounded-xl border border-[oklch(0.68_0.18_155/0.32)] bg-[oklch(0.68_0.18_155/0.08)] p-3.5 space-y-2.5 text-xs">
