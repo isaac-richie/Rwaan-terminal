@@ -566,6 +566,7 @@ export async function fetchPolymarketMarkets(
         const params = new URLSearchParams(baseParams)
         params.set("tag_id", tagId)
         params.set("related_tags", "true")
+        params.set("compact", "true")
         return fetchGammaEventsDeduped(`${API_BASE}/gamma/events?${params.toString()}`)
       })
     )
