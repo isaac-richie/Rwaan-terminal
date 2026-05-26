@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import {
@@ -91,6 +91,19 @@ export function MarketHero() {
   const [breaking, setBreaking] = useState<PolymarketMarket[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [loading, setLoading] = useState(true)
+  const touchStartX = useRef<number>(0)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+  }
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (trending.length <= 1) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    if (Math.abs(dx) > 48) {
+      if (dx < 0) setActiveIndex((i) => (i + 1) % trending.length)
+      else setActiveIndex((i) => (i - 1 + trending.length) % trending.length)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -137,10 +150,10 @@ export function MarketHero() {
   if (!activeMarket) return null
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-7 relative z-[1] overflow-hidden">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-4 sm:pb-7 relative z-[1]">
 
-      {/* ── Hero headline ────────────────────────────────── */}
-      <div className="mb-8">
+      {/* ── Hero headline — hidden on mobile to keep it light ── */}
+      <div className="mb-8 hidden sm:block">
         {/* Live badge */}
         <div
           className="hero-enter inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.07)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[oklch(0.82_0.16_82)]"
@@ -196,7 +209,11 @@ export function MarketHero() {
         style={{ animationDelay: "240ms" }}
       >
         {/* Featured market card */}
-        <div className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260/0.95)] hero-card-glow">
+        <div
+          className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260/0.95)] hero-card-glow"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
 
           {/* Image + question pane */}
           <button
@@ -324,9 +341,9 @@ export function MarketHero() {
             </div>
           </div>
 
-          {/* Ticker strip */}
+          {/* Ticker strip — desktop animated (hidden on mobile) */}
           {marqueeMarkets.length > 0 && (
-            <div className="shrink-0 border-t border-[oklch(0.20_0.015_255)] bg-[oklch(0.095_0.012_260)] py-3">
+            <div className="hidden sm:block shrink-0 border-t border-[oklch(0.20_0.015_255)] bg-[oklch(0.095_0.012_260)] py-3 overflow-hidden">
               <div className="w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
                 <div className="ticker-scroll flex min-w-max gap-2 px-2">
                   {marqueeMarkets.map((market, idx) => {
@@ -373,7 +390,7 @@ export function MarketHero() {
           )}
         </div>
 
-        {/* ── Breaking news sidebar — hidden on mobile, shown lg+ ── */}
+        {/* ── Breaking news sidebar — desktop only ── */}
         <aside
           className="hidden lg:flex flex-col rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260/0.95)] overflow-hidden hero-card-glow"
         >
@@ -446,6 +463,49 @@ export function MarketHero() {
           </div>
         </aside>
       </div>
+
+      {/* ── Mobile scroll strip — swipe through all trending markets ── */}
+      {trending.length > 0 && (
+        <div className="sm:hidden mt-3 -mx-4 border-t border-[oklch(0.20_0.015_255)] bg-[oklch(0.095_0.012_260)]">
+          <div className="overflow-x-auto [-webkit-overflow-scrolling:touch] scroll-smooth no-scrollbar">
+            <div className="flex gap-2 px-4 py-3 w-max">
+              {trending.map((market) => {
+                const price = getPrimaryPrice(market)
+                const isHigh = price >= 55
+                const imgSrc = (market.image ?? market.icon) as string | undefined
+                return (
+                  <button
+                    key={market.id}
+                    type="button"
+                    onClick={() => goToMarket(market)}
+                    className="flex w-[220px] shrink-0 items-center gap-2 rounded-xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.13_0.013_255/0.9)] px-3 py-2 text-left active:scale-[0.98] transition-transform"
+                  >
+                    <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-[oklch(0.20_0.015_255)] bg-[oklch(0.16_0.014_255)]">
+                      {imgSrc ? (
+                        <Image src={imgSrc} alt="" fill quality={85} sizes="28px" className="object-contain p-0.5" />
+                      ) : (
+                        <Flame className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[11px] font-semibold text-foreground leading-snug">{market.question}</span>
+                      <span className="block mt-0.5 font-mono text-[9px] text-muted-foreground">{market.volume}</span>
+                    </span>
+                    <span className={cn(
+                      "shrink-0 rounded-lg px-1.5 py-0.5 font-mono text-[11px] font-bold",
+                      isHigh ? "bg-[oklch(0.68_0.18_155/0.12)] text-[oklch(0.68_0.18_155)]"
+                           : "bg-[oklch(0.60_0.18_25/0.10)] text-[oklch(0.62_0.18_25)]"
+                    )}>
+                      {price.toFixed(0)}¢
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
     </section>
   )
 }

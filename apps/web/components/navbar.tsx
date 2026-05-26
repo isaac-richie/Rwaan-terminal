@@ -576,9 +576,27 @@ export function Navbar() {
   const privyEnabled = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 8)
+    let frame = 0
+    const updateScrolled = () => {
+      setScrolled((current) => {
+        const y = window.scrollY
+        const next = current ? y > 4 : y > 24
+        return current === next ? current : next
+      })
+    }
+    const handleScroll = () => {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => {
+        frame = 0
+        updateScrolled()
+      })
+    }
+    updateScrolled()
     window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame)
+      window.removeEventListener("scroll", handleScroll)
+    }
   }, [])
 
   useEffect(() => {
@@ -648,10 +666,10 @@ export function Navbar() {
     <>
       <header
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          "fixed top-0 left-0 right-0 z-50 transform-gpu bg-[oklch(0.09_0.012_260/0.94)] backdrop-blur-xl [backface-visibility:hidden] [contain:paint] [will-change:transform] transition-[background-color,box-shadow] duration-200",
           scrolled
-            ? "bg-[oklch(0.09_0.012_260/0.97)] backdrop-blur-2xl shadow-[0_1px_0_oklch(0.78_0.16_82/0.12)]"
-            : "bg-[oklch(0.10_0.012_260/0.80)] backdrop-blur-xl"
+            ? "shadow-[0_1px_0_oklch(0.78_0.16_82/0.12),0_10px_34px_oklch(0_0_0/0.26)]"
+            : "shadow-none"
         )}
       >
         {/* Bottom border — glows amber on scroll */}
@@ -678,12 +696,12 @@ export function Navbar() {
                 className="h-full w-full object-contain"
               />
             </div>
-            <div className="leading-none hidden sm:block">
-              <div className="text-[15px] font-extrabold tracking-tight">
+            <div className="leading-none">
+              <div className="text-[13px] sm:text-[15px] font-extrabold tracking-tight">
                 <span className="text-foreground">Rawli</span>{" "}
                 <span className="text-[oklch(0.82_0.16_82)]">Analytic</span>
               </div>
-              <div className="text-[9px] uppercase tracking-[0.22em] text-muted-foreground/70 mt-[3px]">
+              <div className="hidden sm:block text-[9px] uppercase tracking-[0.22em] text-muted-foreground/70 mt-[3px]">
                 prediction terminal
               </div>
             </div>

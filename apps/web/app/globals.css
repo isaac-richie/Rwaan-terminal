@@ -407,6 +407,6 @@
     .hero-card-glow { box-shadow: none; }
     .card-enter { animation: none; opacity: 1; transform: none; }
     .hero-enter  { animation: none; opacity: 1; transform: none; }
-    .ticker-scroll { animation-duration: 60s; }
+    .ticker-scroll { animation: none; }
   }
 }

@@ -4,7 +4,6 @@ import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { MarketHero } from "@/components/market-hero"
-import { MobileTicker } from "@/components/mobile-ticker"
 import { CategoriesBar } from "@/components/categories-bar"
 import { MarketsGrid } from "@/components/markets-grid"
 import { Footer } from "@/components/footer"
@@ -26,17 +25,10 @@ function HomeContent() {
     <div className="terminal-grid-bg min-h-screen bg-background flex flex-col ambient-glow">
       <Navbar />
 
-      {/* Hero: hidden on mobile to reduce weight — show from sm up */}
-      <div className="hidden sm:block">
-        <MarketHero />
-      </div>
+      {/* Hero: always shown — mobile gets compact swipeable version */}
+      <MarketHero />
 
-      {/* pt-[78px] clears the fixed navbar on mobile (hero does it on sm+) */}
-      <main id="markets" className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-[78px] sm:pt-0 pb-24 sm:pb-16 relative z-[1]">
-        {/* Mobile ticker — sits just below navbar, scrolls with content */}
-        <div className="-mx-4 mb-3 sm:hidden">
-          <MobileTicker />
-        </div>
+      <main id="markets" className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-0 pb-24 sm:pb-16 relative z-[1]">
         {/* Desktop heading */}
         <div className="hidden sm:flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 pb-3">
           <div>
