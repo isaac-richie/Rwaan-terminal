@@ -165,7 +165,7 @@ export function bridgeTxAsEvents(txs: BridgeTransaction[], phase?: string): Acti
       status: isComplete ? "confirmed" : isFailed ? "failed" : "processing",
       title: isComplete ? "Deposit confirmed" : isFailed ? "Deposit failed" : "Deposit processing",
       detail: tx.txHash ? `Tx ${shortHash(tx.txHash)}` : "Bridge transaction in progress",
-      amount: tx.amount ? `${tx.amount} ${tx.asset ?? ""}`.trim() : undefined,
+      amount: tx.fromAmountBaseUnit ? `${(Number(tx.fromAmountBaseUnit) / 1e18).toFixed(4)} BNB` : undefined,
       txHash: tx.txHash ?? undefined,
       timestamp: parseTimestamp(tx.createdTimeMs),
       raw: tx,
