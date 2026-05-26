@@ -5,10 +5,16 @@ const REDIS_URL = process.env.REDIS_URL?.trim() || "";
 type MemoryCacheEntry = {
   value: string;
   expiresAt: number;
+  staleUntil: number;
 };
 
 let redisClient: Redis | null = null;
 const memoryCache = new Map<string, MemoryCacheEntry>();
+
+export type JsonCacheHit<T> = {
+  value: T;
+  state: "fresh" | "stale";
+};
 
 const getClient = () => {
   if (!REDIS_URL) return null;
@@ -36,11 +42,15 @@ export const buildCacheKey = (prefix: string, query: Record<string, string | num
   return suffix ? `${prefix}?${suffix}` : prefix;
 };
 
-export const getJsonCache = async <T>(key: string): Promise<T | null> => {
+export const getJsonCacheEntry = async <T>(key: string): Promise<JsonCacheHit<T> | null> => {
   const memoryEntry = memoryCache.get(key);
   if (memoryEntry) {
-    if (memoryEntry.expiresAt > Date.now()) {
-      return JSON.parse(memoryEntry.value) as T;
+    const now = Date.now();
+    if (memoryEntry.expiresAt > now) {
+      return { value: JSON.parse(memoryEntry.value) as T, state: "fresh" };
+    }
+    if (memoryEntry.staleUntil > now) {
+      return { value: JSON.parse(memoryEntry.value) as T, state: "stale" };
     }
     memoryCache.delete(key);
   }
@@ -50,18 +60,32 @@ export const getJsonCache = async <T>(key: string): Promise<T | null> => {
     if (!client) return null;
     const cached = await client.get(key);
     if (!cached) return null;
-    memoryCache.set(key, { value: cached, expiresAt: Date.now() + 5_000 });
-    return JSON.parse(cached) as T;
+    const now = Date.now();
+    memoryCache.set(key, { value: cached, expiresAt: now + 5_000, staleUntil: now + 5_000 });
+    return { value: JSON.parse(cached) as T, state: "fresh" };
   } catch {
     return null;
   }
 };
 
-export const setJsonCache = async (key: string, value: unknown, ttlSeconds: number): Promise<void> => {
+export const getJsonCache = async <T>(key: string): Promise<T | null> => {
+  const hit = await getJsonCacheEntry<T>(key);
+  return hit?.state === "fresh" ? hit.value : null;
+};
+
+export const setJsonCache = async (
+  key: string,
+  value: unknown,
+  ttlSeconds: number,
+  options: { staleTtlSeconds?: number } = {},
+): Promise<void> => {
   const serialized = JSON.stringify(value);
+  const now = Date.now();
+  const staleTtlSeconds = options.staleTtlSeconds ?? 0;
   memoryCache.set(key, {
     value: serialized,
-    expiresAt: Date.now() + ttlSeconds * 1000,
+    expiresAt: now + ttlSeconds * 1000,
+    staleUntil: now + (ttlSeconds + staleTtlSeconds) * 1000,
   });
 
   try {
