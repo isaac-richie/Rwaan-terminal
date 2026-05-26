@@ -1,0 +1,170 @@
+import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+vi.mock("./services/polymarket.js", async () => {
+  const actual = await vi.importActual<typeof import("./services/polymarket.js")>("./services/polymarket.js");
+  return {
+    ...actual,
+    getClobAuthenticated: vi.fn(),
+  };
+});
+
+const { buildServer } = await import("./server.js");
+const { closeTradingProfileDbForTests } = await import("./services/db.js");
+const { getClobAuthenticated } = await import("./services/polymarket.js");
+
+const walletA = "0x0000000000000000000000000000000000000001";
+const walletB = "0x0000000000000000000000000000000000000002";
+const tokenId = "123456789";
+
+const clobHeaders = {
+  POLY_ADDRESS: walletA,
+  POLY_SIGNATURE: "signature",
+  POLY_TIMESTAMP: "123",
+  POLY_API_KEY: "key",
+  POLY_PASSPHRASE: "passphrase",
+};
+
+async function withRewardStore<T>(fn: () => Promise<T>): Promise<T> {
+  const originalDb = process.env.TRADING_PROFILE_DB_PATH;
+  const originalSupabaseDb = process.env.SUPABASE_DB_URL;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  const dir = await mkdtemp(join(tmpdir(), "rawli-points-test-"));
+  closeTradingProfileDbForTests();
+  process.env.TRADING_PROFILE_DB_PATH = join(dir, "points.sqlite");
+  delete process.env.SUPABASE_DB_URL;
+  delete process.env.DATABASE_URL;
+
+  try {
+    return await fn();
+  } finally {
+    closeTradingProfileDbForTests();
+    if (originalDb === undefined) {
+      delete process.env.TRADING_PROFILE_DB_PATH;
+    } else {
+      process.env.TRADING_PROFILE_DB_PATH = originalDb;
+    }
+    if (originalSupabaseDb === undefined) {
+      delete process.env.SUPABASE_DB_URL;
+    } else {
+      process.env.SUPABASE_DB_URL = originalSupabaseDb;
+    }
+    if (originalDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    }
+    await rm(dir, { recursive: true, force: true });
+    vi.mocked(getClobAuthenticated).mockReset();
+  }
+}
+
+function tradePayload(orderId: string) {
+  return {
+    wallet: walletA,
+    tradingWalletAddress: walletA,
+    orderId,
+    marketId: "market-1",
+    tokenId,
+    amountUsd: 999,
+    quickSettle: true,
+    crypto: false,
+    premium: false,
+  };
+}
+
+describe("points routes", () => {
+  it("rejects browser trade rewards without CLOB order proof", async () => {
+    await withRewardStore(async () => {
+      const app = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/points/events/trade",
+        payload: tradePayload("order-no-proof"),
+      });
+
+      expect(res.statusCode).toBe(401);
+      expect(res.json().error).toBe("missing_clob_order_proof");
+    });
+  });
+
+  it("awards points only for verified matched CLOB volume", async () => {
+    await withRewardStore(async () => {
+      vi.mocked(getClobAuthenticated).mockResolvedValueOnce({
+        owner: walletA,
+        maker_address: walletA,
+        asset_id: tokenId,
+        price: "0.5",
+        original_size: "20",
+        size_matched: "10",
+      });
+
+      const app = buildServer();
+      const rewardRes = await app.inject({
+        method: "POST",
+        url: "/points/events/trade",
+        headers: clobHeaders,
+        payload: tradePayload("order-matched"),
+      });
+      expect(rewardRes.statusCode).toBe(200);
+      expect(rewardRes.json()).toMatchObject({ ok: true, rewarded: true, amountUsd: 5 });
+
+      const summaryRes = await app.inject({ method: "GET", url: `/points/summary/${walletA}` });
+      expect(summaryRes.statusCode).toBe(200);
+      expect(summaryRes.json().summary.volumeUsd).toBe(5);
+      expect(summaryRes.json().summary.trades).toBe(1);
+      expect(summaryRes.json().summary.totalPoints).toBe(55);
+      expect(summaryRes.json().summary.events.map((event: any) => event.eventType)).toContain("daily_quest_completed");
+    });
+  });
+
+  it("does not award points for an unfilled order", async () => {
+    await withRewardStore(async () => {
+      vi.mocked(getClobAuthenticated).mockResolvedValueOnce({
+        owner: walletA,
+        asset_id: tokenId,
+        price: "0.5",
+        original_size: "20",
+        size_matched: "0",
+      });
+
+      const app = buildServer();
+      const rewardRes = await app.inject({
+        method: "POST",
+        url: "/points/events/trade",
+        headers: clobHeaders,
+        payload: tradePayload("order-resting"),
+      });
+      expect(rewardRes.statusCode).toBe(200);
+      expect(rewardRes.json()).toMatchObject({ ok: true, rewarded: false, reason: "order_not_filled" });
+
+      const summaryRes = await app.inject({ method: "GET", url: `/points/summary/${walletA}` });
+      expect(summaryRes.json().summary.trades).toBe(0);
+    });
+  });
+
+  it("rejects a verified order owned by a different wallet", async () => {
+    await withRewardStore(async () => {
+      vi.mocked(getClobAuthenticated).mockResolvedValueOnce({
+        owner: walletB,
+        asset_id: tokenId,
+        price: "0.5",
+        original_size: "20",
+        size_matched: "10",
+      });
+
+      const app = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/points/events/trade",
+        headers: clobHeaders,
+        payload: tradePayload("order-foreign"),
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toBe("order_owner_mismatch");
+    });
+  });
+});

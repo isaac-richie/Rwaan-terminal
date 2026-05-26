@@ -174,22 +174,27 @@ function hasPremiumAnalysisCached(marketId: string | null | undefined): boolean 
 
 async function recordTradeRewardEvent(input: {
   wallet: string | null;
+  tradingWalletAddress?: string | null;
   orderId?: string | null;
   marketId?: string | null;
+  tokenId?: string | null;
   amountUsd: number;
   quickSettle: boolean;
   crypto: boolean;
   premium?: boolean;
+  headers?: Record<string, string> | null;
 }) {
-  if (!input.wallet || !input.marketId || !input.orderId || input.amountUsd <= 0) return;
+  if (!input.wallet || !input.tradingWalletAddress || !input.marketId || !input.tokenId || !input.orderId || input.amountUsd <= 0 || !input.headers) return;
   try {
     await fetch(`${API_BASE}/points/events/trade`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...input.headers },
       body: JSON.stringify({
         wallet: input.wallet,
+        tradingWalletAddress: input.tradingWalletAddress,
         orderId: input.orderId,
         marketId: String(input.marketId),
+        tokenId: input.tokenId,
         amountUsd: input.amountUsd,
         quickSettle: input.quickSettle,
         crypto: input.crypto,
@@ -200,6 +205,8 @@ async function recordTradeRewardEvent(input: {
     // Rewards are tracked opportunistically; trade execution should never depend on them.
   }
 }
+
+type TradeRewardCandidate = Omit<Parameters<typeof recordTradeRewardEvent>[0], "orderId" | "headers">;
 
 async function fetchGammaMarketByQuery(query: Record<string, string>, matches?: (market: any) => boolean) {
   const params = new URLSearchParams(query);
@@ -566,6 +573,7 @@ export default function MarketDetailPage() {
   );
   const clobSession = useClobSession(connectedWallet, tradingProfile.profile);
   const emittedTerminalOrderRef = useRef<string | null>(null);
+  const rewardCandidateRef = useRef<TradeRewardCandidate | null>(null);
   const depositWalletApproval = useDepositWalletApproval(
     connectedWalletAddress,
     tradingProfile.profile?.tradingWalletKind === "deposit" ? tradingWalletAddress : null,
@@ -713,6 +721,12 @@ export default function MarketDetailPage() {
       const previewTokenId = clobSession.signedOrderPreview?.tokenId;
       const outcomeIdx = previewTokenId ? (market?.tokenIds?.indexOf(previewTokenId) ?? -1) : -1;
       const outcome = outcomeIdx >= 0 ? (market?.outcomes?.[outcomeIdx] ?? activeOutcomeName) : activeOutcomeName;
+      void (async () => {
+        const rewardCandidate = rewardCandidateRef.current;
+        if (!rewardCandidate) return;
+        const rewardHeaders = await clobSession.createOrderLookupHeaders(orderId);
+        await recordTradeRewardEvent({ ...rewardCandidate, orderId, headers: rewardHeaders });
+      })();
       toast.success(`${orderSide === "BUY" ? "Buy" : "Sell"} order filled!`, {
         description: `Your ${outcome} position was matched on the CLOB · ${orderId.slice(0, 8)}…`,
         duration: 8000,
@@ -916,15 +930,19 @@ export default function MarketDetailPage() {
         if (marketId) router.replace(`/markets/${encodeURIComponent(String(marketId))}`, { scroll: false });
       }
       const orderId = submission.orderId ? ` · ${submission.orderId.slice(0, 8)}…` : "";
-      void recordTradeRewardEvent({
+      const rewardHeaders = submission.orderId ? await clobSession.createOrderLookupHeaders(submission.orderId) : null;
+      const rewardCandidate: TradeRewardCandidate = {
         wallet: connectedWalletAddress,
-        orderId: submission.orderId ?? `${market?.id ?? marketId}:${Date.now()}`,
+        tradingWalletAddress,
         marketId: market?.id ?? marketId ?? null,
+        tokenId: activeTokenId,
         amountUsd: amountNumber,
         quickSettle: resolvesWithinHours(market?.endsAt, 24),
         crypto: Boolean(cryptoAsset),
         premium: hasPremiumAnalysisCached(market?.id ?? marketId),
-      });
+      };
+      rewardCandidateRef.current = rewardCandidate;
+      void recordTradeRewardEvent({ ...rewardCandidate, orderId: submission.orderId, headers: rewardHeaders });
       toast.success(`${side === "BUY" ? "Buy" : "Sell"} order submitted${orderId}`, {
         description: submission.takingAmount
           ? `Filled ${submission.takingAmount} shares`

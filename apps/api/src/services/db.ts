@@ -662,20 +662,67 @@ export async function getRewardSummary(walletInput: string): Promise<RewardSumma
   };
 
   let rows: RewardEventRow[];
+  let totals: {
+    total_points: number | string | null;
+    cashback_cents: number | string | null;
+    volume_usd: number | string | null;
+    trades: number | string | null;
+    premium_unlocks: number | string | null;
+  };
   if (usePostgres()) {
     const pool = await getPgPool();
-    const result = await pool.query<RewardEventRow>(
-      `
+    const [totalResult, eventResult] = await Promise.all([
+      pool.query<{
+        total_points: string | null;
+        cashback_cents: string | null;
+        volume_usd: string | null;
+        trades: string | null;
+        premium_unlocks: string | null;
+      }>(
+        `
+          SELECT
+            COALESCE(SUM(points), 0) AS total_points,
+            COALESCE(SUM(cashback_cents), 0) AS cashback_cents,
+            COALESCE(SUM(amount_usd), 0) AS volume_usd,
+            COUNT(*) FILTER (WHERE event_type = 'trade_submitted') AS trades,
+            COUNT(*) FILTER (WHERE event_type = 'premium_unlock') AS premium_unlocks
+          FROM reward_events
+          WHERE wallet = $1
+        `,
+        [wallet],
+      ),
+      pool.query<RewardEventRow>(
+        `
         SELECT * FROM reward_events
         WHERE wallet = $1
         ORDER BY created_at DESC
         LIMIT 50
       `,
-      [wallet],
-    );
-    rows = result.rows;
+        [wallet],
+      ),
+    ]);
+    totals = totalResult.rows[0] ?? {
+      total_points: 0,
+      cashback_cents: 0,
+      volume_usd: 0,
+      trades: 0,
+      premium_unlocks: 0,
+    };
+    rows = eventResult.rows;
   } else {
     const db = await getDb();
+    totals = db.prepare(
+      `
+        SELECT
+          COALESCE(SUM(points), 0) AS total_points,
+          COALESCE(SUM(cashback_cents), 0) AS cashback_cents,
+          COALESCE(SUM(amount_usd), 0) AS volume_usd,
+          SUM(CASE WHEN event_type = 'trade_submitted' THEN 1 ELSE 0 END) AS trades,
+          SUM(CASE WHEN event_type = 'premium_unlock' THEN 1 ELSE 0 END) AS premium_unlocks
+        FROM reward_events
+        WHERE wallet = ?
+      `,
+    ).get(wallet) as typeof totals;
     rows = db.prepare(
       `
         SELECT * FROM reward_events
@@ -688,11 +735,6 @@ export async function getRewardSummary(walletInput: string): Promise<RewardSumma
 
   return rows.reduce<RewardSummary>(
     (summary, row) => {
-      summary.totalPoints += Number(row.points) || 0;
-      summary.cashbackCents += Number(row.cashback_cents) || 0;
-      summary.volumeUsd += Number(row.amount_usd) || 0;
-      if (row.event_type === "trade_submitted") summary.trades += 1;
-      if (row.event_type === "premium_unlock") summary.premiumUnlocks += 1;
       summary.events.push({
         id: row.id,
         eventType: row.event_type,
@@ -705,7 +747,15 @@ export async function getRewardSummary(walletInput: string): Promise<RewardSumma
       });
       return summary;
     },
-    { wallet, totalPoints: 0, cashbackCents: 0, volumeUsd: 0, trades: 0, premiumUnlocks: 0, events: [] },
+    {
+      wallet,
+      totalPoints: Number(totals.total_points) || 0,
+      cashbackCents: Number(totals.cashback_cents) || 0,
+      volumeUsd: Number(totals.volume_usd) || 0,
+      trades: Number(totals.trades) || 0,
+      premiumUnlocks: Number(totals.premium_unlocks) || 0,
+      events: [],
+    },
   );
 }
 

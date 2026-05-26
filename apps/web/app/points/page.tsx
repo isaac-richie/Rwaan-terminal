@@ -62,8 +62,8 @@ const EARNING_METHODS = [
   {
     icon: BarChart3,
     title: "Trade on Rawli-routed markets",
-    detail: "Earn 1 point per $1 notional traded through Rawli CLOB routes.",
-    pts: "+1 pt / $1",
+    detail: "Earn points on matched Rawli CLOB volume, with daily quest bonuses credited automatically.",
+    pts: "Auto-credit",
     color: "oklch(0.68_0.18_155)",
   },
   {
@@ -121,7 +121,7 @@ const DEFAULT_QUESTS: QuestSnapshot[] = [
     id: "daily_crypto_trade",
     title: "Trade 1 crypto market",
     detail: "Use the Smart Feed crypto lane and place one routed trade today.",
-    reward: "+25 pts boost",
+    reward: "+25 pts auto",
     progress: 0,
     target: 1,
     completed: false,
@@ -130,16 +130,34 @@ const DEFAULT_QUESTS: QuestSnapshot[] = [
     id: "daily_quick_settle",
     title: "Trade 1 Quick Settle",
     detail: "Place a trade on a market resolving within 24 hours.",
-    reward: "+30 pts boost",
+    reward: "+30 pts auto",
     progress: 0,
     target: 1,
+    completed: false,
+  },
+  {
+    id: "daily_two_trades",
+    title: "Place 2 trades today",
+    detail: "Build a small daily rhythm across any eligible Rawli-routed markets.",
+    reward: "+50 pts auto",
+    progress: 0,
+    target: 2,
     completed: false,
   },
   {
     id: "daily_unlock_report",
     title: "Unlock 1 intelligence report",
     detail: "Use premium analysis before entering a market.",
-    reward: "+25 pts + cashback",
+    reward: "+25 pts auto",
+    progress: 0,
+    target: 1,
+    completed: false,
+  },
+  {
+    id: "daily_cashback",
+    title: "Earn cashback credits",
+    detail: "Complete any eligible paid action or routed trade that generates credits.",
+    reward: "Cashback tracker",
     progress: 0,
     target: 1,
     completed: false,
@@ -280,7 +298,7 @@ export default function PointsPage() {
             data.leaderboard.map((row: any, i: number) => ({
               rank: i + 1,
               wallet: row.wallet as string,
-              points: Number(row.points),
+              points: Number(row.totalPoints ?? row.points ?? 0),
               tier: row.tier as string,
             }))
           );
@@ -350,7 +368,7 @@ export default function PointsPage() {
 
             <div className="mt-5 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.65)] p-3 text-[11px] leading-5 text-muted-foreground">
               {connectedWalletAddress
-                ? `Cashback credits accrued: ${formatCashback(summary?.cashbackCents ?? 0)}. Credits are pre-season rewards until claims open.`
+                ? `Cashback credits accrued: ${formatCashback(summary?.cashbackCents ?? 0)}. Quest bonuses are credited automatically when completed.`
                 : "Connect your wallet and execute your first trade to begin earning Season 1 points."}
             </div>
             <button
@@ -423,7 +441,7 @@ export default function PointsPage() {
             <div className="flex items-center gap-2">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-muted-foreground">Daily quests</div>
-                <h2 className="mt-1.5 text-2xl font-bold text-foreground">Small actions. Daily rewards.</h2>
+                <h2 className="mt-1.5 text-2xl font-bold text-foreground">Small actions. Auto rewards.</h2>
               </div>
               {pointsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-5" />}
             </div>

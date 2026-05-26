@@ -105,7 +105,7 @@ export function CategoriesBar({
   const currentSort = sortOptions.find((s) => s.id === sortBy) ?? sortOptions[0]
 
   return (
-    <div className="sticky top-16 z-40 bg-[oklch(0.11_0.012_260/0.92)] backdrop-blur-xl border-b border-[oklch(0.22_0.015_255)]">
+    <div className="sticky top-[70px] z-40 bg-[oklch(0.11_0.012_260/0.92)] backdrop-blur-xl border-b border-[oklch(0.22_0.015_255)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3 py-2.5">
           {/* Category chips — fade mask hints at scrollable overflow */}

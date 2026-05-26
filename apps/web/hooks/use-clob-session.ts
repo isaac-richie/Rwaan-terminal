@@ -132,6 +132,7 @@ type ClobSessionState = {
   refreshOpenOrders: (params?: OpenOrderParams) => Promise<OpenOrderSnapshot[]>
   cancelOpenOrder: (orderId: string) => Promise<boolean>
   createReadinessHeaders: () => Promise<Record<string, string> | null>
+  createOrderLookupHeaders: (orderId: string) => Promise<Record<string, string> | null>
   clearSignedOrderPreview: () => void
   approveCollateral: () => Promise<boolean>
   approveConditionalTokens: () => Promise<boolean>
@@ -980,6 +981,20 @@ export function useClobSession(wallet?: ConnectedWallet | null, profile?: Tradin
     }
   }
 
+  const createOrderLookupHeaders = async (orderId: string) => {
+    if (!signerRef.current || !credsRef.current || !orderId) return null
+    try {
+      const headers = await createL2Headers(
+        signerRef.current as any,
+        credsRef.current,
+        { method: "GET", requestPath: `/data/order/${orderId}` }
+      )
+      return stringHeaders(headers)
+    } catch {
+      return null
+    }
+  }
+
   const createSignedSellOrder = async (input: SignedSellOrderInput) => {
     if (!clientRef.current) {
       setError("Prepare a CLOB session before signing a sell order.")
@@ -1201,6 +1216,7 @@ export function useClobSession(wallet?: ConnectedWallet | null, profile?: Tradin
     refreshOpenOrders,
     cancelOpenOrder,
     createReadinessHeaders,
+    createOrderLookupHeaders,
     clearSignedOrderPreview,
     approveCollateral,
     approveConditionalTokens,

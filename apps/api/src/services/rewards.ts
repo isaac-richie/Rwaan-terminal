@@ -1,4 +1,4 @@
-import { recordRewardEvent, getTotalTradeCount, getReferrerForReferee, markReferralRewarded } from "./db.js";
+import { recordRewardEvent, getTotalTradeCount, getReferrerForReferee, markReferralRewarded, getRewardEventsSince } from "./db.js";
 import type { RewardEventRow } from "./db.js";
 
 const PREMIUM_UNLOCK_POINTS = 25;
@@ -6,6 +6,12 @@ const PREMIUM_UNLOCK_CASHBACK_CENTS = 5;
 const TRADE_CASHBACK_BPS = 25;
 const MAX_TRADE_CASHBACK_CENTS = 100;
 const REFERRAL_POINTS = 500;
+const DAILY_QUEST_POINTS: Record<string, number> = {
+  daily_crypto_trade: 25,
+  daily_quick_settle: 30,
+  daily_two_trades: 50,
+  daily_unlock_report: 25,
+};
 
 /**
  * Season 1 has not launched. Set this to the actual launch timestamp (ISO string)
@@ -66,6 +72,8 @@ export async function recordTradeReward(input: TradeRewardInput): Promise<void> 
     },
   });
 
+  await recordCompletedDailyQuestRewards(input.wallet);
+
   // After recording, check if this was the wallet's very first trade.
   // If it was, and if they were referred, fire the referral reward for their referrer.
   void triggerReferralRewardIfFirstTrade(input.wallet);
@@ -120,6 +128,7 @@ export async function recordPremiumUnlockReward(input: {
       amountRaw: input.amountRaw,
     },
   });
+  await recordCompletedDailyQuestRewards(input.wallet);
 }
 
 export type QuestSnapshot = {
@@ -153,7 +162,7 @@ export function buildDailyQuests(events: RewardEventRow[]): QuestSnapshot[] {
       id: "daily_crypto_trade",
       title: "Trade 1 crypto market",
       detail: "Use the Smart Feed crypto lane and place one routed trade today.",
-      reward: "+25 pts boost",
+      reward: "+25 pts auto",
       progress: cryptoTrades.length,
       target: 1,
     },
@@ -161,7 +170,7 @@ export function buildDailyQuests(events: RewardEventRow[]): QuestSnapshot[] {
       id: "daily_quick_settle",
       title: "Trade 1 Quick Settle",
       detail: "Place a trade on a market resolving within 24 hours.",
-      reward: "+30 pts boost",
+      reward: "+30 pts auto",
       progress: quickSettleTrades.length,
       target: 1,
     },
@@ -169,7 +178,7 @@ export function buildDailyQuests(events: RewardEventRow[]): QuestSnapshot[] {
       id: "daily_two_trades",
       title: "Place 2 trades today",
       detail: "Build a small daily rhythm across any eligible Rawli-routed markets.",
-      reward: "+50 pts streak seed",
+      reward: "+50 pts auto",
       progress: trades.length,
       target: 2,
     },
@@ -177,7 +186,7 @@ export function buildDailyQuests(events: RewardEventRow[]): QuestSnapshot[] {
       id: "daily_unlock_report",
       title: "Unlock 1 intelligence report",
       detail: "Use premium analysis before entering a market.",
-      reward: "+25 pts + cashback",
+      reward: "+25 pts auto",
       progress: premiumUnlocks.length,
       target: 1,
     },
@@ -196,4 +205,44 @@ export function buildDailyQuests(events: RewardEventRow[]): QuestSnapshot[] {
     progress: Math.min(quest.progress, quest.target),
     completed: quest.progress >= quest.target,
   }));
+}
+
+function dailyQuestWindow(date = new Date()) {
+  const start = new Date(date);
+  start.setUTCHours(0, 0, 0, 0);
+  return {
+    dateKey: start.toISOString().slice(0, 10),
+    startIso: start.toISOString(),
+  };
+}
+
+async function recordCompletedDailyQuestRewards(wallet: string): Promise<void> {
+  try {
+    const { dateKey, startIso } = dailyQuestWindow();
+    const events = await getRewardEventsSince(wallet, startIso);
+    const quests = buildDailyQuests(events);
+    await Promise.all(
+      quests
+        .filter((quest) => quest.completed && DAILY_QUEST_POINTS[quest.id] > 0)
+        .map((quest) =>
+          recordRewardEvent({
+            wallet,
+            eventType: "daily_quest_completed",
+            idempotencyKey: `daily_quest:${wallet.toLowerCase()}:${quest.id}:${dateKey}`,
+            points: DAILY_QUEST_POINTS[quest.id],
+            cashbackCents: 0,
+            amountUsd: 0,
+            marketId: null,
+            metadata: {
+              questId: quest.id,
+              questTitle: quest.title,
+              date: dateKey,
+              source: "automatic",
+            },
+          }),
+        ),
+    );
+  } catch {
+    // Quest bonuses should never block the underlying trade or premium unlock.
+  }
 }
