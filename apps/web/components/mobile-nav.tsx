@@ -2,14 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, BarChart2, Star, Briefcase } from "lucide-react"
+import { Home, Star, Briefcase } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const TABS = [
   { href: "/",          label: "Markets",   icon: Home },
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/points",    label: "Points",    icon: Star },
-  { href: "/portfolio", label: "Activity",  icon: BarChart2 },
 ]
 
 export function MobileNav() {
@@ -19,7 +18,7 @@ export function MobileNav() {
     <nav className="fixed bottom-0 inset-x-0 z-50 sm:hidden border-t border-[oklch(0.18_0.014_255)] bg-[oklch(0.09_0.011_260/0.97)] backdrop-blur-xl">
       <div className="flex items-stretch h-16">
         {TABS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href && !(href === "/portfolio" && label === "Activity")
+          const active = pathname === href
           return (
             <Link
               key={label}
