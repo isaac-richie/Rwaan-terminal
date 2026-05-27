@@ -323,39 +323,35 @@ function buildPremiumPrompt(
         ``,
         `TECHNICAL ANALYSIS (${ta.symbol} — live from Binance):`,
         ta.summary,
-        ``,
-        `TA METRICS:`,
-        `- Price: $${ta.currentPrice.toFixed(2)}`,
-        `- HTF Structure: ${ta.htf.structure} (strength ${ta.htf.trendStrength}/100) — ${ta.htf.bias}`,
-        `- RSI(14): ${ta.rsi14.toFixed(1)}`,
-        `- VWAP Distance: ${ta.vwapDistance > 0 ? "+" : ""}${ta.vwapDistance.toFixed(2)}%`,
-        `- Volume Profile: ${ta.volumeProfile}`,
-        `- Volatility (ATR%): ${ta.volatilityPct.toFixed(2)}%`,
-        `- Regime: ${ta.regime}`,
-        `- Nearest Support: ${ta.nearestSupport ? "$" + ta.nearestSupport.toFixed(2) : "none"}`,
-        `- Nearest Resistance: ${ta.nearestResistance ? "$" + ta.nearestResistance.toFixed(2) : "none"}`,
-        `- Confluence Score: ${ta.confluenceScore}/100`,
-        `- Confluence Factors: ${ta.confluenceFactors.join("; ")}`,
-        ...(ta.riskReward
-          ? [
-              `- Long R:R — entry $${ta.riskReward.longEntry.toFixed(2)}, stop $${ta.riskReward.longStop.toFixed(2)}, target $${ta.riskReward.longTarget.toFixed(2)} (${ta.riskReward.longRR.toFixed(1)}R)`,
-              `- Short R:R — entry $${ta.riskReward.shortEntry.toFixed(2)}, stop $${ta.riskReward.shortStop.toFixed(2)}, target $${ta.riskReward.shortTarget.toFixed(2)} (${ta.riskReward.shortRR.toFixed(1)}R)`,
-            ]
-          : []),
       ].join("\n")
     : "";
 
   const taInstructions = ta
     ? [
         ``,
-        `CRITICAL — CRYPTO MARKET WITH LIVE TA:`,
-        `This is a crypto asset market. You have been given real technical analysis data from Binance.`,
-        `You MUST incorporate the TA data into your verdict and analysis:`,
-        `- Use the HTF structure, RSI, VWAP, and regime to inform your directional call`,
-        `- Reference key support/resistance levels in your structural drivers`,
-        `- The confluence score (${ta.confluenceScore}/100) should weight your confidence`,
-        `- If TA and news conflict, note the divergence explicitly`,
-        `- Include specific price levels and technical context — the user paid for precision`,
+        `CRITICAL — CRYPTO MARKET WITH FULL TA SUITE:`,
+        `This is a crypto asset market. You have been given comprehensive technical analysis from Binance including:`,
+        `- Multi-timeframe market structure (4H/1H/15m candles)`,
+        `- EMA ribbon (9/21/50/200) showing ${ta.ema.ribbonState.replace("_", " ")}`,
+        `- MACD with histogram — ${ta.macd.crossover !== "none" ? `FRESH ${ta.macd.crossover.replace("_", " ").toUpperCase()}` : ta.macd.trend + " trend"}`,
+        `- Bollinger Bands${ta.bollinger.squeeze ? " — SQUEEZE ACTIVE (breakout imminent)" : ""}`,
+        `- RSI across 3 timeframes: ${ta.multiTfRsi.alignment.replace("_", " ")}`,
+        ...(ta.rsiDivergence ? [`- ⚠ RSI DIVERGENCE DETECTED: ${ta.rsiDivergence.type}`] : []),
+        ...(ta.obv.divergence ? [`- ⚠ OBV DIVERGENCE: ${ta.obv.divergence.type} — smart money signal`] : []),
+        `- Fibonacci retracements from swing structure`,
+        ...(ta.funding ? [`- Futures funding rate: ${ta.funding.sentiment.replace("_", " ")} (${ta.funding.annualized.toFixed(0)}% annualized)`] : []),
+        ...(ta.fearGreed ? [`- Fear & Greed Index: ${ta.fearGreed.value}/100 (${ta.fearGreed.classification})`] : []),
+        `- Confluence score: ${ta.confluenceScore}/100 across 12 weighted axes`,
+        ``,
+        `You MUST weave the TA data deeply into your analysis:`,
+        `- Your VERDICT confidence should correlate with the confluence score (${ta.confluenceScore}/100)`,
+        `- Reference specific EMA levels, MACD state, and Bollinger position in market signal interpretation`,
+        `- Call out any RSI or OBV divergences as key structural signals`,
+        `- Use Fibonacci levels and key S/R in your structural drivers`,
+        `- If funding rate shows crowded positioning, flag the squeeze risk`,
+        `- If Fear & Greed is extreme, note the contrarian implication`,
+        `- If TA and news conflict, the divergence itself is the insight — explain it`,
+        `- Include specific dollar price levels — the user paid $1 for precision, not vague commentary`,
       ].join("\n")
     : "";
 

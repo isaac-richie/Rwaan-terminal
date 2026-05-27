@@ -101,21 +101,42 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         })),
         generatedAt,
         signalHash,
-        // Include TA metadata when available (crypto markets only)
+        // Include full TA metadata when available (crypto markets only)
         ...(taResult && {
           technicalAnalysis: {
             symbol: taResult.symbol,
             currentPrice: taResult.currentPrice,
             structure: taResult.htf.structure,
             trendStrength: taResult.htf.trendStrength,
+            bias: taResult.htf.bias,
+            swingHigh: taResult.htf.swingHigh,
+            swingLow: taResult.htf.swingLow,
+            // EMA Ribbon
+            ema: taResult.ema,
+            // MACD
+            macd: taResult.macd,
+            // Bollinger
+            bollinger: taResult.bollinger,
+            // RSI suite
             rsi14: taResult.rsi14,
-            regime: taResult.regime,
-            confluenceScore: taResult.confluenceScore,
-            confluenceFactors: taResult.confluenceFactors,
+            rsiDivergence: taResult.rsiDivergence,
+            multiTfRsi: taResult.multiTfRsi,
+            // Volume
+            obv: taResult.obv,
+            volumeProfile: taResult.volumeProfile,
+            // Levels
             nearestSupport: taResult.nearestSupport,
             nearestResistance: taResult.nearestResistance,
+            fibLevels: taResult.fibLevels,
+            // Context
+            vwapDistance: taResult.vwapDistance,
             volatilityPct: taResult.volatilityPct,
-            volumeProfile: taResult.volumeProfile,
+            regime: taResult.regime,
+            funding: taResult.funding,
+            fearGreed: taResult.fearGreed,
+            // Conviction
+            confluenceScore: taResult.confluenceScore,
+            confluenceFactors: taResult.confluenceFactors,
             riskReward: taResult.riskReward,
           },
         }),
