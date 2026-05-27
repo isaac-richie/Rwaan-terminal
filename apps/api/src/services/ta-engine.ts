@@ -1440,12 +1440,30 @@ export function detectCryptoSymbol(text: string): string | null {
     ["FET", ["fetch.ai", /\bfet\b/]],
     ["RENDER", ["render", /\brndr\b/]],
   ];
+
+  // Find ALL matches with their earliest position in the text
+  const matches: Array<{ sym: string; pos: number }> = [];
   for (const [sym, needles] of patterns) {
-    if (needles.some((n) => typeof n === "string" ? haystack.includes(n) : n.test(haystack))) {
-      return sym;
+    let earliest = Infinity;
+    for (const n of needles) {
+      if (typeof n === "string") {
+        const idx = haystack.indexOf(n);
+        if (idx !== -1 && idx < earliest) earliest = idx;
+      } else {
+        const m = n.exec(haystack);
+        if (m && m.index < earliest) earliest = m.index;
+      }
+    }
+    if (earliest < Infinity) {
+      matches.push({ sym, pos: earliest });
     }
   }
-  return null;
+
+  if (!matches.length) return null;
+
+  // Return the FIRST mentioned crypto — it's most likely the subject
+  matches.sort((a, b) => a.pos - b.pos);
+  return matches[0].sym;
 }
 
 export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnalysis | null> {
