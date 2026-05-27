@@ -1159,21 +1159,21 @@ export default function MarketDetailPage() {
           {/* Right: Trade Panel */}
           <div className="lg:col-span-4">
             <div
-              className="surface-card rounded-2xl p-4 sm:p-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain space-y-4"
+              className="surface-card rounded-3xl p-4 sm:p-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain space-y-4"
               style={{ overflowAnchor: "none" }}
             >
               {/* Header + Buy/Sell toggle */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-foreground">Trade</h3>
-                  <div className="flex rounded-lg border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] p-0.5">
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Trade</h3>
+                  <div className="flex rounded-full border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_255)] p-0.5">
                     <button
                       onClick={() => setTradeSide("buy")}
                       disabled={tradeActionBusy}
                       className={cn(
-                        "px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-md text-[11px] sm:text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                        "px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60",
                         tradeSide === "buy"
-                          ? "bg-[oklch(0.68_0.18_155/0.18)] text-[oklch(0.68_0.18_155)] shadow-sm"
+                          ? "bg-[oklch(0.28_0.12_155)] border border-[oklch(0.68_0.18_155/0.45)] text-[oklch(0.78_0.20_155)] shadow-[0_2px_8px_oklch(0.68_0.18_155/0.20)]"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
@@ -1183,9 +1183,9 @@ export default function MarketDetailPage() {
                       onClick={() => setTradeSide("sell")}
                       disabled={tradeActionBusy}
                       className={cn(
-                        "px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-md text-[11px] sm:text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                        "px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60",
                         tradeSide === "sell"
-                          ? "bg-[oklch(0.58_0.2_25/0.18)] text-[oklch(0.62_0.18_25)] shadow-sm"
+                          ? "bg-[oklch(0.24_0.12_25)] border border-[oklch(0.58_0.2_25/0.40)] text-[oklch(0.72_0.20_25)] shadow-[0_2px_8px_oklch(0.58_0.2_25/0.15)]"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
@@ -1289,21 +1289,21 @@ export default function MarketDetailPage() {
                       onClick={() => setSelectedOutcomeIdx(i)}
                       disabled={tradeActionBusy}
                       className={cn(
-                        "rounded-xl border p-3.5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-70",
+                        "rounded-2xl border p-3.5 text-left transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70",
                         selectedOutcomeIdx === i
                           ? tradeSide === "buy"
-                            ? "border-[oklch(0.68_0.18_155/0.55)] bg-[oklch(0.68_0.18_155/0.12)] shadow-[0_0_12px_oklch(0.68_0.18_155/0.1)]"
-                            : "border-[oklch(0.58_0.2_25/0.5)] bg-[oklch(0.58_0.2_25/0.1)] shadow-[0_0_12px_oklch(0.58_0.2_25/0.1)]"
-                          : "border-[oklch(0.22_0.015_255)] bg-[oklch(0.16_0.014_255)] hover:border-[oklch(0.30_0.016_255)]"
+                            ? "border-[oklch(0.68_0.18_155/0.55)] bg-[oklch(0.68_0.18_155/0.10)] shadow-[0_0_16px_oklch(0.68_0.18_155/0.12)]"
+                            : "border-[oklch(0.58_0.2_25/0.5)] bg-[oklch(0.58_0.2_25/0.10)] shadow-[0_0_16px_oklch(0.58_0.2_25/0.12)]"
+                          : "border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.012_255)] hover:border-[oklch(0.30_0.016_255)] hover:bg-[oklch(0.16_0.014_255)]"
                       )}
                     >
                       <div className={cn(
-                        "text-[9px] font-bold uppercase tracking-widest truncate",
+                        "text-[10px] font-bold uppercase tracking-[0.12em] truncate",
                         tradeSide === "buy" ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.62_0.18_25)]"
                       )}>
                         {tradeSide === "buy" ? "Buy" : "Sell"} {outcomeName}
                       </div>
-                      <div className="text-xl font-bold text-foreground mt-0.5">{displayPrice.toFixed(1)}¢</div>
+                      <div className="text-xl font-bold text-foreground mt-1">{displayPrice.toFixed(1)}¢</div>
                     </button>
                   );
                 })}
@@ -1316,8 +1316,8 @@ export default function MarketDetailPage() {
                 if (!asks.length && !bids.length) return null;
                 const maxSize = Math.max(...[...asks, ...bids].map(l => l.size), 1);
                 return (
-                  <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_255)] overflow-hidden">
-                    <div className="grid grid-cols-3 px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60 border-b border-[oklch(0.22_0.015_255)]">
+                  <div className="rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_255)] overflow-hidden">
+                    <div className="grid grid-cols-3 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/60 border-b border-[oklch(0.22_0.015_255)]">
                       <span>Price</span><span className="text-center">Depth</span><span className="text-right">Size</span>
                     </div>
                     {/* Asks (sells) — red, lowest first reversed */}
@@ -1357,18 +1357,18 @@ export default function MarketDetailPage() {
               })()}
 
               {/* Amount input + quick amounts */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              <div className="space-y-2.5">
+                <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                   {tradeSide === "buy" ? "Amount (pUSD)" : "Shares to sell"}
                 </label>
-                <div className="flex items-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.013_255)] px-3 focus-within:border-[oklch(0.78_0.16_82/0.4)] focus-within:shadow-[0_0_0_3px_oklch(0.78_0.16_82/0.08)] transition-all">
-                  <span className="w-5 text-sm text-muted-foreground">{tradeSide === "buy" ? "$" : "sh"}</span>
+                <div className="flex items-center gap-2 rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] px-4 focus-within:border-[oklch(0.78_0.16_82/0.45)] focus-within:shadow-[0_0_0_3px_oklch(0.78_0.16_82/0.08)] transition-all">
+                  <span className="text-sm font-bold text-muted-foreground">{tradeSide === "buy" ? "$" : "sh"}</span>
                   <input
                     value={orderAmount}
                     onChange={(e) => setOrderAmount(e.target.value)}
                     disabled={tradeActionBusy}
                     inputMode="decimal"
-                    className="h-10 flex-1 bg-transparent outline-none text-sm font-semibold text-foreground disabled:cursor-not-allowed"
+                    className="h-12 flex-1 bg-transparent outline-none text-lg font-bold text-foreground disabled:cursor-not-allowed"
                     placeholder="0.00"
                   />
                 </div>
@@ -1387,10 +1387,10 @@ export default function MarketDetailPage() {
                         onClick={() => isBuy ? setBuyPercentAmount(item.value) : setSellPercentAmount(item.value)}
                         disabled={disabled}
                         className={cn(
-                          "flex-1 h-8 sm:h-7 rounded-lg text-[11px] sm:text-[10px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-45 active:scale-95",
+                          "flex-1 h-8 rounded-full text-[11px] font-bold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-45 active:scale-95",
                           active
-                            ? "bg-[oklch(0.78_0.16_82/0.15)] border border-[oklch(0.78_0.16_82/0.35)] text-[oklch(0.78_0.16_82)]"
-                            : "bg-[oklch(0.15_0.013_255)] border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground hover:border-[oklch(0.28_0.018_255)]"
+                            ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] shadow-[0_2px_8px_oklch(0.78_0.16_82/0.30)]"
+                            : "bg-[oklch(0.15_0.013_255)] border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground hover:border-[oklch(0.30_0.018_255)]"
                         )}
                       >
                         {item.label}
@@ -1399,12 +1399,12 @@ export default function MarketDetailPage() {
                   })}
                 </div>
                 {connectedWalletAddress && (
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] p-2 sm:p-2.5">
+                  <div className="grid grid-cols-3 gap-2 rounded-2xl border border-[oklch(0.20_0.014_255)] bg-[oklch(0.12_0.012_260)] p-3">
                     <div className="min-w-0">
-                      <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-muted-foreground truncate">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground truncate">
                         {tradeSide === "buy" ? "Available" : "Position"}
                       </div>
-                      <div className="mt-1 font-mono text-xs sm:text-sm font-semibold text-foreground truncate">
+                      <div className="mt-1.5 font-mono text-sm font-semibold text-foreground truncate">
                         {tradeSide === "buy"
                           ? availablePusd === null ? "--" : formatPusd(String(availablePusd))
                           : positionShares === null
@@ -1413,11 +1413,11 @@ export default function MarketDetailPage() {
                       </div>
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-muted-foreground truncate">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground truncate">
                         {tradeSide === "buy" ? "Spendable" : "Sellable"}
                       </div>
                       <div className={cn(
-                        "mt-1 font-mono text-xs sm:text-sm font-semibold truncate",
+                        "mt-1.5 font-mono text-sm font-semibold truncate",
                         (tradeSide === "buy" ? spendablePusd : sellableShares) === null
                           ? "text-muted-foreground"
                           : (tradeSide === "buy" ? spendablePusd! : sellableShares!) > 0
@@ -1430,10 +1430,10 @@ export default function MarketDetailPage() {
                       </div>
                     </div>
                     <div className="text-right min-w-0">
-                      <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-muted-foreground truncate">
-                        {tradeSide === "buy" ? "After" : "After"}
+                      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground truncate">
+                        After
                       </div>
-                      <div className="mt-1 font-mono text-xs sm:text-sm font-semibold text-foreground truncate">
+                      <div className="mt-1.5 font-mono text-sm font-semibold text-foreground truncate">
                         {tradeSide === "buy"
                           ? remainingPusd === null ? "--" : formatPusd(String(remainingPusd))
                           : remainingShares === null ? "--" : `${remainingShares.toFixed(2)} sh`}
@@ -1445,19 +1445,19 @@ export default function MarketDetailPage() {
 
               {/* Order type selector */}
               <div className="space-y-2">
-                <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                   Order type
                 </label>
-                <div className="flex rounded-lg border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] p-0.5">
+                <div className="flex rounded-full border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_255)] p-0.5">
                   {(["market", "limit", "gtd"] as const).map((type) => (
                     <button
                       key={type}
                       onClick={() => setOrderType(type)}
                       disabled={tradeActionBusy}
                       className={cn(
-                        "flex-1 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                        "flex-1 py-2 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60",
                         orderType === type
-                          ? "bg-[oklch(0.78_0.16_82/0.18)] text-[oklch(0.78_0.16_82)]"
+                          ? "bg-[oklch(0.78_0.16_82/0.18)] border border-[oklch(0.78_0.16_82/0.30)] text-[oklch(0.82_0.16_82)]"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
@@ -1507,7 +1507,7 @@ export default function MarketDetailPage() {
               </div>
 
               {/* Return preview */}
-              <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] p-3.5 space-y-3 text-xs">
+              <div className="rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_255)] p-4 space-y-3 text-xs">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <Calculator className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
@@ -1650,7 +1650,7 @@ export default function MarketDetailPage() {
               </div>
 
               {(tradePreview || previewError) && (
-                <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] p-3.5 space-y-2.5 text-xs">
+                <div className="rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260)] p-4 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                       Trade preview
@@ -1994,7 +1994,7 @@ export default function MarketDetailPage() {
               })()}
 
               {clobSession.signedOrderPreview && (
-                <div className="rounded-xl border border-[oklch(0.68_0.18_155/0.32)] bg-[oklch(0.68_0.18_155/0.08)] p-3.5 space-y-2.5 text-xs">
+                <div className="rounded-2xl border border-[oklch(0.68_0.18_155/0.32)] bg-[oklch(0.68_0.18_155/0.08)] p-4 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">
                       Signed order preview
@@ -2048,7 +2048,7 @@ export default function MarketDetailPage() {
                       variant="outline"
                       onClick={clobSession.clearSignedOrderPreview}
                       disabled={clobSession.submitStatus === "submitting"}
-                      className="h-9 text-xs"
+                      className="h-10 rounded-xl text-xs border-[oklch(0.24_0.016_255)] text-muted-foreground hover:text-foreground"
                     >
                       Clear
                     </Button>
@@ -2060,7 +2060,7 @@ export default function MarketDetailPage() {
                         (clobSession.signedOrderPreview.side === "BUY" && !tradeCollateralGate.ready) ||
                         (clobSession.signedOrderPreview.side === "SELL" && !tradePositionGate.ready)
                       }
-                      className="h-9 gap-2 bg-[oklch(0.68_0.18_155)] text-[oklch(0.10_0.01_255)] hover:bg-[oklch(0.72_0.18_155)] text-xs font-semibold"
+                      className="h-10 rounded-xl gap-2 bg-[oklch(0.68_0.18_155)] text-[oklch(0.10_0.01_255)] hover:bg-[oklch(0.72_0.18_155)] text-xs font-bold shadow-[0_4px_16px_oklch(0.68_0.18_155/0.25)]"
                     >
                       <Send className="w-3.5 h-3.5" />
                       Submit
@@ -2072,7 +2072,7 @@ export default function MarketDetailPage() {
               {clobSession.orderSubmission && (
                 <div
                   className={cn(
-                    "rounded-xl border p-3.5 space-y-2.5 text-xs",
+                    "rounded-2xl border p-4 space-y-2.5 text-xs",
                     clobSession.orderSubmission.success
                       ? "border-[oklch(0.68_0.18_155/0.35)] bg-[oklch(0.68_0.18_155/0.08)]"
                       : "border-[oklch(0.58_0.2_25/0.35)] bg-[oklch(0.58_0.2_25/0.08)]"
@@ -2549,10 +2549,10 @@ export default function MarketDetailPage() {
                 <div className="space-y-2">
                   <Button
                     className={cn(
-                      "w-full h-12 sm:h-11 gap-2 font-semibold text-sm sm:text-xs shadow-[0_0_20px_oklch(0.78_0.16_82/0.25)] active:scale-[0.98] transition-transform",
+                      "w-full h-13 rounded-2xl gap-2 font-bold text-sm active:scale-[0.98] transition-all duration-200",
                       tradeSide === "buy"
-                        ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)]"
-                        : "bg-[oklch(0.58_0.2_25)] text-white hover:bg-[oklch(0.62_0.2_25)]"
+                        ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.01_255)] hover:bg-[oklch(0.83_0.16_82)] shadow-[0_4px_20px_oklch(0.78_0.16_82/0.35)]"
+                        : "bg-[oklch(0.58_0.2_25)] text-white hover:bg-[oklch(0.63_0.2_25)] shadow-[0_4px_20px_oklch(0.58_0.2_25/0.25)]"
                     )}
                     onClick={handlePreviewTrade}
                     disabled={tradeActionBusy || !activeTokenId || amountNumber <= 0 || readiness.readiness?.canPreview === false}

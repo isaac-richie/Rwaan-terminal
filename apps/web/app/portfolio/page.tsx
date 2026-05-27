@@ -32,7 +32,7 @@ import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
 import { Navbar } from "@/components/navbar";
 import { ActivityFeed } from "@/components/portfolio/activity-feed";
 import { Button } from "@/components/ui/button";
-import { fundingStatusTone, useFundingStatus } from "@/hooks/use-funding-status";
+import { useFundingStatus } from "@/hooks/use-funding-status";
 import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet";
 import {
   formatPortfolioMoney,
@@ -199,10 +199,10 @@ function TabButton({ active, children, count, onClick }: {
       type="button"
       onClick={onClick}
       className={cn(
-        "relative flex h-9 items-center gap-2 rounded-xl px-4 text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200",
+        "relative flex h-9 items-center gap-2 rounded-full px-5 text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200",
         active
-          ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] shadow-[0_8px_24px_oklch(0.78_0.16_82/0.25)]"
-          : "text-muted-foreground hover:bg-[oklch(0.16_0.014_255)] hover:text-foreground"
+          ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] shadow-[0_4px_16px_oklch(0.78_0.16_82/0.30)]"
+          : "text-muted-foreground hover:bg-[oklch(0.16_0.014_255/0.7)] hover:text-foreground"
       )}
     >
       <span>{children}</span>
@@ -310,7 +310,7 @@ function BalanceLedgerCard({
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <CircleDollarSign className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
-          <span className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Funds breakdown</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Funds breakdown</span>
         </div>
         <Button
           type="button"
@@ -334,14 +334,14 @@ function BalanceLedgerCard({
           <div
             key={item.label}
             className={cn(
-              "rounded-xl border p-4",
+              "rounded-2xl border p-4",
               (item as any).gold
                 ? "border-[oklch(0.78_0.16_82/0.18)] bg-[oklch(0.78_0.16_82/0.05)]"
                 : "border-[oklch(0.20_0.014_255)] bg-[oklch(0.12_0.012_260/0.65)]"
             )}
           >
-            <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{item.label}</div>
-            <div className="mt-2.5 font-mono text-xl font-bold text-foreground">{item.value}</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
+            <div className="mt-3 font-mono text-xl font-bold text-foreground">{item.value}</div>
             <div className="mt-1 text-[10px] text-muted-foreground">{item.sub}</div>
           </div>
         ))}
@@ -354,27 +354,17 @@ function BalanceLedgerCard({
         total={(liquidPusd ?? 0) + inPositions + lockedOrdersValue}
       />
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-lg border border-[oklch(0.18_0.014_255)] bg-[oklch(0.10_0.012_260/0.5)] px-3 py-2 text-[11px]">
-          <span className="text-muted-foreground">Wallet · </span>
-          <span className="font-mono text-foreground">{shortAddress(tradingWalletAddress)}</span>
-        </div>
-        <div className="rounded-lg border border-[oklch(0.18_0.014_255)] bg-[oklch(0.10_0.012_260/0.5)] px-3 py-2 text-[11px]">
-          <span className="text-muted-foreground">Orders locked · </span>
-          <span className="font-mono text-foreground">{formatPortfolioMoney(lockedBuyCollateral)} buy</span>
-          {lockedSellShares > 0 && <span className="text-muted-foreground"> + {formatPortfolioNumber(lockedSellShares)} sell sh</span>}
-        </div>
-        <div
-          className={cn(
-            "rounded-lg border px-3 py-2 text-[11px]",
-            statusTone === "gold" && "border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.07)] text-[oklch(0.82_0.16_82)]",
-            statusTone === "red" && "border-[oklch(0.58_0.2_25/0.30)] bg-[oklch(0.58_0.2_25/0.07)] text-[oklch(0.68_0.2_25)]",
-            statusTone === "green" && "border-[oklch(0.68_0.18_155/0.22)] bg-[oklch(0.68_0.18_155/0.07)] text-[oklch(0.68_0.18_155)]",
-            statusTone === "muted" && "border-[oklch(0.20_0.014_255)] bg-[oklch(0.12_0.012_260/0.50)] text-muted-foreground",
-          )}
-        >
-          {statusMessage}
-        </div>
+      {/* Status indicator — compact, no technical plumbing */}
+      <div
+        className={cn(
+          "mt-4 rounded-2xl border px-4 py-3 text-[11px] leading-snug",
+          statusTone === "gold" && "border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.07)] text-[oklch(0.82_0.16_82)]",
+          statusTone === "red" && "border-[oklch(0.58_0.2_25/0.30)] bg-[oklch(0.58_0.2_25/0.07)] text-[oklch(0.68_0.2_25)]",
+          statusTone === "green" && "border-[oklch(0.68_0.18_155/0.22)] bg-[oklch(0.68_0.18_155/0.07)] text-[oklch(0.68_0.18_155)]",
+          statusTone === "muted" && "border-[oklch(0.20_0.014_255)] bg-[oklch(0.12_0.012_260/0.50)] text-muted-foreground",
+        )}
+      >
+        {statusMessage}
       </div>
     </div>
   );
@@ -662,7 +652,7 @@ function PortfolioContent() {
             type="button"
             onClick={() => setFundingOpen(true)}
             disabled={!walletAddress || tradingProfile.loading || !tradingProfile.profile}
-            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[oklch(0.78_0.16_82)] text-sm font-bold text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-40"
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[oklch(0.78_0.16_82)] text-sm font-bold text-[oklch(0.10_0.012_260)] transition-all hover:bg-[oklch(0.83_0.16_82)] hover:shadow-[0_4px_16px_oklch(0.78_0.16_82/0.30)] disabled:opacity-40"
           >
             <Wallet className="h-4 w-4" />
             Fund Account
@@ -782,16 +772,16 @@ function PortfolioContent() {
             { label: "Closed positions", value: data ? String(closedPositions.length) : "—", icon: CheckCircle2, tone: stats.realizedPositive ? "positive" as const : "negative" as const },
             { label: "Avg P/L", value: data ? formatPercent(stats.avgPnlPercent) : "—", icon: stats.avgPnlPercent >= 0 ? TrendingUp : TrendingDown, tone: stats.avgPnlPercent >= 0 ? "positive" as const : "negative" as const },
           ].map(({ label, value, icon: Icon, tone }) => (
-            <div key={label} className="surface-card rounded-xl sm:rounded-2xl p-3 sm:p-4">
+            <div key={label} className="surface-card rounded-2xl p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
-                <Icon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5",
+                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
+                <Icon className={cn("h-3.5 w-3.5",
                   tone === "positive" && "text-[oklch(0.68_0.18_155)]",
                   tone === "negative" && "text-[oklch(0.60_0.18_25)]",
                   tone === "gold" && "text-[oklch(0.78_0.16_82)]",
                 )} />
               </div>
-              <div className="mt-2 sm:mt-3 text-lg sm:text-xl font-bold tracking-tight text-foreground">{value}</div>
+              <div className="mt-3 text-xl font-bold tracking-tight text-foreground">{value}</div>
             </div>
           ))}
         </div>
@@ -812,38 +802,10 @@ function PortfolioContent() {
           />
         </div>
 
-        {/* ── Wallet / funding strip ──────────────────────── */}
-        {walletAddress && (
-          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
-            {[
-              { label: "Connected wallet", value: shortAddress(walletAddress) },
-              { label: "Trading wallet", value: shortAddress(tradingWalletAddress) },
-              { label: "BNB deposit", value: shortAddress(depositAddress) },
-            ].map((item) => (
-              <div key={item.label} className="surface-card flex items-center justify-between rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{item.label}</span>
-                <span className="font-mono text-[11px] sm:text-xs text-foreground">{item.value}</span>
-              </div>
-            ))}
-            <div className="surface-card flex items-center justify-between rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 sm:col-span-2 lg:col-span-1">
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Bridge</span>
-              <button
-                type="button"
-                onClick={fundingStatus.refresh}
-                disabled={!depositAddress || fundingStatus.loading}
-                className={cn("flex items-center gap-1.5 text-xs font-semibold disabled:opacity-50", fundingStatusTone(fundingStatus.phase))}
-              >
-                <RefreshCw className={cn("h-3 w-3", fundingStatus.loading && "animate-spin")} />
-                {depositAddress ? fundingStatus.label : "No address"}
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* ── Tabs ────────────────────────────────────────── */}
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="no-scrollbar overflow-x-auto">
-            <div className="flex w-max min-w-full gap-1 rounded-xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.10_0.012_260/0.65)] p-1">
+            <div className="flex w-max min-w-full gap-1 rounded-2xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.10_0.012_260/0.65)] p-1">
               <TabButton active={activeTab === "positions"} count={openPositions.length} onClick={() => setActiveTab("positions")}>
                 Positions
               </TabButton>
@@ -957,19 +919,19 @@ function PortfolioContent() {
                         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                           <div className="grid grid-cols-4 gap-3 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
                             <div>
-                              <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Shares</div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Shares</div>
                               <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPortfolioNumber(shares)}</div>
                             </div>
                             <div>
-                              <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Value</div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Value</div>
                               <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPortfolioMoney(value)}</div>
                             </div>
                             <div>
-                              <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Avg</div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Avg</div>
                               <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPrice(avgPrice)}</div>
                             </div>
                             <div>
-                              <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Now</div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Now</div>
                               <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPrice(currentPrice)}</div>
                             </div>
                           </div>
@@ -978,14 +940,14 @@ function PortfolioContent() {
                             <button
                               onClick={() => marketHref && router.push(marketHref)}
                               disabled={!marketHref}
-                              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[oklch(0.22_0.015_255)] bg-transparent px-3 text-[11px] font-bold text-muted-foreground transition-colors hover:border-[oklch(0.30_0.016_255)] hover:text-foreground disabled:opacity-40 sm:flex-none sm:h-8"
+                              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-[oklch(0.24_0.016_255)] bg-transparent px-4 text-[11px] font-bold text-muted-foreground transition-colors hover:border-[oklch(0.32_0.016_255)] hover:text-foreground disabled:opacity-40 sm:flex-none"
                             >
                               View <ArrowUpRight className="h-3 w-3" />
                             </button>
                             <button
                               onClick={handleSell}
                               disabled={!marketHref}
-                              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[oklch(0.78_0.16_82)] px-3 text-[11px] font-bold text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-40 sm:flex-none sm:h-8"
+                              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[oklch(0.78_0.16_82)] px-4 text-[11px] font-bold text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-40 sm:flex-none"
                             >
                               <ArrowDownUp className="h-3 w-3" />
                               Sell
