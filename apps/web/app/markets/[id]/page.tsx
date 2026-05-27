@@ -752,6 +752,16 @@ export default function MarketDetailPage() {
       reason: `order_${status.toLowerCase()}`,
       address: tradingWalletAddress,
     });
+
+    // Delayed re-refresh: CLOB balance lags behind order matching
+    setTimeout(() => {
+      void clobSession.refreshBalanceAllowance();
+      if (activeTokenId) void clobSession.refreshConditionalBalanceAllowance(activeTokenId);
+    }, 3000);
+    setTimeout(() => {
+      void clobSession.refreshBalanceAllowance();
+      if (activeTokenId) void clobSession.refreshConditionalBalanceAllowance(activeTokenId);
+    }, 8000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clobSession.orderSubmission?.orderId, clobSession.orderStatus?.status, activeTokenId, tradingWalletAddress]);
 
@@ -919,23 +929,43 @@ export default function MarketDetailPage() {
     if (submission?.success) {
       setSubmitConfirmOpen(false);
       setSubmitDialogError(null);
-      await clobSession.refreshBalanceAllowance();
+      const side = clobSession.signedOrderPreview?.side ?? "BUY";
+
+      // Immediately clear all trade state so the UI resets — don't wait for refreshes
+      clobSession.clearSignedOrderPreview();
+      setOrderAmount("");
+      setTradePreview(null);
+      setPreviewError(null);
+
+      // Refresh balances in the background — CLOB may take a moment to reflect
+      void clobSession.refreshBalanceAllowance();
       if (activeTokenId) {
-        await clobSession.refreshConditionalBalanceAllowance(activeTokenId);
+        void clobSession.refreshConditionalBalanceAllowance(activeTokenId);
       }
-      await readiness.refresh();
+      void readiness.refresh();
       scheduleAccountRefresh({
         reason: "order_submitted",
         address: tradingWalletAddress,
       });
-      const side = clobSession.signedOrderPreview?.side ?? "BUY";
-      // Always clear the signed order preview to prevent stale re-submissions
-      clobSession.clearSignedOrderPreview();
-      if (side === "SELL") {
-        setOrderAmount("");
-        setTradePreview(null);
-        setPreviewError(null);
-        if (marketId) router.replace(`/markets/${encodeURIComponent(String(marketId))}`, { scroll: false });
+
+      // Delayed re-refresh: CLOB balance endpoint lags behind order matching
+      // by 2-5s. A second refresh catches the updated position.
+      setTimeout(async () => {
+        await clobSession.refreshBalanceAllowance();
+        if (activeTokenId) {
+          await clobSession.refreshConditionalBalanceAllowance(activeTokenId);
+        }
+      }, 3000);
+      // Third sweep at 8s for orders that take longer to settle
+      setTimeout(async () => {
+        await clobSession.refreshBalanceAllowance();
+        if (activeTokenId) {
+          await clobSession.refreshConditionalBalanceAllowance(activeTokenId);
+        }
+      }, 8000);
+
+      if (side === "SELL" && marketId) {
+        router.replace(`/markets/${encodeURIComponent(String(marketId))}`, { scroll: false });
       }
       const orderId = submission.orderId ? ` · ${submission.orderId.slice(0, 8)}…` : "";
       const rewardHeaders = submission.orderId ? await clobSession.createOrderLookupHeaders(submission.orderId) : null;
