@@ -1,5 +1,6 @@
 import { config } from "../config.js";
 import { createHash } from "node:crypto";
+import type { TechnicalAnalysis } from "./ta-engine.js";
 
 const OPENAI_ANALYSIS_TIMEOUT_MS = Number(process.env.OPENAI_ANALYSIS_TIMEOUT_MS ?? 25000);
 
@@ -304,7 +305,11 @@ function premiumAnalysisSchema() {
   };
 }
 
-function buildPremiumPrompt(market: PremiumAnalysisInput, articles: PremiumNewsArticle[]): string {
+function buildPremiumPrompt(
+  market: PremiumAnalysisInput,
+  articles: PremiumNewsArticle[],
+  ta?: TechnicalAnalysis | null
+): string {
   const consensusStr = market.outcomes?.length
     ? market.outcomes.map(o => `${o.name}: ${o.price}%`).join(" / ")
     : "N/A";
@@ -312,6 +317,47 @@ function buildPremiumPrompt(market: PremiumAnalysisInput, articles: PremiumNewsA
   const newsSection = articles.length
     ? articles.map((a, i) => `--- Source ${i + 1}: ${a.title} ---\n${a.bodyText}`).join("\n\n")
     : "No live news available at this time.";
+
+  const taSection = ta
+    ? [
+        ``,
+        `TECHNICAL ANALYSIS (${ta.symbol} — live from Binance):`,
+        ta.summary,
+        ``,
+        `TA METRICS:`,
+        `- Price: $${ta.currentPrice.toFixed(2)}`,
+        `- HTF Structure: ${ta.htf.structure} (strength ${ta.htf.trendStrength}/100) — ${ta.htf.bias}`,
+        `- RSI(14): ${ta.rsi14.toFixed(1)}`,
+        `- VWAP Distance: ${ta.vwapDistance > 0 ? "+" : ""}${ta.vwapDistance.toFixed(2)}%`,
+        `- Volume Profile: ${ta.volumeProfile}`,
+        `- Volatility (ATR%): ${ta.volatilityPct.toFixed(2)}%`,
+        `- Regime: ${ta.regime}`,
+        `- Nearest Support: ${ta.nearestSupport ? "$" + ta.nearestSupport.toFixed(2) : "none"}`,
+        `- Nearest Resistance: ${ta.nearestResistance ? "$" + ta.nearestResistance.toFixed(2) : "none"}`,
+        `- Confluence Score: ${ta.confluenceScore}/100`,
+        `- Confluence Factors: ${ta.confluenceFactors.join("; ")}`,
+        ...(ta.riskReward
+          ? [
+              `- Long R:R — entry $${ta.riskReward.longEntry.toFixed(2)}, stop $${ta.riskReward.longStop.toFixed(2)}, target $${ta.riskReward.longTarget.toFixed(2)} (${ta.riskReward.longRR.toFixed(1)}R)`,
+              `- Short R:R — entry $${ta.riskReward.shortEntry.toFixed(2)}, stop $${ta.riskReward.shortStop.toFixed(2)}, target $${ta.riskReward.shortTarget.toFixed(2)} (${ta.riskReward.shortRR.toFixed(1)}R)`,
+            ]
+          : []),
+      ].join("\n")
+    : "";
+
+  const taInstructions = ta
+    ? [
+        ``,
+        `CRITICAL — CRYPTO MARKET WITH LIVE TA:`,
+        `This is a crypto asset market. You have been given real technical analysis data from Binance.`,
+        `You MUST incorporate the TA data into your verdict and analysis:`,
+        `- Use the HTF structure, RSI, VWAP, and regime to inform your directional call`,
+        `- Reference key support/resistance levels in your structural drivers`,
+        `- The confluence score (${ta.confluenceScore}/100) should weight your confidence`,
+        `- If TA and news conflict, note the divergence explicitly`,
+        `- Include specific price levels and technical context — the user paid for precision`,
+      ].join("\n")
+    : "";
 
   return [
     `You are a senior intelligence analyst producing a premium market report.`,
@@ -325,6 +371,8 @@ function buildPremiumPrompt(market: PremiumAnalysisInput, articles: PremiumNewsA
     ``,
     `LIVE INTELLIGENCE (sourced ${new Date().toISOString()}):`,
     newsSection,
+    taSection,
+    taInstructions,
     ``,
     `REQUIRED OUTPUT:`,
     `1. VERDICT: You MUST choose YES or NO. Include confidence 0-100 and a 2-3 sentence rationale explaining your directional call. Be decisive.`,
@@ -376,7 +424,8 @@ function fallbackPremiumAnalysis(): PremiumAnalysisResult {
 
 export async function generatePremiumAnalysis(
   market: PremiumAnalysisInput,
-  articles: PremiumNewsArticle[]
+  articles: PremiumNewsArticle[],
+  ta?: TechnicalAnalysis | null
 ): Promise<PremiumAnalysisResult> {
   if (!config.openai.apiKey) {
     return fallbackPremiumAnalysis();
@@ -393,7 +442,7 @@ export async function generatePremiumAnalysis(
       },
       body: JSON.stringify({
         model: config.openai.model,
-        messages: [{ role: "user", content: buildPremiumPrompt(market, articles) }],
+        messages: [{ role: "user", content: buildPremiumPrompt(market, articles, ta) }],
         response_format: {
           type: "json_schema",
           json_schema: {

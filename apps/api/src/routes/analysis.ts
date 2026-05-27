@@ -5,6 +5,7 @@ import { generateMarketAnalysis, generatePremiumAnalysis } from "../services/ope
 import { paymentGate } from "../middleware/paymentGate.js";
 import { fetchPremiumNews } from "../services/news.js";
 import { buildPaymentRequirement } from "../services/payment.js";
+import { detectCryptoSymbol, runTechnicalAnalysis } from "../services/ta-engine.js";
 
 const marketSchema = z.object({
   id: z.string().min(1),
@@ -69,9 +70,21 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
 
       const { market } = payload.data;
 
-      const newsArticles = await fetchPremiumNews(market.question);
+      // Detect crypto asset from market question for TA enrichment
+      const cryptoSymbol = detectCryptoSymbol(market.question);
 
-      const raw = await generatePremiumAnalysis(market, newsArticles);
+      // Fetch news and TA in parallel (TA only runs for crypto markets)
+      const [newsArticles, taResult] = await Promise.all([
+        fetchPremiumNews(market.question),
+        cryptoSymbol
+          ? runTechnicalAnalysis(cryptoSymbol).catch((err) => {
+              console.warn(`[smartmarket] TA engine failed for ${cryptoSymbol}:`, err);
+              return null;
+            })
+          : Promise.resolve(null),
+      ]);
+
+      const raw = await generatePremiumAnalysis(market, newsArticles, taResult);
 
       const generatedAt = new Date().toISOString();
       const signalHash = createHash("sha256")
@@ -88,6 +101,24 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         })),
         generatedAt,
         signalHash,
+        // Include TA metadata when available (crypto markets only)
+        ...(taResult && {
+          technicalAnalysis: {
+            symbol: taResult.symbol,
+            currentPrice: taResult.currentPrice,
+            structure: taResult.htf.structure,
+            trendStrength: taResult.htf.trendStrength,
+            rsi14: taResult.rsi14,
+            regime: taResult.regime,
+            confluenceScore: taResult.confluenceScore,
+            confluenceFactors: taResult.confluenceFactors,
+            nearestSupport: taResult.nearestSupport,
+            nearestResistance: taResult.nearestResistance,
+            volatilityPct: taResult.volatilityPct,
+            volumeProfile: taResult.volumeProfile,
+            riskReward: taResult.riskReward,
+          },
+        }),
       };
 
       return {
