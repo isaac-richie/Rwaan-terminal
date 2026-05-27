@@ -360,9 +360,9 @@ export function MarketHero() {
                         key={`${market.id}-${idx}`}
                         type="button"
                         onClick={() => goToMarket(market)}
-                        className="flex w-[260px] items-center gap-2.5 rounded-xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.13_0.013_255/0.9)] px-3 py-2 text-left transition hover:border-[oklch(0.78_0.16_82/0.30)] hover:bg-[oklch(0.15_0.014_255)] btn-press"
+                        className="flex w-[260px] items-center gap-2.5 rounded-xl border border-[oklch(0.22_0.015_255/0.65)] bg-[oklch(0.145_0.013_255/0.95)] px-3 py-2 text-left transition hover:border-[oklch(0.78_0.16_82/0.30)] hover:bg-[oklch(0.16_0.014_255)] btn-press"
                       >
-                        <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-[oklch(0.20_0.015_255)] bg-[oklch(0.16_0.014_255)]">
+                        <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-[oklch(0.22_0.015_255/0.6)] bg-[oklch(0.17_0.014_255)]">
                           {market.image || market.icon ? (
                             <Image
                               src={(market.image ?? market.icon) as string}
@@ -378,12 +378,12 @@ export function MarketHero() {
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[11px] font-semibold text-foreground leading-snug">{market.question}</span>
-                          <span className="block mt-0.5 font-mono text-[9px] text-muted-foreground">{market.volume}</span>
+                          <span className="block mt-0.5 font-mono text-[10px] text-muted-foreground">{market.volume}</span>
                         </span>
                         <span className={cn(
-                          "shrink-0 rounded-lg px-2 py-0.5 font-mono text-[11px] font-bold",
-                          isHigh ? "bg-[oklch(0.68_0.18_155/0.12)] text-[oklch(0.68_0.18_155)]"
-                          : "bg-[oklch(0.60_0.18_25/0.10)] text-[oklch(0.62_0.18_25)]"
+                          "shrink-0 rounded-lg px-2 py-1 font-mono text-[11px] font-bold",
+                          isHigh ? "bg-[oklch(0.28_0.12_155/0.9)] text-[oklch(0.78_0.20_155)]"
+                          : "bg-[oklch(0.26_0.12_25/0.9)] text-[oklch(0.72_0.20_25)]"
                         )}>
                           {price.toFixed(0)}¢
                         </span>
@@ -432,17 +432,17 @@ export function MarketHero() {
                     <span className="line-clamp-2 text-[12px] font-semibold leading-snug text-foreground transition-colors group-hover:text-[oklch(0.90_0.01_90)]">
                       {market.question}
                     </span>
-                    <span className="mt-1 flex items-center gap-2 text-[9px] text-muted-foreground">
+                    <span className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                       <span className="truncate">{market.category ?? "News"}</span>
-                      <span className="text-[oklch(0.22_0.015_255)]">·</span>
+                      <span className="text-[oklch(0.24_0.015_255)]">·</span>
                       <span className="font-mono">{market.volume}</span>
                     </span>
                   </span>
                   <span className={cn(
                     "mt-0.5 shrink-0 rounded-lg px-2 py-1 font-mono text-[11px] font-bold",
                     isHigh
-                      ? "bg-[oklch(0.68_0.18_155/0.10)] text-[oklch(0.68_0.18_155)]"
-                      : "bg-[oklch(0.60_0.18_25/0.10)] text-[oklch(0.62_0.18_25)]"
+                      ? "bg-[oklch(0.28_0.12_155/0.9)] text-[oklch(0.78_0.20_155)]"
+                      : "bg-[oklch(0.26_0.12_25/0.9)] text-[oklch(0.72_0.20_25)]"
                   )}>
                     {price.toFixed(0)}¢
                   </span>
@@ -484,9 +484,9 @@ export function MarketHero() {
                     key={market.id}
                     type="button"
                     onClick={() => goToMarket(market)}
-                    className="flex w-[220px] shrink-0 items-center gap-2 rounded-xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.13_0.013_255/0.9)] px-3 py-2 text-left active:scale-[0.98] transition-transform"
+                    className="flex w-[220px] shrink-0 items-center gap-2.5 rounded-xl border border-[oklch(0.22_0.015_255/0.65)] bg-[oklch(0.145_0.013_255/0.95)] px-3 py-2.5 text-left active:scale-[0.97] transition-transform"
                   >
-                    <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-[oklch(0.20_0.015_255)] bg-[oklch(0.16_0.014_255)]">
+                    <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-[oklch(0.22_0.015_255/0.6)] bg-[oklch(0.17_0.014_255)]">
                       {imgSrc ? (
                         <Image src={imgSrc} alt="" fill quality={85} sizes="28px" className="object-contain p-0.5" />
                       ) : (
@@ -495,12 +495,12 @@ export function MarketHero() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[11px] font-semibold text-foreground leading-snug">{market.question}</span>
-                      <span className="block mt-0.5 font-mono text-[9px] text-muted-foreground">{market.volume}</span>
+                      <span className="block mt-0.5 font-mono text-[10px] text-muted-foreground">{market.volume}</span>
                     </span>
                     <span className={cn(
-                      "shrink-0 rounded-lg px-1.5 py-0.5 font-mono text-[11px] font-bold",
-                      isHigh ? "bg-[oklch(0.68_0.18_155/0.12)] text-[oklch(0.68_0.18_155)]"
-                           : "bg-[oklch(0.60_0.18_25/0.10)] text-[oklch(0.62_0.18_25)]"
+                      "shrink-0 rounded-lg px-2 py-1 font-mono text-[11px] font-bold",
+                      isHigh ? "bg-[oklch(0.28_0.12_155/0.9)] text-[oklch(0.78_0.20_155)]"
+                           : "bg-[oklch(0.26_0.12_25/0.9)] text-[oklch(0.72_0.20_25)]"
                     )}>
                       {price.toFixed(0)}¢
                     </span>

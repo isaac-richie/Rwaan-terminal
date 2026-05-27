@@ -109,7 +109,7 @@ export function TradingCard({ market, index }: TradingCardProps) {
           {/* Category + question */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
                 {market.category ?? "Market"}
               </span>
               {market.featured && (
@@ -130,7 +130,7 @@ export function TradingCard({ market, index }: TradingCardProps) {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <span className="text-[13px] font-semibold text-foreground">Yes</span>
-              <span className="font-mono text-[13px] font-bold text-[oklch(0.68_0.18_155)]">
+              <span className="font-mono text-[13px] font-bold text-[oklch(0.74_0.20_155)]">
                 {Math.round(yes)}%
               </span>
             </div>
@@ -155,7 +155,7 @@ export function TradingCard({ market, index }: TradingCardProps) {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span className="text-[13px] font-semibold text-foreground">No</span>
-                <span className="font-mono text-[13px] font-bold text-[oklch(0.62_0.18_25)]">
+                <span className="font-mono text-[13px] font-bold text-[oklch(0.65_0.20_25)]">
                   {Math.round(no)}%
                 </span>
               </div>
