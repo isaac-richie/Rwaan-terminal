@@ -197,8 +197,8 @@ export function MarketHero() {
               { icon: Brain, label: "AI reports" },
               { icon: Flame, label: "Live books" },
             ].map(({ icon: Icon, label }) => (
-              <span key={label} className="inline-flex items-center gap-1.5 rounded-lg border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.012_260/0.8)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                <Icon className="h-3 w-3 text-[oklch(0.78_0.16_82)]" />
+              <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(0.24_0.015_255/0.7)] bg-[oklch(0.15_0.013_260/0.85)] px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+                <Icon className="h-3 w-3 text-[oklch(0.80_0.16_82)]" />
                 {label}
               </span>
             ))}
@@ -338,7 +338,7 @@ export function MarketHero() {
                   <button
                     type="button"
                     onClick={() => goToMarket(activeMarket)}
-                    className="flex items-center gap-1.5 rounded-xl bg-[oklch(0.78_0.16_82)] px-4 py-2 text-xs font-bold text-[oklch(0.10_0.012_260)] transition hover:bg-[oklch(0.83_0.16_82)] btn-press"
+                    className="flex items-center gap-1.5 rounded-full bg-[oklch(0.78_0.16_82)] px-4 py-2 text-xs font-bold text-[oklch(0.10_0.012_260)] transition-all hover:bg-[oklch(0.83_0.16_82)] hover:shadow-[0_4px_16px_oklch(0.78_0.16_82/0.35)] btn-press"
                   >
                     Trade now <ArrowUpRight className="h-3.5 w-3.5" />
                   </button>
@@ -398,7 +398,7 @@ export function MarketHero() {
 
         {/* ── Breaking news sidebar — desktop only ── */}
         <aside
-          className="hidden lg:flex flex-col max-h-[480px] rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260/0.95)] overflow-hidden hero-card-glow"
+          className="hidden lg:flex flex-col max-h-[480px] rounded-2xl border border-[oklch(0.20_0.014_255/0.8)] bg-[oklch(0.118_0.012_260/0.96)] overflow-hidden hero-card-glow"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[oklch(0.18_0.014_255)] px-4 py-3">

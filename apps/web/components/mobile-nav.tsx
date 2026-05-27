@@ -15,7 +15,7 @@ export function MobileNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 sm:hidden border-t border-[oklch(0.18_0.014_255)] bg-[oklch(0.09_0.011_260/0.97)] backdrop-blur-xl">
+    <nav className="fixed bottom-0 inset-x-0 z-50 sm:hidden border-t border-[oklch(0.18_0.014_255/0.6)] bg-[oklch(0.09_0.011_260/0.96)] backdrop-blur-2xl">
       <div className="flex items-stretch h-16">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href
@@ -24,23 +24,28 @@ export function MobileNav() {
               key={label}
               href={href}
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wide transition-colors",
+                "flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wide transition-all duration-200",
                 active
                   ? "text-[oklch(0.78_0.16_82)]"
-                  : "text-muted-foreground hover:text-foreground",
+                  : "text-[oklch(0.42_0.01_90)] hover:text-foreground",
               )}
             >
-              <Icon className={cn(
-                "h-5 w-5 transition-colors",
-                active ? "text-[oklch(0.78_0.16_82)]" : "text-muted-foreground",
-              )} />
+              <div className={cn(
+                "relative flex items-center justify-center w-10 h-6 rounded-full transition-all duration-200",
+                active ? "bg-[oklch(0.78_0.16_82/0.14)]" : ""
+              )}>
+                <Icon className={cn(
+                  "h-[18px] w-[18px] transition-all duration-200",
+                  active ? "text-[oklch(0.80_0.16_82)] scale-110" : "text-[oklch(0.42_0.01_90)]",
+                )} />
+              </div>
               {label}
             </Link>
           )
         })}
       </div>
       {/* Safe area spacer for iOS home bar */}
-      <div className="h-safe-bottom bg-[oklch(0.09_0.011_260/0.97)]" />
+      <div className="h-safe-bottom bg-[oklch(0.09_0.011_260/0.96)]" />
     </nav>
   )
 }

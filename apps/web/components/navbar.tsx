@@ -161,8 +161,8 @@ function NavbarBalanceBreakdown() {
         type="button"
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "flex h-9 items-center gap-2 rounded-xl border border-[oklch(0.24_0.016_255)] bg-[oklch(0.16_0.014_255)] px-3 text-xs font-bold text-foreground transition-all hover:border-[oklch(0.78_0.16_82/0.4)] hover:bg-[oklch(0.18_0.014_255)]",
-          open && "border-[oklch(0.78_0.16_82/0.45)] bg-[oklch(0.18_0.014_255)]"
+          "flex h-9 items-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255/0.7)] bg-[oklch(0.155_0.014_255/0.9)] px-3 text-xs font-bold text-foreground transition-all hover:border-[oklch(0.78_0.16_82/0.35)] hover:bg-[oklch(0.18_0.014_255)]",
+          open && "border-[oklch(0.78_0.16_82/0.40)] bg-[oklch(0.18_0.014_255)]"
         )}
         aria-expanded={open}
         aria-label="Open balance breakdown"
@@ -173,7 +173,7 @@ function NavbarBalanceBreakdown() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 mt-2 w-[min(292px,calc(100vw-1rem))] overflow-hidden rounded-xl border border-[oklch(0.28_0.018_255)] bg-[oklch(0.18_0.014_255/0.98)] shadow-[0_22px_64px_oklch(0_0_0/0.62)] backdrop-blur-2xl z-50">
+        <div className="absolute right-0 mt-2 w-[min(292px,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-[oklch(0.26_0.016_255/0.7)] bg-[oklch(0.16_0.014_255/0.97)] shadow-[0_24px_72px_oklch(0_0_0/0.65)] backdrop-blur-2xl z-50">
           <div
             className="absolute inset-0 opacity-[0.08] pointer-events-none"
             style={{
@@ -402,7 +402,7 @@ function PrivyDesktopWallet() {
   return (
     <div className="flex items-center gap-2" data-wallet-menu>
       {/* BNB Chain pill */}
-      <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[oklch(0.16_0.014_255)] border border-[oklch(0.22_0.015_255)]">
+      <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[oklch(0.15_0.014_255/0.8)] border border-[oklch(0.22_0.015_255/0.6)]">
         <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
         <span className="text-[10px] font-semibold text-muted-foreground">BNB Chain</span>
       </div>
@@ -533,10 +533,10 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
     <Link
       href={href}
       className={cn(
-        "relative text-[13px] font-semibold transition-all duration-200 px-3 py-1.5 rounded-lg",
+        "relative text-[13px] font-semibold transition-all duration-200 px-3 py-1.5 rounded-full",
         isActive
-          ? "text-[oklch(0.88_0.12_82)] bg-[oklch(0.78_0.16_82/0.12)] border border-[oklch(0.78_0.16_82/0.22)]"
-          : "text-muted-foreground hover:text-foreground hover:bg-[oklch(0.16_0.014_255)] border border-transparent"
+          ? "text-[oklch(0.10_0.012_260)] bg-[oklch(0.78_0.16_82)] shadow-[0_2px_10px_oklch(0.78_0.16_82/0.30)]"
+          : "text-[oklch(0.55_0.01_90)] hover:text-foreground hover:bg-[oklch(0.16_0.014_255/0.8)]"
       )}
     >
       {children}
@@ -720,11 +720,11 @@ export function Navbar() {
           {/* Search trigger */}
           <button
             onClick={() => setSearchOpen(true)}
-            className="hidden md:flex flex-1 max-w-sm items-center gap-2.5 h-8 px-3 rounded-lg bg-[oklch(0.145_0.013_255)] border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:border-[oklch(0.78_0.16_82/0.3)] hover:text-foreground/70 transition-all ml-auto group"
+            className="hidden md:flex flex-1 max-w-sm items-center gap-2.5 h-9 px-3.5 rounded-xl bg-[oklch(0.145_0.013_255/0.9)] border border-[oklch(0.22_0.015_255/0.7)] text-muted-foreground hover:border-[oklch(0.78_0.16_82/0.28)] hover:text-foreground/70 hover:bg-[oklch(0.16_0.014_255)] transition-all ml-auto group"
           >
-            <Search className="w-3.5 h-3.5 shrink-0 group-hover:text-[oklch(0.78_0.16_82/0.7)] transition-colors" />
+            <Search className="w-3.5 h-3.5 shrink-0 group-hover:text-[oklch(0.78_0.16_82/0.75)] transition-colors duration-200" />
             <span className="text-xs flex-1 text-left">Search markets…</span>
-            <kbd className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-[oklch(0.20_0.015_255)] border border-[oklch(0.22_0.015_255)] text-muted-foreground/70">
+            <kbd className="text-[9px] font-mono px-1.5 py-0.5 rounded-lg bg-[oklch(0.20_0.015_255/0.8)] border border-[oklch(0.24_0.016_255/0.6)] text-muted-foreground/60">
               ⌘K
             </kbd>
           </button>
@@ -802,7 +802,7 @@ export function Navbar() {
           onClick={() => setSearchOpen(false)}
         >
           <div
-            className="w-full max-w-[560px] rounded-2xl bg-[oklch(0.13_0.013_255)] border border-[oklch(0.24_0.016_255)] shadow-[0_40px_100px_oklch(0_0_0/0.7),0_0_0_1px_oklch(0.78_0.16_82/0.06)] overflow-hidden"
+            className="w-full max-w-[560px] rounded-2xl bg-[oklch(0.135_0.013_255/0.98)] border border-[oklch(0.24_0.016_255/0.7)] shadow-[0_40px_100px_oklch(0_0_0/0.72),inset_0_1px_0_oklch(1_0_0/0.05)] backdrop-blur-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Input row */}
