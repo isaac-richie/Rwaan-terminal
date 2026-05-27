@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 const RawliPrivyLogo = (
   <img
     src="/rawli-brand.png"
-    alt="Rawli Analytic"
+    alt="Rawli Analytics"
     style={{ width: 96, height: 56, objectFit: "contain" }}
   />
 );

@@ -2,8 +2,8 @@ import Link from "next/link"
 import { ArrowLeft, Scale } from "lucide-react"
 
 export const metadata = {
-  title: "Terms of Service | Rawli Analytic",
-  description: "Terms of Service for Rawli Analytic prediction market terminal.",
+  title: "Terms of Service | Rawli Analytics",
+  description: "Terms of Service for Rawli Analytics prediction market terminal.",
 }
 
 const LAST_UPDATED = "May 2025"
@@ -36,19 +36,19 @@ export default function TermsPage() {
 
           <Section title="1. Acceptance of Terms">
             <p>
-              By accessing or using Rawli Analytic (&quot;the Platform&quot;), you agree to be bound by these Terms of
+              By accessing or using Rawli Analytics (&quot;the Platform&quot;), you agree to be bound by these Terms of
               Service. If you do not agree to these terms, do not use the Platform.
             </p>
           </Section>
 
           <Section title="2. Description of Service">
             <p>
-              Rawli Analytic is a non-custodial trading interface that routes prediction market orders through
+              Rawli Analytics is a non-custodial trading interface that routes prediction market orders through
               Polymarket&apos;s Central Limit Order Book (CLOB) protocol. The Platform does not custody funds, hold
               user assets, or act as a counterparty to any trade.
             </p>
             <p className="mt-3">
-              All trades are executed on-chain via Polymarket&apos;s smart contracts. Rawli Analytic provides the
+              All trades are executed on-chain via Polymarket&apos;s smart contracts. Rawli Analytics provides the
               interface and routing infrastructure only.
             </p>
           </Section>
@@ -67,13 +67,13 @@ export default function TermsPage() {
             </ul>
             <p className="mt-3">
               By using the Platform, you represent and warrant that you are eligible to do so under the laws of your
-              jurisdiction. Rawli Analytic reserves the right to restrict access from any region at any time.
+              jurisdiction. Rawli Analytics reserves the right to restrict access from any region at any time.
             </p>
           </Section>
 
           <Section title="4. Non-Custodial Nature">
             <p>
-              Rawli Analytic is non-custodial. Your private keys and funds remain entirely under your control. The
+              Rawli Analytics is non-custodial. Your private keys and funds remain entirely under your control. The
               Platform cannot access, freeze, or recover your funds. You are solely responsible for the security of
               your wallet credentials.
             </p>
@@ -99,7 +99,7 @@ export default function TermsPage() {
 
           <Section title="7. Intellectual Property">
             <p>
-              All Platform content, design, code, and branding are proprietary to Rawli Analytic. You may not
+              All Platform content, design, code, and branding are proprietary to Rawli Analytics. You may not
               reproduce, distribute, or create derivative works without express written permission.
             </p>
           </Section>
@@ -137,7 +137,7 @@ export default function TermsPage() {
 
           <div className="pt-4 border-t border-[oklch(0.18_0.014_255)]">
             <p className="text-[12px] text-muted-foreground/60">
-              By using Rawli Analytic, you acknowledge that you have read, understood, and agree to these Terms of
+              By using Rawli Analytics, you acknowledge that you have read, understood, and agree to these Terms of
               Service. See also our{" "}
               <Link href="/privacy" className="text-[oklch(0.78_0.16_82)] hover:underline">
                 Privacy Policy

@@ -59,11 +59,11 @@ export function Footer() {
             <div className="space-y-6">
               <Link href="/" className="inline-flex items-center gap-3 group">
                 <div className="relative flex h-10 w-16 items-center justify-center">
-                  <img src="/rawli-brand.png" alt="Rawli Analytic" className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105" />
+                  <img src="/rawli-brand.png" alt="Rawli Analytics" className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105" />
                 </div>
                 <div className="leading-none">
                   <p className="text-[15px] font-bold tracking-tight text-foreground">
-                    Rawli <span className="text-[oklch(0.78_0.16_82)]">Analytic</span>
+                    Rawli <span className="text-[oklch(0.78_0.16_82)]">Analytics</span>
                   </p>
                   <p className="mt-1 text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
                     prediction terminal
@@ -126,7 +126,7 @@ export function Footer() {
           <div className="mt-12 pt-6 border-t border-[oklch(0.18_0.014_255)] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <p className="text-[11px] text-muted-foreground/60">
-                © {new Date().getFullYear()} Rawli Analytic.{" "}
+                © {new Date().getFullYear()} Rawli Analytics.{" "}
                 <span className="text-muted-foreground/40">
                   Not financial advice.
                 </span>

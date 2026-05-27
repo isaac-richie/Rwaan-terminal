@@ -692,14 +692,14 @@ export function Navbar() {
             >
               <img
                 src="/rawli-brand.png"
-                alt="Rawli Analytic"
+                alt="Rawli Analytics"
                 className="h-full w-full object-contain"
               />
             </div>
             <div className="leading-none">
               <div className="text-[13px] sm:text-[15px] font-extrabold tracking-tight">
                 <span className="text-foreground">Rawli</span>{" "}
-                <span className="text-[oklch(0.82_0.16_82)]">Analytic</span>
+                <span className="text-[oklch(0.82_0.16_82)]">Analytics</span>
               </div>
               <div className="hidden sm:block text-[9px] uppercase tracking-[0.22em] text-muted-foreground/70 mt-[3px]">
                 prediction terminal

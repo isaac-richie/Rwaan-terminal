@@ -2,8 +2,8 @@ import Link from "next/link"
 import { ArrowLeft, ShieldCheck } from "lucide-react"
 
 export const metadata = {
-  title: "Privacy Policy | Rawli Analytic",
-  description: "Privacy Policy for Rawli Analytic prediction market terminal.",
+  title: "Privacy Policy | Rawli Analytics",
+  description: "Privacy Policy for Rawli Analytics prediction market terminal.",
 }
 
 const LAST_UPDATED = "May 2025"
@@ -36,7 +36,7 @@ export default function PrivacyPage() {
 
           <Section title="1. Overview">
             <p>
-              Rawli Analytic is a non-custodial prediction market interface. We are committed to minimizing data
+              Rawli Analytics is a non-custodial prediction market interface. We are committed to minimizing data
               collection and protecting user privacy. This policy explains what data we collect, how we use it, and
               your rights.
             </p>
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
             <p>
               When you access the Platform, we proxy a geoblock check to Polymarket by forwarding your IP address.
               This is required to comply with Polymarket&apos;s regional restrictions. Your IP is forwarded to
-              Polymarket but is not stored by Rawli Analytic.
+              Polymarket but is not stored by Rawli Analytics.
             </p>
           </Section>
 

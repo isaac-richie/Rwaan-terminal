@@ -19,7 +19,7 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rawli Analytic — Prediction Terminal",
+  title: "Rawli Analytics — Prediction Terminal",
   description:
     "BNB-native prediction terminal routing live Polymarket markets, liquidity, and trading data.",
   keywords: ["prediction terminal", "rawli analytic", "polymarket", "bnb", "trading"],
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     apple: "/apple-icon.png",
   },
   openGraph: {
-    title: "Rawli Analytic — Prediction Terminal",
+    title: "Rawli Analytics — Prediction Terminal",
     description: "BNB-native prediction terminal for live markets, liquidity, and trading data.",
     type: "website",
   },
