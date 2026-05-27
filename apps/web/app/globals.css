@@ -420,6 +420,6 @@
     .hero-card-glow { box-shadow: none; }
     .card-enter { animation: none; opacity: 1; transform: none; }
     .hero-enter  { animation: none; opacity: 1; transform: none; }
-    .ticker-scroll { animation: none; }
+    /* ticker-scroll intentionally kept active on mobile — rolling on both viewports */
   }
 }

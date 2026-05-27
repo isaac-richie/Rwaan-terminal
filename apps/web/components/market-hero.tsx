@@ -470,21 +470,21 @@ export function MarketHero() {
         </aside>
       </div>
 
-      {/* ── Mobile scroll strip — swipe through all trending markets ── */}
-      {trending.length > 0 && (
-        <div className="sm:hidden mt-3 -mx-4 border-t border-[oklch(0.20_0.015_255)] bg-[oklch(0.095_0.012_260)]">
-          <div className="overflow-x-auto [-webkit-overflow-scrolling:touch] scroll-smooth no-scrollbar">
-            <div className="flex gap-2 px-4 py-3 w-max">
-              {trending.map((market) => {
+      {/* ── Mobile ticker strip — same rolling behaviour as desktop ── */}
+      {marqueeMarkets.length > 0 && (
+        <div className="sm:hidden mt-3 -mx-4 border-t border-[oklch(0.20_0.015_255)] bg-[oklch(0.095_0.012_260)] py-3 overflow-hidden">
+          <div className="w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">
+            <div className="ticker-scroll flex min-w-max gap-2 px-2">
+              {marqueeMarkets.map((market, idx) => {
                 const price = getPrimaryPrice(market)
                 const isHigh = price >= 55
                 const imgSrc = (market.image ?? market.icon) as string | undefined
                 return (
                   <button
-                    key={market.id}
+                    key={`mobile-${market.id}-${idx}`}
                     type="button"
                     onClick={() => goToMarket(market)}
-                    className="flex w-[220px] shrink-0 items-center gap-2.5 rounded-xl border border-[oklch(0.22_0.015_255/0.65)] bg-[oklch(0.145_0.013_255/0.95)] px-3 py-2.5 text-left active:scale-[0.97] transition-transform"
+                    className="flex w-[210px] shrink-0 items-center gap-2.5 rounded-xl border border-[oklch(0.22_0.015_255/0.65)] bg-[oklch(0.145_0.013_255/0.95)] px-3 py-2 text-left active:scale-[0.97] transition-transform"
                   >
                     <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-[oklch(0.22_0.015_255/0.6)] bg-[oklch(0.17_0.014_255)]">
                       {imgSrc ? (
@@ -500,7 +500,7 @@ export function MarketHero() {
                     <span className={cn(
                       "shrink-0 rounded-lg px-2 py-1 font-mono text-[11px] font-bold",
                       isHigh ? "bg-[oklch(0.28_0.12_155/0.9)] text-[oklch(0.78_0.20_155)]"
-                           : "bg-[oklch(0.26_0.12_25/0.9)] text-[oklch(0.72_0.20_25)]"
+                             : "bg-[oklch(0.26_0.12_25/0.9)] text-[oklch(0.72_0.20_25)]"
                     )}>
                       {price.toFixed(0)}¢
                     </span>
