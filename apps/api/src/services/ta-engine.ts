@@ -95,6 +95,29 @@ type FearGreedData = {
   classification: string;
 };
 
+export type SignalVote = {
+  name: string;
+  direction: "bullish" | "bearish" | "neutral";
+  weight: number;       // how much this signal matters (0-1)
+  conviction: number;   // how strong the signal is (0-1)
+  reason: string;
+};
+
+export type ComputedVerdict = {
+  direction: "YES" | "NO";
+  confidence: number;           // 0-100
+  bullishScore: number;         // raw bullish points
+  bearishScore: number;         // raw bearish points
+  netScore: number;             // bullish - bearish (-100 to +100)
+  signalAgreement: number;      // % of signals agreeing with verdict (0-100)
+  totalSignals: number;
+  agreeingSignals: number;
+  votes: SignalVote[];
+  regimeAdjustment: number;     // confidence modifier from regime
+  contrariansFlags: string[];   // signals that disagree with majority
+  verdictRationale: string;     // human-readable reasoning chain
+};
+
 export type TechnicalAnalysis = {
   symbol: string;
   currentPrice: number;
@@ -135,6 +158,8 @@ export type TechnicalAnalysis = {
   // Conviction
   confluenceScore: number; // 0-100
   confluenceFactors: string[];
+  // Deterministic verdict — computed from math, not AI
+  verdict: ComputedVerdict;
   // Pre-computed trade context
   riskReward: {
     longEntry: number;
@@ -912,6 +937,372 @@ function computeRiskReward(price: number, levels: KeyLevel[]) {
   };
 }
 
+// ─── Deterministic Verdict Engine ────────────────────────────────────────────
+//
+// Every indicator casts a directional vote (bullish/bearish/neutral) with a
+// weight (importance) and conviction (signal strength). The engine tallies
+// weighted scores, computes signal agreement %, applies regime-based
+// adjustments, and outputs a YES/NO verdict with confidence 0-100.
+//
+// This runs BEFORE the AI. The AI's job is to EXPLAIN the verdict, not decide.
+
+function computeVerdict(params: {
+  htfStructure: MarketStructure;
+  trendStrength: number;
+  ema: EMASet;
+  macd: MACDResult;
+  bollinger: BollingerResult;
+  rsi: number;
+  rsiDiv: Divergence | null;
+  multiTfRsiAlignment: "all_bullish" | "all_bearish" | "mixed";
+  obv: { trend: "rising" | "falling" | "flat"; divergence: Divergence | null };
+  volProfile: "increasing" | "decreasing" | "flat";
+  vwapDist: number;
+  nearSupport: boolean;
+  nearResistance: boolean;
+  regime: Regime;
+  funding: FundingData | null;
+  fearGreed: FearGreedData | null;
+  riskReward: ReturnType<typeof computeRiskReward>;
+}): ComputedVerdict {
+  const {
+    htfStructure, trendStrength, ema, macd, bollinger, rsi, rsiDiv,
+    multiTfRsiAlignment, obv, volProfile, vwapDist, nearSupport,
+    nearResistance, regime, funding, fearGreed, riskReward,
+  } = params;
+
+  const votes: SignalVote[] = [];
+
+  // ── 1. HTF Structure (weight: 0.18 — the king) ──
+  {
+    const w = 0.18;
+    if (htfStructure === "uptrend") {
+      const c = Math.min(1, trendStrength / 100);
+      votes.push({ name: "HTF Structure", direction: "bullish", weight: w, conviction: c, reason: `4H uptrend, strength ${Math.round(trendStrength)}/100` });
+    } else if (htfStructure === "downtrend") {
+      const c = Math.min(1, trendStrength / 100);
+      votes.push({ name: "HTF Structure", direction: "bearish", weight: w, conviction: c, reason: `4H downtrend, strength ${Math.round(trendStrength)}/100` });
+    } else {
+      votes.push({ name: "HTF Structure", direction: "neutral", weight: w, conviction: 0.3, reason: "4H ranging — no directional edge" });
+    }
+  }
+
+  // ── 2. EMA Ribbon (weight: 0.14) ──
+  {
+    const w = 0.14;
+    if (ema.ribbonState === "bullish_stack") {
+      votes.push({ name: "EMA Ribbon", direction: "bullish", weight: w, conviction: 0.9, reason: "Full bullish stack: 9>21>50>200" });
+    } else if (ema.ribbonState === "bearish_stack") {
+      votes.push({ name: "EMA Ribbon", direction: "bearish", weight: w, conviction: 0.9, reason: "Full bearish stack: 9<21<50<200" });
+    } else if (ema.ribbonState === "compressed") {
+      // Compressed = about to break out, lean toward HTF bias
+      const dir = htfStructure === "uptrend" ? "bullish" as const : htfStructure === "downtrend" ? "bearish" as const : "neutral" as const;
+      votes.push({ name: "EMA Ribbon", direction: dir, weight: w, conviction: 0.4, reason: "EMAs compressed — breakout pending, leaning HTF bias" });
+    } else {
+      // Mixed — check price vs EMA200 as tie-breaker
+      const dir = ema.priceVsEma200 === "above" ? "bullish" as const : ema.priceVsEma200 === "below" ? "bearish" as const : "neutral" as const;
+      votes.push({ name: "EMA Ribbon", direction: dir, weight: w, conviction: 0.5, reason: `Mixed ribbon, price ${ema.priceVsEma200} EMA200` });
+    }
+  }
+
+  // ── 3. MACD (weight: 0.12) ──
+  {
+    const w = 0.12;
+    if (macd.crossover === "bullish_cross") {
+      votes.push({ name: "MACD", direction: "bullish", weight: w, conviction: 0.85, reason: "Fresh bullish crossover" });
+    } else if (macd.crossover === "bearish_cross") {
+      votes.push({ name: "MACD", direction: "bearish", weight: w, conviction: 0.85, reason: "Fresh bearish crossover" });
+    } else if (macd.trend === "bullish" && macd.histogramDirection === "expanding") {
+      votes.push({ name: "MACD", direction: "bullish", weight: w, conviction: 0.75, reason: "Bullish with expanding histogram — accelerating" });
+    } else if (macd.trend === "bearish" && macd.histogramDirection === "expanding") {
+      votes.push({ name: "MACD", direction: "bearish", weight: w, conviction: 0.75, reason: "Bearish with expanding histogram — accelerating" });
+    } else if (macd.trend === "bullish") {
+      votes.push({ name: "MACD", direction: "bullish", weight: w, conviction: 0.5, reason: "Bullish but histogram contracting — losing steam" });
+    } else if (macd.trend === "bearish") {
+      votes.push({ name: "MACD", direction: "bearish", weight: w, conviction: 0.5, reason: "Bearish but histogram contracting — losing steam" });
+    } else {
+      votes.push({ name: "MACD", direction: "neutral", weight: w, conviction: 0.2, reason: "MACD flat at zero line" });
+    }
+  }
+
+  // ── 4. Bollinger Bands (weight: 0.08) ──
+  {
+    const w = 0.08;
+    if (bollinger.squeeze) {
+      // Squeeze = no directional signal, but high conviction that a move is coming
+      const dir = htfStructure === "uptrend" ? "bullish" as const : htfStructure === "downtrend" ? "bearish" as const : "neutral" as const;
+      votes.push({ name: "Bollinger", direction: dir, weight: w, conviction: 0.6, reason: "Squeeze — breakout imminent, leaning HTF" });
+    } else if (bollinger.priceZone === "below_lower") {
+      votes.push({ name: "Bollinger", direction: "bullish", weight: w, conviction: 0.7, reason: "Price below lower band — mean reversion buy" });
+    } else if (bollinger.priceZone === "above_upper") {
+      votes.push({ name: "Bollinger", direction: "bearish", weight: w, conviction: 0.7, reason: "Price above upper band — mean reversion sell" });
+    } else if (bollinger.percentB > 70) {
+      votes.push({ name: "Bollinger", direction: "bullish", weight: w, conviction: 0.5, reason: `%B at ${bollinger.percentB.toFixed(0)}% — riding upper band` });
+    } else if (bollinger.percentB < 30) {
+      votes.push({ name: "Bollinger", direction: "bearish", weight: w, conviction: 0.5, reason: `%B at ${bollinger.percentB.toFixed(0)}% — riding lower band` });
+    } else {
+      votes.push({ name: "Bollinger", direction: "neutral", weight: w, conviction: 0.3, reason: "Price in middle of Bollinger range" });
+    }
+  }
+
+  // ── 5. RSI (weight: 0.10) ──
+  {
+    const w = 0.10;
+    if (rsiDiv) {
+      // Divergence overrides raw RSI — it's a higher-conviction reversal signal
+      votes.push({
+        name: "RSI Divergence",
+        direction: rsiDiv.type === "bullish" ? "bullish" : "bearish",
+        weight: w + 0.03, // divergence gets bonus weight
+        conviction: 0.85,
+        reason: rsiDiv.description,
+      });
+    } else if (rsi <= 25) {
+      votes.push({ name: "RSI", direction: "bullish", weight: w, conviction: 0.8, reason: `RSI deeply oversold at ${rsi}` });
+    } else if (rsi <= 35) {
+      votes.push({ name: "RSI", direction: "bullish", weight: w, conviction: 0.6, reason: `RSI oversold at ${rsi}` });
+    } else if (rsi >= 75) {
+      votes.push({ name: "RSI", direction: "bearish", weight: w, conviction: 0.8, reason: `RSI deeply overbought at ${rsi}` });
+    } else if (rsi >= 65) {
+      votes.push({ name: "RSI", direction: "bearish", weight: w, conviction: 0.6, reason: `RSI overbought at ${rsi}` });
+    } else if (rsi > 55) {
+      votes.push({ name: "RSI", direction: "bullish", weight: w, conviction: 0.4, reason: `RSI mildly bullish at ${rsi}` });
+    } else if (rsi < 45) {
+      votes.push({ name: "RSI", direction: "bearish", weight: w, conviction: 0.4, reason: `RSI mildly bearish at ${rsi}` });
+    } else {
+      votes.push({ name: "RSI", direction: "neutral", weight: w, conviction: 0.2, reason: `RSI neutral at ${rsi}` });
+    }
+  }
+
+  // ── 6. Multi-TF RSI Alignment (weight: 0.07) ──
+  {
+    const w = 0.07;
+    if (multiTfRsiAlignment === "all_bullish") {
+      votes.push({ name: "Multi-TF RSI", direction: "bullish", weight: w, conviction: 0.8, reason: "RSI >50 across 4H/1H/15m — full alignment" });
+    } else if (multiTfRsiAlignment === "all_bearish") {
+      votes.push({ name: "Multi-TF RSI", direction: "bearish", weight: w, conviction: 0.8, reason: "RSI <50 across 4H/1H/15m — full alignment" });
+    } else {
+      votes.push({ name: "Multi-TF RSI", direction: "neutral", weight: w, conviction: 0.3, reason: "RSI mixed across timeframes" });
+    }
+  }
+
+  // ── 7. OBV (weight: 0.09) ──
+  {
+    const w = 0.09;
+    if (obv.divergence) {
+      // OBV divergence = smart money signal, high weight
+      votes.push({
+        name: "OBV",
+        direction: obv.divergence.type === "bullish" ? "bullish" : "bearish",
+        weight: w + 0.02,
+        conviction: 0.8,
+        reason: obv.divergence.description,
+      });
+    } else if (obv.trend === "rising") {
+      votes.push({ name: "OBV", direction: "bullish", weight: w, conviction: 0.6, reason: "OBV rising — volume flow supports price" });
+    } else if (obv.trend === "falling") {
+      votes.push({ name: "OBV", direction: "bearish", weight: w, conviction: 0.6, reason: "OBV falling — volume flow contradicts price" });
+    } else {
+      votes.push({ name: "OBV", direction: "neutral", weight: w, conviction: 0.3, reason: "OBV flat — no clear accumulation/distribution" });
+    }
+  }
+
+  // ── 8. Volume Profile (weight: 0.05) ──
+  {
+    const w = 0.05;
+    // Volume alone isn't directional — it confirms the prevailing structure
+    if (volProfile === "increasing") {
+      const dir = htfStructure === "uptrend" ? "bullish" as const : htfStructure === "downtrend" ? "bearish" as const : "neutral" as const;
+      votes.push({ name: "Volume", direction: dir, weight: w, conviction: 0.7, reason: "Volume increasing — confirms trend momentum" });
+    } else if (volProfile === "decreasing") {
+      // Declining volume in a trend = weakening
+      const dir = htfStructure === "uptrend" ? "bearish" as const : htfStructure === "downtrend" ? "bullish" as const : "neutral" as const;
+      votes.push({ name: "Volume", direction: dir, weight: w, conviction: 0.5, reason: "Volume declining — trend losing conviction" });
+    } else {
+      votes.push({ name: "Volume", direction: "neutral", weight: w, conviction: 0.2, reason: "Volume flat — market waiting" });
+    }
+  }
+
+  // ── 9. VWAP (weight: 0.05) ──
+  {
+    const w = 0.05;
+    if (vwapDist > 1.0) {
+      votes.push({ name: "VWAP", direction: "bearish", weight: w, conviction: 0.5, reason: `Extended +${vwapDist.toFixed(2)}% above VWAP — mean reversion risk` });
+    } else if (vwapDist < -1.0) {
+      votes.push({ name: "VWAP", direction: "bullish", weight: w, conviction: 0.5, reason: `Extended ${vwapDist.toFixed(2)}% below VWAP — snap-back potential` });
+    } else if (vwapDist > 0) {
+      votes.push({ name: "VWAP", direction: "bullish", weight: w, conviction: 0.4, reason: `Price above VWAP (+${vwapDist.toFixed(2)}%) — buyers in control` });
+    } else {
+      votes.push({ name: "VWAP", direction: "bearish", weight: w, conviction: 0.4, reason: `Price below VWAP (${vwapDist.toFixed(2)}%) — sellers in control` });
+    }
+  }
+
+  // ── 10. Key Level Proximity (weight: 0.06) ──
+  {
+    const w = 0.06;
+    if (nearSupport) {
+      votes.push({ name: "Key Level", direction: "bullish", weight: w, conviction: 0.7, reason: "Price at key support — high-probability bounce zone" });
+    } else if (nearResistance) {
+      votes.push({ name: "Key Level", direction: "bearish", weight: w, conviction: 0.7, reason: "Price at key resistance — high-probability rejection zone" });
+    } else {
+      votes.push({ name: "Key Level", direction: "neutral", weight: w, conviction: 0.2, reason: "Price between levels — no immediate edge" });
+    }
+  }
+
+  // ── 11. Funding Rate (weight: 0.04 — contrarian) ──
+  if (funding) {
+    const w = 0.04;
+    if (funding.sentiment === "long_heavy") {
+      // Crowded longs = contrarian bearish (squeeze the longs)
+      votes.push({ name: "Funding", direction: "bearish", weight: w, conviction: 0.65, reason: `Funding heavily positive (${funding.annualized.toFixed(0)}% ann.) — crowded longs, squeeze risk` });
+    } else if (funding.sentiment === "short_heavy") {
+      // Crowded shorts = contrarian bullish (squeeze the shorts)
+      votes.push({ name: "Funding", direction: "bullish", weight: w, conviction: 0.65, reason: `Funding negative (${funding.annualized.toFixed(0)}% ann.) — crowded shorts, squeeze potential` });
+    } else {
+      votes.push({ name: "Funding", direction: "neutral", weight: w, conviction: 0.2, reason: "Funding neutral — balanced positioning" });
+    }
+  }
+
+  // ── 12. Fear & Greed (weight: 0.03 — contrarian) ──
+  if (fearGreed) {
+    const w = 0.03;
+    if (fearGreed.value <= 20) {
+      votes.push({ name: "Fear & Greed", direction: "bullish", weight: w, conviction: 0.7, reason: `Extreme Fear (${fearGreed.value}) — historically a buy signal` });
+    } else if (fearGreed.value >= 80) {
+      votes.push({ name: "Fear & Greed", direction: "bearish", weight: w, conviction: 0.7, reason: `Extreme Greed (${fearGreed.value}) — historically a sell signal` });
+    } else if (fearGreed.value <= 35) {
+      votes.push({ name: "Fear & Greed", direction: "bullish", weight: w, conviction: 0.4, reason: `Fear zone (${fearGreed.value})` });
+    } else if (fearGreed.value >= 65) {
+      votes.push({ name: "Fear & Greed", direction: "bearish", weight: w, conviction: 0.4, reason: `Greed zone (${fearGreed.value})` });
+    } else {
+      votes.push({ name: "Fear & Greed", direction: "neutral", weight: w, conviction: 0.2, reason: `Neutral sentiment (${fearGreed.value})` });
+    }
+  }
+
+  // ── 13. R:R Asymmetry (weight: 0.04) ──
+  if (riskReward) {
+    const w = 0.04;
+    if (riskReward.longRR > 2.0 && riskReward.shortRR < 1.0) {
+      votes.push({ name: "Risk/Reward", direction: "bullish", weight: w, conviction: 0.7, reason: `Long R:R ${riskReward.longRR}:1 vs Short ${riskReward.shortRR}:1 — asymmetric long` });
+    } else if (riskReward.shortRR > 2.0 && riskReward.longRR < 1.0) {
+      votes.push({ name: "Risk/Reward", direction: "bearish", weight: w, conviction: 0.7, reason: `Short R:R ${riskReward.shortRR}:1 vs Long ${riskReward.longRR}:1 — asymmetric short` });
+    } else if (riskReward.longRR > riskReward.shortRR) {
+      votes.push({ name: "Risk/Reward", direction: "bullish", weight: w, conviction: 0.5, reason: `Long R:R ${riskReward.longRR}:1 slightly favored` });
+    } else if (riskReward.shortRR > riskReward.longRR) {
+      votes.push({ name: "Risk/Reward", direction: "bearish", weight: w, conviction: 0.5, reason: `Short R:R ${riskReward.shortRR}:1 slightly favored` });
+    } else {
+      votes.push({ name: "Risk/Reward", direction: "neutral", weight: w, conviction: 0.2, reason: "Symmetric R:R — no edge from levels" });
+    }
+  }
+
+  // ─── Tally weighted scores ───
+  let bullishScore = 0;
+  let bearishScore = 0;
+  let totalWeight = 0;
+
+  for (const v of votes) {
+    const pts = v.weight * v.conviction * 100;
+    if (v.direction === "bullish") bullishScore += pts;
+    else if (v.direction === "bearish") bearishScore += pts;
+    // Neutral adds to neither
+    totalWeight += v.weight;
+  }
+
+  // Normalize to 0-100 scale
+  const maxPossible = totalWeight * 100;
+  bullishScore = maxPossible > 0 ? (bullishScore / maxPossible) * 100 : 50;
+  bearishScore = maxPossible > 0 ? (bearishScore / maxPossible) * 100 : 50;
+  const netScore = bullishScore - bearishScore; // -100 to +100
+
+  // ─── Signal agreement ───
+  const majorityDir = netScore >= 0 ? "bullish" : "bearish";
+  const directionalVotes = votes.filter((v) => v.direction !== "neutral");
+  const agreeingSignals = directionalVotes.filter((v) => v.direction === majorityDir).length;
+  const totalSignals = directionalVotes.length;
+  const signalAgreement = totalSignals > 0 ? Math.round((agreeingSignals / totalSignals) * 100) : 50;
+
+  // Contrarian flags — signals that disagree with the majority
+  const contrariansFlags = directionalVotes
+    .filter((v) => v.direction !== majorityDir)
+    .map((v) => `${v.name}: ${v.direction} — ${v.reason}`);
+
+  // ─── Regime-based confidence adjustment ───
+  let regimeAdjustment = 0;
+  if (regime === "trending") {
+    // Trending regimes make directional signals more reliable
+    regimeAdjustment = 8;
+  } else if (regime === "volatile") {
+    // Volatile regimes make everything less reliable
+    regimeAdjustment = -12;
+  } else {
+    // Ranging reduces confidence slightly
+    regimeAdjustment = -5;
+  }
+
+  // ─── Compute final confidence ───
+  // Base confidence from how far apart bull vs bear scores are
+  const separation = Math.abs(netScore);
+  let confidence = Math.min(95, Math.max(15, separation * 1.2 + 20));
+
+  // Signal agreement multiplier: if 80%+ agree, boost; if <50%, penalize
+  if (signalAgreement >= 80) confidence += 10;
+  else if (signalAgreement >= 65) confidence += 5;
+  else if (signalAgreement < 45) confidence -= 10;
+
+  // Regime adjustment
+  confidence += regimeAdjustment;
+
+  // High-conviction divergences add extra confidence
+  const hasDivergence = rsiDiv || obv.divergence;
+  if (hasDivergence) confidence += 5;
+
+  // Clamp
+  confidence = Math.max(10, Math.min(95, Math.round(confidence)));
+
+  // ─── Direction ───
+  const direction: "YES" | "NO" = netScore >= 0 ? "YES" : "NO";
+
+  // ─── Build rationale ───
+  const topBullish = votes
+    .filter((v) => v.direction === "bullish")
+    .sort((a, b) => b.weight * b.conviction - a.weight * a.conviction)
+    .slice(0, 3);
+  const topBearish = votes
+    .filter((v) => v.direction === "bearish")
+    .sort((a, b) => b.weight * b.conviction - a.weight * a.conviction)
+    .slice(0, 3);
+
+  const rationale = [
+    `Verdict: ${direction} with ${confidence}% confidence.`,
+    `${agreeingSignals}/${totalSignals} directional signals agree (${signalAgreement}% alignment).`,
+    `Net score: ${netScore > 0 ? "+" : ""}${netScore.toFixed(1)} (bull ${bullishScore.toFixed(1)} vs bear ${bearishScore.toFixed(1)}).`,
+    ``,
+    `Top bullish signals:`,
+    ...topBullish.map((v) => `  • ${v.name} (${(v.conviction * 100).toFixed(0)}% conviction): ${v.reason}`),
+    ``,
+    `Top bearish signals:`,
+    ...topBearish.map((v) => `  • ${v.name} (${(v.conviction * 100).toFixed(0)}% conviction): ${v.reason}`),
+    ...(contrariansFlags.length > 0 ? [``, `Contrarian warnings:`, ...contrariansFlags.map((f) => `  ⚠ ${f}`)] : []),
+    ``,
+    `Regime: ${regime} (adjustment: ${regimeAdjustment > 0 ? "+" : ""}${regimeAdjustment}pts)`,
+  ].join("\n");
+
+  return {
+    direction,
+    confidence,
+    bullishScore: Math.round(bullishScore * 10) / 10,
+    bearishScore: Math.round(bearishScore * 10) / 10,
+    netScore: Math.round(netScore * 10) / 10,
+    signalAgreement,
+    totalSignals,
+    agreeingSignals,
+    votes,
+    regimeAdjustment,
+    contrariansFlags,
+    verdictRationale: rationale,
+  };
+}
+
 // ─── Summary builder ────────────────────────────────────────────────────────
 
 function buildSummary(ta: Omit<TechnicalAnalysis, "summary">): string {
@@ -920,13 +1311,20 @@ function buildSummary(ta: Omit<TechnicalAnalysis, "summary">): string {
     confluenceScore, confluenceFactors, levels, nearestSupport,
     nearestResistance, riskReward, currentPrice, volatilityPct,
     ema, macd, bollinger, obv, funding, fearGreed, fibLevels,
-    multiTfRsi,
+    multiTfRsi, verdict,
   } = ta;
 
   const fmtPrice = (p: number) => `$${p.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 
   const lines: string[] = [
     `TECHNICAL ANALYSIS — ${ta.symbol} @ ${fmtPrice(currentPrice)}`,
+    ``,
+    `═══════════════════════════════════════════════`,
+    `  COMPUTED VERDICT: ${verdict.direction} (${verdict.confidence}% confidence)`,
+    `  Signal Agreement: ${verdict.agreeingSignals}/${verdict.totalSignals} signals (${verdict.signalAgreement}%)`,
+    `  Net Score: ${verdict.netScore > 0 ? "+" : ""}${verdict.netScore} (bull ${verdict.bullishScore} / bear ${verdict.bearishScore})`,
+    `  Regime Adjustment: ${verdict.regimeAdjustment > 0 ? "+" : ""}${verdict.regimeAdjustment}pts (${regime})`,
+    `═══════════════════════════════════════════════`,
     ``,
     `STRUCTURE:`,
     `  4H: ${htf.structure.toUpperCase()} (strength ${htf.trendStrength}/100)`,
@@ -993,6 +1391,20 @@ function buildSummary(ta: Omit<TechnicalAnalysis, "summary">): string {
     lines.push(``, `RISK/REWARD:`);
     lines.push(`  Long: entry ${fmtPrice(riskReward.longEntry)}, stop ${fmtPrice(riskReward.longStop)}, target ${fmtPrice(riskReward.longTarget)} — R:R ${riskReward.longRR}:1`);
     lines.push(`  Short: entry ${fmtPrice(riskReward.shortEntry)}, stop ${fmtPrice(riskReward.shortStop)}, target ${fmtPrice(riskReward.shortTarget)} — R:R ${riskReward.shortRR}:1`);
+  }
+
+  // Full verdict breakdown
+  lines.push(``, `SIGNAL VOTES:`);
+  for (const v of verdict.votes) {
+    const arrow = v.direction === "bullish" ? "▲" : v.direction === "bearish" ? "▼" : "—";
+    lines.push(`  ${arrow} ${v.name} [${v.direction}] (w:${v.weight.toFixed(2)} c:${(v.conviction * 100).toFixed(0)}%): ${v.reason}`);
+  }
+
+  if (verdict.contrariansFlags.length > 0) {
+    lines.push(``, `CONTRARIAN WARNINGS:`);
+    for (const flag of verdict.contrariansFlags) {
+      lines.push(`  ⚠ ${flag}`);
+    }
   }
 
   return lines.filter(Boolean).join("\n");
@@ -1151,6 +1563,27 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
     // ─── Risk/reward ───
     const riskReward = computeRiskReward(price, levels);
 
+    // ─── Deterministic verdict ───
+    const verdict = computeVerdict({
+      htfStructure: structure,
+      trendStrength,
+      ema,
+      macd,
+      bollinger,
+      rsi: rsi14,
+      rsiDiv: rsiDivergence,
+      multiTfRsiAlignment: multiTfRsi.alignment,
+      obv,
+      volProfile: volumeProfile,
+      vwapDist: vwapDistance,
+      nearSupport: nearSup,
+      nearResistance: nearRes,
+      regime,
+      funding: fundingData,
+      fearGreed: fearGreedData,
+      riskReward,
+    });
+
     const ta: Omit<TechnicalAnalysis, "summary"> = {
       symbol: `${asset.toUpperCase()}USDT`,
       currentPrice: price,
@@ -1174,6 +1607,7 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
       regime,
       confluenceScore: Math.round(score),
       confluenceFactors: factors,
+      verdict,
       riskReward,
     };
 

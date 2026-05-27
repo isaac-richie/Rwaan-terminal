@@ -137,6 +137,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
             // Conviction
             confluenceScore: taResult.confluenceScore,
             confluenceFactors: taResult.confluenceFactors,
+            // Deterministic verdict from quant engine
+            computedVerdict: taResult.verdict,
             riskReward: taResult.riskReward,
           },
         }),

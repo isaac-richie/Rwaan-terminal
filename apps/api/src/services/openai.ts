@@ -326,38 +326,56 @@ function buildPremiumPrompt(
       ].join("\n")
     : "";
 
+  // If we have TA with a pre-computed verdict, the AI must justify it — not override it
+  const verdictBlock = ta?.verdict
+    ? [
+        ``,
+        `PRE-COMPUTED VERDICT FROM QUANTITATIVE ENGINE:`,
+        `Direction: ${ta.verdict.direction}`,
+        `Confidence: ${ta.verdict.confidence}%`,
+        `Signal Agreement: ${ta.verdict.agreeingSignals}/${ta.verdict.totalSignals} directional signals (${ta.verdict.signalAgreement}%)`,
+        `Net Score: ${ta.verdict.netScore > 0 ? "+" : ""}${ta.verdict.netScore} (bull ${ta.verdict.bullishScore} / bear ${ta.verdict.bearishScore})`,
+        `Regime: ${ta.regime} (adjustment: ${ta.verdict.regimeAdjustment > 0 ? "+" : ""}${ta.verdict.regimeAdjustment}pts)`,
+        ...(ta.verdict.contrariansFlags.length > 0
+          ? [`Contrarian signals: ${ta.verdict.contrariansFlags.join(" | ")}`]
+          : []),
+      ].join("\n")
+    : "";
+
   const taInstructions = ta
     ? [
         ``,
-        `CRITICAL — CRYPTO MARKET WITH FULL TA SUITE:`,
-        `This is a crypto asset market. You have been given comprehensive technical analysis from Binance including:`,
-        `- Multi-timeframe market structure (4H/1H/15m candles)`,
-        `- EMA ribbon (9/21/50/200) showing ${ta.ema.ribbonState.replace("_", " ")}`,
-        `- MACD with histogram — ${ta.macd.crossover !== "none" ? `FRESH ${ta.macd.crossover.replace("_", " ").toUpperCase()}` : ta.macd.trend + " trend"}`,
-        `- Bollinger Bands${ta.bollinger.squeeze ? " — SQUEEZE ACTIVE (breakout imminent)" : ""}`,
-        `- RSI across 3 timeframes: ${ta.multiTfRsi.alignment.replace("_", " ")}`,
-        ...(ta.rsiDivergence ? [`- ⚠ RSI DIVERGENCE DETECTED: ${ta.rsiDivergence.type}`] : []),
-        ...(ta.obv.divergence ? [`- ⚠ OBV DIVERGENCE: ${ta.obv.divergence.type} — smart money signal`] : []),
-        `- Fibonacci retracements from swing structure`,
-        ...(ta.funding ? [`- Futures funding rate: ${ta.funding.sentiment.replace("_", " ")} (${ta.funding.annualized.toFixed(0)}% annualized)`] : []),
-        ...(ta.fearGreed ? [`- Fear & Greed Index: ${ta.fearGreed.value}/100 (${ta.fearGreed.classification})`] : []),
-        `- Confluence score: ${ta.confluenceScore}/100 across 12 weighted axes`,
+        `CRITICAL — CRYPTO MARKET WITH FULL QUANTITATIVE TA SUITE:`,
+        `This is a crypto asset market. A deterministic quant engine has already computed a verdict`,
+        `from 13 weighted signal votes across multi-timeframe technical analysis.`,
         ``,
-        `You MUST weave the TA data deeply into your analysis:`,
-        `- Your VERDICT confidence should correlate with the confluence score (${ta.confluenceScore}/100)`,
-        `- Reference specific EMA levels, MACD state, and Bollinger position in market signal interpretation`,
-        `- Call out any RSI or OBV divergences as key structural signals`,
-        `- Use Fibonacci levels and key S/R in your structural drivers`,
-        `- If funding rate shows crowded positioning, flag the squeeze risk`,
-        `- If Fear & Greed is extreme, note the contrarian implication`,
-        `- If TA and news conflict, the divergence itself is the insight — explain it`,
-        `- Include specific dollar price levels — the user paid $1 for precision, not vague commentary`,
+        `The quant engine analyzed:`,
+        `- 4H/1H/15m market structure, EMA ribbon (9/21/50/200): ${ta.ema.ribbonState.replace("_", " ")}`,
+        `- MACD: ${ta.macd.crossover !== "none" ? `FRESH ${ta.macd.crossover.replace("_", " ").toUpperCase()}` : ta.macd.trend + " (" + ta.macd.histogramDirection + ")"}`,
+        `- Bollinger Bands: %B ${ta.bollinger.percentB.toFixed(0)}%${ta.bollinger.squeeze ? " — SQUEEZE ACTIVE" : ""}`,
+        `- RSI: ${ta.rsi14} (multi-TF: ${ta.multiTfRsi.alignment.replace("_", " ")})`,
+        ...(ta.rsiDivergence ? [`- ⚠ RSI DIVERGENCE: ${ta.rsiDivergence.type}`] : []),
+        ...(ta.obv.divergence ? [`- ⚠ OBV DIVERGENCE: ${ta.obv.divergence.type}`] : []),
+        `- Fibonacci, key S/R, VWAP, OBV, funding rate, Fear & Greed`,
+        ``,
+        `YOUR ROLE IS TO EXPLAIN AND JUSTIFY — NOT TO OVERRIDE:`,
+        `- Your verdict MUST match the quant engine: ${ta.verdict.direction} direction`,
+        `- Your confidence MUST be within ±10 of the computed ${ta.verdict.confidence}%`,
+        `- Your rationale must explain WHY the indicators support this direction`,
+        `- Reference specific EMA levels, MACD state, Bollinger position, RSI readings`,
+        `- Call out any divergences (RSI, OBV) as key evidence`,
+        `- Use exact dollar price levels from Fibonacci and S/R throughout`,
+        `- If news contradicts the TA verdict, explain the divergence — but maintain the TA direction`,
+        `- The only exception: if breaking news fundamentally invalidates the technical setup, you may flip`,
+        `  the direction but MUST explicitly state why and reduce confidence to 30-45%`,
+        `- Include specific price levels for entries, stops, and targets from the R:R data`,
       ].join("\n")
     : "";
 
   return [
-    `You are a senior intelligence analyst producing a premium market report.`,
+    `You are a senior quantitative intelligence analyst producing a premium market report.`,
     `You have been paid $1 for this analysis. Deliver maximum value.`,
+    `Your analysis is backed by a real-time quantitative engine processing live Binance data.`,
     ``,
     `MARKET: ${market.question}`,
     `CATEGORY: ${market.category ?? "Events"}`,
@@ -368,27 +386,35 @@ function buildPremiumPrompt(
     `LIVE INTELLIGENCE (sourced ${new Date().toISOString()}):`,
     newsSection,
     taSection,
+    verdictBlock,
     taInstructions,
     ``,
     `REQUIRED OUTPUT:`,
-    `1. VERDICT: You MUST choose YES or NO. Include confidence 0-100 and a 2-3 sentence rationale explaining your directional call. Be decisive.`,
+    `1. VERDICT: ${ta?.verdict ? `You MUST output "${ta.verdict.direction}" as direction. Confidence within ±10 of ${ta.verdict.confidence}%. Write a 2-3 sentence rationale explaining the technical AND fundamental basis.` : `You MUST choose YES or NO. Include confidence 0-100 and a 2-3 sentence rationale.`}`,
     `2. EVENT BRIEF: Why this event matters and what broader system it belongs to (3-4 sentences).`,
     `3. GLOBAL CONTEXT: Macro trends, geopolitical forces, and structural factors at play.`,
-    `4. STRUCTURAL DRIVERS: 3-5 named forces driving the outcome. Each must be concrete and specific.`,
-    `5. MARKET SIGNAL INTERPRETATION: What current pricing and volume reveal about conviction and positioning.`,
-    `6. INFORMATION ASYMMETRY: What the public narrative misses. Where hidden or opaque factors exist.`,
-    `7. RISK LANDSCAPE: 3-4 specific risks framed as uncertainties. Not generic.`,
-    `8. STRATEGIC INSIGHT: How to think about this situation. What signals matter most going forward.`,
-    `9. TERMINAL NOTE: Closing note reinforcing the analytical framework used.`,
+    `4. STRUCTURAL DRIVERS: 3-5 named forces driving the outcome. Each must be concrete and specific.${ta ? " Include at least 2 technical drivers with exact price levels." : ""}`,
+    `5. MARKET SIGNAL INTERPRETATION: ${ta ? "Interpret the EMA ribbon, MACD histogram, Bollinger position, RSI readings, and volume flow. Use specific numbers." : "What current pricing and volume reveal about conviction and positioning."}`,
+    `6. INFORMATION ASYMMETRY: What the public narrative misses. ${ta ? "Include what the quant engine detects that retail traders cannot see (divergences, smart money flow, crowded positioning)." : "Where hidden or opaque factors exist."}`,
+    `7. RISK LANDSCAPE: 3-4 specific risks framed as uncertainties. Not generic.${ta ? " Include at least 1 technical risk with a specific price level that would invalidate the thesis." : ""}`,
+    `8. STRATEGIC INSIGHT: ${ta ? "Provide specific entry zones, stop levels, and targets from the technical data. Tell the user exactly what to watch." : "How to think about this situation. What signals matter most going forward."}`,
+    `9. TERMINAL NOTE: Closing note. ${ta ? "Reference the quant engine's signal agreement and confluence score." : "Reinforce the analytical framework."}`,
     ``,
     `VERDICT RULES:`,
-    `- Confidence 70-100: Strong directional evidence from news + structural factors`,
-    `- Confidence 40-69: Leaning direction but significant uncertainty remains`,
-    `- Confidence 0-39: Near coin-flip, verdict is marginal`,
-    `- Base your verdict on the live news, market data, and structural analysis`,
+    ...(ta?.verdict
+      ? [
+          `- Your direction MUST be ${ta.verdict.direction} (from the quant engine)`,
+          `- Your confidence MUST be between ${Math.max(10, ta.verdict.confidence - 10)} and ${Math.min(95, ta.verdict.confidence + 10)}`,
+          `- ${ta.verdict.signalAgreement >= 70 ? "High signal agreement — express conviction clearly" : "Lower signal agreement — acknowledge the contrarian signals but maintain direction"}`,
+        ]
+      : [
+          `- Confidence 70-100: Strong directional evidence from news + structural factors`,
+          `- Confidence 40-69: Leaning direction but significant uncertainty remains`,
+          `- Confidence 0-39: Near coin-flip, verdict is marginal`,
+        ]),
     `- Be opinionated. The user paid for a clear signal, not hedging.`,
     ``,
-    `STYLE: No fluff. No generic phrases. Every sentence must carry insight. Use precise, confident language.`
+    `STYLE: No fluff. No generic phrases. Every sentence must carry insight. Use precise, confident language.${ta ? " Include specific dollar amounts and percentages throughout." : ""}`
   ].join("\n");
 }
 
