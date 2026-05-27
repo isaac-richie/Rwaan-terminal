@@ -391,7 +391,7 @@ export default function MarketDetailPage() {
   const [orderType, setOrderType] = useState<"market" | "limit" | "gtd">("market");
   const [limitPrice, setLimitPrice] = useState("");
   const [gtdExpiry, setGtdExpiry] = useState(""); // ISO date string
-  const [orderAmount, setOrderAmount] = useState("3");
+  const [orderAmount, setOrderAmount] = useState("");
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
   const [fundingOpen, setFundingOpen] = useState(false);
   const [fundingInitialTab, setFundingInitialTab] = useState<"deposit" | "withdraw">("deposit");
@@ -647,8 +647,6 @@ export default function MarketDetailPage() {
       ? positionShares
       : Number.isFinite(linkedSellShares) && linkedSellShares > 0
       ? linkedSellShares
-      : amountNumber > 0
-      ? amountNumber
       : 0;
   const hasSellReferenceShares = sellReferenceShares > 0;
   const requiresCollateral = tradeSide === "buy";
