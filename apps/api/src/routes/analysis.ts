@@ -134,6 +134,9 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
             regime: taResult.regime,
             funding: taResult.funding,
             fearGreed: taResult.fearGreed,
+            openInterest: taResult.openInterest,
+            longShort: taResult.longShort,
+            takerRatio: taResult.takerRatio,
             // Conviction
             confluenceScore: taResult.confluenceScore,
             confluenceFactors: taResult.confluenceFactors,

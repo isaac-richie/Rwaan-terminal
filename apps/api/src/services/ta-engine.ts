@@ -95,6 +95,33 @@ type FearGreedData = {
   classification: string;
 };
 
+export type OpenInterestData = {
+  current: number;           // current OI in USD
+  change24h: number;         // % change over 24h
+  trend: "rising" | "falling" | "flat";
+  signal: "bullish" | "bearish" | "neutral"; // OI + price direction combo
+  interpretation: string;
+};
+
+export type LongShortData = {
+  globalLongPct: number;     // % of accounts long (0-100)
+  globalShortPct: number;
+  topTraderLongPct: number;  // top traders (smart money) long %
+  topTraderShortPct: number;
+  retailBias: "long_heavy" | "short_heavy" | "balanced";
+  smartMoneyBias: "long_heavy" | "short_heavy" | "balanced";
+  contrarian: "bullish" | "bearish" | "neutral"; // when retail is crowded = fade them
+  interpretation: string;
+};
+
+export type TakerRatioData = {
+  buyRatio: number;          // taker buy volume / total volume (0-1)
+  sellRatio: number;
+  trend: "buyers_dominant" | "sellers_dominant" | "balanced";
+  strength: "strong" | "moderate" | "weak";
+  interpretation: string;
+};
+
 export type SignalVote = {
   name: string;
   direction: "bullish" | "bearish" | "neutral";
@@ -153,6 +180,9 @@ export type TechnicalAnalysis = {
   // External data
   funding: FundingData | null;
   fearGreed: FearGreedData | null;
+  openInterest: OpenInterestData | null;
+  longShort: LongShortData | null;
+  takerRatio: TakerRatioData | null;
   // Regime
   regime: Regime;
   // Conviction
@@ -306,6 +336,191 @@ async function fetchFearGreed(): Promise<FearGreedData | null> {
     return {
       value: Number(data.data[0].value),
       classification: data.data[0].value_classification,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Open Interest from Binance Futures ──────────────────────────────────────
+
+async function fetchOpenInterest(symbol: string, currentPrice: number): Promise<OpenInterestData | null> {
+  try {
+    // Current OI
+    const [curRes, histRes] = await Promise.all([
+      fetch(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${symbol}`, {
+        signal: AbortSignal.timeout(5000),
+      }),
+      // 24h OI history at 1h intervals — last 25 candles gives us 24h change
+      fetch(`https://fapi.binance.com/futures/data/openInterestHist?symbol=${symbol}&period=1h&limit=25`, {
+        signal: AbortSignal.timeout(5000),
+      }),
+    ]);
+
+    if (!curRes.ok) return null;
+    const curData = await curRes.json() as { openInterest: string };
+    const currentOI = Number(curData.openInterest) * currentPrice; // convert to USD
+
+    let change24h = 0;
+    if (histRes.ok) {
+      const histData = await histRes.json() as Array<{ sumOpenInterest: string }>;
+      if (histData.length >= 2) {
+        const oldest = Number(histData[0].sumOpenInterest) * currentPrice;
+        const newest = Number(histData[histData.length - 1].sumOpenInterest) * currentPrice;
+        change24h = oldest > 0 ? ((newest - oldest) / oldest) * 100 : 0;
+      }
+    }
+
+    const trend = change24h > 2 ? "rising" as const : change24h < -2 ? "falling" as const : "flat" as const;
+
+    // OI + price direction combo signal
+    // Rising OI + rising price = longs adding = bullish
+    // Rising OI + falling price = shorts adding = bearish
+    // Falling OI = deleveraging (squeeze or capitulation) = neutral/warning
+    let signal: OpenInterestData["signal"];
+    let interpretation: string;
+
+    if (trend === "rising" && change24h > 3) {
+      signal = "bullish"; // assume with price context — will be refined in verdict engine
+      interpretation = `OI up ${change24h.toFixed(1)}% in 24h — new money entering, positioning building`;
+    } else if (trend === "falling" && change24h < -3) {
+      signal = "neutral";
+      interpretation = `OI down ${Math.abs(change24h).toFixed(1)}% in 24h — deleveraging/liquidations, market resetting`;
+    } else {
+      signal = "neutral";
+      interpretation = `OI relatively stable (${change24h > 0 ? "+" : ""}${change24h.toFixed(1)}%) — no significant positioning shift`;
+    }
+
+    return {
+      current: Math.round(currentOI),
+      change24h: Math.round(change24h * 100) / 100,
+      trend,
+      signal,
+      interpretation,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Long/Short Ratio from Binance Futures ────────────────────────────────────
+
+async function fetchLongShortRatio(symbol: string): Promise<LongShortData | null> {
+  try {
+    const [globalRes, topRes] = await Promise.all([
+      fetch(`https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${symbol}&period=1h&limit=1`, {
+        signal: AbortSignal.timeout(5000),
+      }),
+      fetch(`https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=${symbol}&period=1h&limit=1`, {
+        signal: AbortSignal.timeout(5000),
+      }),
+    ]);
+
+    if (!globalRes.ok) return null;
+    const globalData = await globalRes.json() as Array<{ longAccount: string; shortAccount: string }>;
+    if (!globalData.length) return null;
+
+    const globalLongPct = Number(globalData[0].longAccount) * 100;
+    const globalShortPct = Number(globalData[0].shortAccount) * 100;
+
+    let topTraderLongPct = 50;
+    let topTraderShortPct = 50;
+    if (topRes.ok) {
+      const topData = await topRes.json() as Array<{ longAccount: string; shortAccount: string }>;
+      if (topData.length) {
+        topTraderLongPct = Number(topData[0].longAccount) * 100;
+        topTraderShortPct = Number(topData[0].shortAccount) * 100;
+      }
+    }
+
+    const retailBias: LongShortData["retailBias"] =
+      globalLongPct > 60 ? "long_heavy" : globalLongPct < 40 ? "short_heavy" : "balanced";
+    const smartMoneyBias: LongShortData["smartMoneyBias"] =
+      topTraderLongPct > 60 ? "long_heavy" : topTraderLongPct < 40 ? "short_heavy" : "balanced";
+
+    // Contrarian read on retail: when retail crowds one side, fade them
+    // Also factor in smart money: if smart money disagrees with retail = stronger contrarian signal
+    let contrarian: LongShortData["contrarian"];
+    let interpretation: string;
+
+    if (retailBias === "long_heavy" && smartMoneyBias === "short_heavy") {
+      contrarian = "bearish";
+      interpretation = `Retail ${globalLongPct.toFixed(0)}% long, smart money ${topTraderLongPct.toFixed(0)}% long — classic divergence, fade retail longs`;
+    } else if (retailBias === "short_heavy" && smartMoneyBias === "long_heavy") {
+      contrarian = "bullish";
+      interpretation = `Retail ${globalLongPct.toFixed(0)}% long (crowded short), smart money ${topTraderLongPct.toFixed(0)}% long — short squeeze setup`;
+    } else if (retailBias === "long_heavy") {
+      contrarian = "bearish";
+      interpretation = `Retail crowded long (${globalLongPct.toFixed(0)}%) — crowded positioning, pullback risk`;
+    } else if (retailBias === "short_heavy") {
+      contrarian = "bullish";
+      interpretation = `Retail crowded short (${globalShortPct.toFixed(0)}%) — short squeeze potential`;
+    } else {
+      contrarian = "neutral";
+      interpretation = `Balanced positioning — retail ${globalLongPct.toFixed(0)}% long, no extreme crowding`;
+    }
+
+    return {
+      globalLongPct: Math.round(globalLongPct * 10) / 10,
+      globalShortPct: Math.round(globalShortPct * 10) / 10,
+      topTraderLongPct: Math.round(topTraderLongPct * 10) / 10,
+      topTraderShortPct: Math.round(topTraderShortPct * 10) / 10,
+      retailBias,
+      smartMoneyBias,
+      contrarian,
+      interpretation,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Taker Buy/Sell Ratio from Binance Futures ────────────────────────────────
+
+async function fetchTakerRatio(symbol: string): Promise<TakerRatioData | null> {
+  try {
+    // Get last 4 hours of taker ratio data (4 × 1h periods)
+    const res = await fetch(
+      `https://fapi.binance.com/futures/data/takerlongshortRatio?symbol=${symbol}&period=1h&limit=4`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as Array<{ buySellRatio: string; buyVol: string; sellVol: string }>;
+    if (!data.length) return null;
+
+    // Average the buy ratio over last 4 periods for a smoother signal
+    const avgBuyRatio = data.reduce((s, d) => {
+      const buy = Number(d.buyVol);
+      const sell = Number(d.sellVol);
+      return s + (buy / (buy + sell || 1));
+    }, 0) / data.length;
+
+    const sellRatio = 1 - avgBuyRatio;
+
+    let trend: TakerRatioData["trend"];
+    let strength: TakerRatioData["strength"];
+    let interpretation: string;
+
+    if (avgBuyRatio >= 0.58) {
+      trend = "buyers_dominant";
+      strength = avgBuyRatio >= 0.65 ? "strong" : "moderate";
+      interpretation = `Taker buy ratio ${(avgBuyRatio * 100).toFixed(1)}% — aggressive buyers dominating, ${strength} bullish pressure`;
+    } else if (avgBuyRatio <= 0.42) {
+      trend = "sellers_dominant";
+      strength = avgBuyRatio <= 0.35 ? "strong" : "moderate";
+      interpretation = `Taker sell ratio ${(sellRatio * 100).toFixed(1)}% — aggressive sellers dominating, ${strength} bearish pressure`;
+    } else {
+      trend = "balanced";
+      strength = "weak";
+      interpretation = `Taker ratio balanced (buy ${(avgBuyRatio * 100).toFixed(1)}%) — no aggressive directional pressure`;
+    }
+
+    return {
+      buyRatio: Math.round(avgBuyRatio * 1000) / 1000,
+      sellRatio: Math.round(sellRatio * 1000) / 1000,
+      trend,
+      strength,
+      interpretation,
     };
   } catch {
     return null;
@@ -1027,12 +1242,17 @@ function computeVerdict(params: {
   regime: Regime;
   funding: FundingData | null;
   fearGreed: FearGreedData | null;
+  openInterest: OpenInterestData | null;
+  longShort: LongShortData | null;
+  takerRatio: TakerRatioData | null;
+  currentPrice: number;
   riskReward: ReturnType<typeof computeRiskReward>;
 }): ComputedVerdict {
   const {
     htfStructure, trendStrength, ema, macd, bollinger, rsi, rsiDiv,
     multiTfRsiAlignment, obv, volProfile, vwapDist, nearSupport,
-    nearResistance, regime, funding, fearGreed, riskReward,
+    nearResistance, regime, funding, fearGreed, openInterest, longShort,
+    takerRatio, currentPrice: price, riskReward,
   } = params;
 
   const votes: SignalVote[] = [];
@@ -1259,6 +1479,57 @@ function computeVerdict(params: {
     }
   }
 
+  // ── 14. Open Interest (weight: 0.06) ──
+  if (openInterest) {
+    const w = 0.06;
+    // OI rising + price above VWAP = longs piling in = bullish
+    // OI rising + price below VWAP = shorts piling in = bearish
+    // OI falling = deleveraging = reduce confidence (neutral)
+    if (openInterest.trend === "rising" && openInterest.change24h > 3) {
+      const dir = vwapDist >= 0 ? "bullish" as const : "bearish" as const;
+      const reason = dir === "bullish"
+        ? `OI up ${openInterest.change24h.toFixed(1)}% + price above VWAP — longs building`
+        : `OI up ${openInterest.change24h.toFixed(1)}% + price below VWAP — shorts building`;
+      votes.push({ name: "Open Interest", direction: dir, weight: w, conviction: 0.7, reason });
+    } else if (openInterest.trend === "falling" && openInterest.change24h < -3) {
+      votes.push({ name: "Open Interest", direction: "neutral", weight: w, conviction: 0.3,
+        reason: `OI down ${Math.abs(openInterest.change24h).toFixed(1)}% — deleveraging, market resetting` });
+    } else {
+      votes.push({ name: "Open Interest", direction: "neutral", weight: w, conviction: 0.2,
+        reason: `OI stable (${openInterest.change24h > 0 ? "+" : ""}${openInterest.change24h.toFixed(1)}%)` });
+    }
+  }
+
+  // ── 15. Long/Short Ratio (weight: 0.06 — contrarian) ──
+  if (longShort) {
+    const w = 0.06;
+    if (longShort.contrarian === "bullish") {
+      // Retail crowded short / smart money long = squeeze fuel
+      const c = longShort.smartMoneyBias === "long_heavy" ? 0.8 : 0.65;
+      votes.push({ name: "L/S Ratio", direction: "bullish", weight: w, conviction: c, reason: longShort.interpretation });
+    } else if (longShort.contrarian === "bearish") {
+      // Retail crowded long / smart money short = dump fuel
+      const c = longShort.smartMoneyBias === "short_heavy" ? 0.8 : 0.65;
+      votes.push({ name: "L/S Ratio", direction: "bearish", weight: w, conviction: c, reason: longShort.interpretation });
+    } else {
+      votes.push({ name: "L/S Ratio", direction: "neutral", weight: w, conviction: 0.2, reason: longShort.interpretation });
+    }
+  }
+
+  // ── 16. Taker Buy/Sell Ratio (weight: 0.07 — highest real-time signal) ──
+  if (takerRatio) {
+    const w = 0.07;
+    const convMap = { strong: 0.85, moderate: 0.65, weak: 0.35 };
+    const c = convMap[takerRatio.strength];
+    if (takerRatio.trend === "buyers_dominant") {
+      votes.push({ name: "Taker Ratio", direction: "bullish", weight: w, conviction: c, reason: takerRatio.interpretation });
+    } else if (takerRatio.trend === "sellers_dominant") {
+      votes.push({ name: "Taker Ratio", direction: "bearish", weight: w, conviction: c, reason: takerRatio.interpretation });
+    } else {
+      votes.push({ name: "Taker Ratio", direction: "neutral", weight: w, conviction: 0.2, reason: takerRatio.interpretation });
+    }
+  }
+
   // ─── Tally weighted scores ───
   let bullishScore = 0;
   let bearishScore = 0;
@@ -1419,12 +1690,24 @@ function buildSummary(ta: Omit<TechnicalAnalysis, "summary">): string {
     `  Volatility (ATR%): ${volatilityPct.toFixed(2)}%`,
   ];
 
-  // Funding & sentiment
+  // Funding, sentiment & market microstructure
   if (funding) {
     lines.push(`  Funding rate: ${(funding.rate * 100).toFixed(4)}% (${funding.annualized.toFixed(0)}% ann.) — ${funding.sentiment.replace("_", " ")}`);
   }
   if (fearGreed) {
     lines.push(`  Fear & Greed: ${fearGreed.value}/100 (${fearGreed.classification})`);
+  }
+  if (ta.openInterest) {
+    const oi = ta.openInterest;
+    lines.push(`  Open Interest: $${(oi.current / 1e9).toFixed(2)}B (${oi.change24h > 0 ? "+" : ""}${oi.change24h.toFixed(1)}% 24h) — ${oi.interpretation}`);
+  }
+  if (ta.longShort) {
+    const ls = ta.longShort;
+    lines.push(`  Long/Short: retail ${ls.globalLongPct.toFixed(0)}%L/${ls.globalShortPct.toFixed(0)}%S | smart money ${ls.topTraderLongPct.toFixed(0)}%L — ${ls.interpretation}`);
+  }
+  if (ta.takerRatio) {
+    const tr = ta.takerRatio;
+    lines.push(`  Taker Ratio: ${(tr.buyRatio * 100).toFixed(1)}% buy / ${(tr.sellRatio * 100).toFixed(1)}% sell — ${tr.interpretation}`);
   }
 
   // Key levels
@@ -1571,7 +1854,7 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
   if (cached) return cached as TechnicalAnalysis;
 
   try {
-    // Fetch multi-timeframe candles + external data in parallel
+    // Fetch multi-timeframe candles + all external data in parallel
     const [candles4h, candles1h, candles15m, fundingData, fearGreedData] = await Promise.all([
       fetchCandles(binanceSymbol, "4h", 200),   // ~33 days (need 200 for EMA200)
       fetchCandles(binanceSymbol, "1h", 250),   // ~10 days
@@ -1583,6 +1866,13 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
     if (!candles4h.length || !candles1h.length) return null;
 
     const price = (candles15m.length ? candles15m[candles15m.length - 1] : candles1h[candles1h.length - 1]).close;
+
+    // Fetch market microstructure data now that we have price (OI needs price for USD conversion)
+    const [oiData, lsData, takerData] = await Promise.all([
+      fetchOpenInterest(binanceSymbol, price).catch(() => null),
+      fetchLongShortRatio(binanceSymbol).catch(() => null),
+      fetchTakerRatio(binanceSymbol).catch(() => null),
+    ]);
 
     // ─── HTF structure from 4H ───
     const htfSwings = findSwingPoints(candles4h, 3);
@@ -1694,6 +1984,10 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
       regime,
       funding: fundingData,
       fearGreed: fearGreedData,
+      openInterest: oiData,
+      longShort: lsData,
+      takerRatio: takerData,
+      currentPrice: price,
       riskReward,
     });
 
@@ -1717,6 +2011,9 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
       volatilityPct: Math.round(volatilityPct * 100) / 100,
       funding: fundingData,
       fearGreed: fearGreedData,
+      openInterest: oiData,
+      longShort: lsData,
+      takerRatio: takerData,
       regime,
       confluenceScore: Math.round(score),
       confluenceFactors: factors,
