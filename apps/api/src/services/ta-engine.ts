@@ -175,18 +175,82 @@ export type TechnicalAnalysis = {
   summary: string;
 };
 
-// ─── Supported assets ────────────────────────────────────────────────────────
+// ─── Supported assets (top 100 by Binance liquidity) ─────────────────────────
+// Every asset here has a USDT spot pair + Binance Futures perpetual contract.
+// detectCryptoSymbol also has a dynamic fallback that validates any uppercase
+// ticker directly against Binance, so unlisted assets auto-resolve too.
 
 const BINANCE_SYMBOLS: Record<string, string> = {
-  BTC: "BTCUSDT", ETH: "ETHUSDT", BNB: "BNBUSDT",
-  SOL: "SOLUSDT", XRP: "XRPUSDT", DOGE: "DOGEUSDT",
-  ADA: "ADAUSDT", AVAX: "AVAXUSDT", DOT: "DOTUSDT",
-  MATIC: "MATICUSDT", LINK: "LINKUSDT", UNI: "UNIUSDT",
-  NEAR: "NEARUSDT", ARB: "ARBUSDT", OP: "OPUSDT",
-  SUI: "SUIUSDT", APT: "APTUSDT", SEI: "SEIUSDT",
-  PEPE: "PEPEUSDT", WIF: "WIFUSDT", TIA: "TIAUSDT",
-  INJ: "INJUSDT", FET: "FETUSDT", RENDER: "RENDERUSDT",
+  // Tier 1 — mega cap
+  BTC: "BTCUSDT", ETH: "ETHUSDT", BNB: "BNBUSDT", SOL: "SOLUSDT",
+  XRP: "XRPUSDT", DOGE: "DOGEUSDT", ADA: "ADAUSDT", TRX: "TRXUSDT",
+  TON: "TONUSDT", AVAX: "AVAXUSDT",
+
+  // Tier 2 — large cap
+  LINK: "LINKUSDT", DOT: "DOTUSDT", MATIC: "MATICUSDT", SHIB: "SHIBUSDT",
+  LTC: "LTCUSDT", BCH: "BCHUSDT", UNI: "UNIUSDT", NEAR: "NEARUSDT",
+  ICP: "ICPUSDT", APT: "APTUSDT", SUI: "SUIUSDT", ATOM: "ATOMUSDT",
+  XLM: "XLMUSDT", HBAR: "HBARUSDT", ARB: "ARBUSDT", OP: "OPUSDT",
+  VET: "VETUSDT", FIL: "FILUSDT", ALGO: "ALGOUSDT", AAVE: "AAVEUSDT",
+
+  // Tier 3 — mid cap
+  INJ: "INJUSDT", TIA: "TIAUSDT", SEI: "SEIUSDT", FET: "FETUSDT",
+  RENDER: "RENDERUSDT", PEPE: "PEPEUSDT", WIF: "WIFUSDT", BONK: "BONKUSDT",
+  JUP: "JUPUSDT", W: "WUSDT", PYTH: "PYTHUSDT", JTO: "JTOUSDT",
+  BLUR: "BLURUSDT", IMX: "IMXUSDT", SAND: "SANDUSDT", MANA: "MANAUSDT",
+  AXS: "AXSUSDT", GALA: "GALAUSDT", ENS: "ENSUSDT", LDO: "LDOUSDT",
+  RUNE: "RUNEUSDT", THETA: "THETAUSDT", EGLD: "EGLDUSDT", FTM: "FTMUSDT",
+  CAKE: "CAKEUSDT", GMT: "GMTUSDT", GRT: "GRTUSDT", STX: "STXUSDT",
+  FLOW: "FLOWUSDT", ROSE: "ROSEUSDT", ZIL: "ZILUSDT", CHZ: "CHZUSDT",
+
+  // Tier 4 — trending / Polymarket-relevant
+  NOT: "NOTUSDT", EIGEN: "EIGENUSDT", STRK: "STRKUSDT", MANTA: "MANTAUSDT",
+  ALT: "ALTUSDT", PIXEL: "PIXELUSDT", PORTAL: "PORTALUSDT", DYM: "DYMUSDT",
+  ZETA: "ZETAUSDT", ETHFI: "ETHFIUSDT", REZ: "REZUSDT", BB: "BBUSDT",
+  IO: "IOUSDT", ZK: "ZKUSDT", LISTA: "LISTAUSDT", ZRO: "ZROUSDT",
+  DOGS: "DOGSUSDT", CATI: "CATIUSDT", HMSTR: "HMSTRUSDT", MAJOR: "MAJORUSDT",
+  TAO: "TAOUSDT", WLD: "WLDUSDT", PNUT: "PNUTUSDT", ACT: "ACTUSDT",
+  TURBO: "TURBOUSDT", MOODENG: "MOODENGUSDT", NEIRO: "NEIROUSDT",
+  PENGU: "PENGUUSDT", TRUMP: "TRUMPUSDT", MELANIA: "MELANIAUSDT",
+  KAITO: "KAITOUSDT", IP: "IPUSDT", VINE: "VINEUSDT", TST: "TSTUSDT",
+
+  // Alt tickers / legacy names
+  POL: "POLUSDT",   // Polygon's rebranded ticker
+  RNDR: "RENDERUSDT",
 };
+
+// ─── Dynamic Binance symbol validator ────────────────────────────────────────
+// Caches the full list of valid Binance USDT spot symbols so we can validate
+// any ticker without a hardcoded map entry.
+
+let binanceSymbolCache: Set<string> | null = null;
+let binanceSymbolCacheTime = 0;
+const BINANCE_SYMBOL_CACHE_TTL = 3_600_000; // 1 hour
+
+async function getBinanceSymbols(): Promise<Set<string>> {
+  const now = Date.now();
+  if (binanceSymbolCache && now - binanceSymbolCacheTime < BINANCE_SYMBOL_CACHE_TTL) {
+    return binanceSymbolCache;
+  }
+  try {
+    const res = await fetch(
+      "https://api.binance.com/api/v3/exchangeInfo?permissions=SPOT",
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!res.ok) return binanceSymbolCache ?? new Set();
+    const data = await res.json() as { symbols: Array<{ symbol: string; status: string }> };
+    const symbols = new Set(
+      data.symbols
+        .filter((s) => s.status === "TRADING" && s.symbol.endsWith("USDT"))
+        .map((s) => s.symbol)
+    );
+    binanceSymbolCache = symbols;
+    binanceSymbolCacheTime = now;
+    return symbols;
+  } catch {
+    return binanceSymbolCache ?? new Set();
+  }
+}
 
 // ─── Binance kline fetcher ───────────────────────────────────────────────────
 
@@ -1412,66 +1476,97 @@ function buildSummary(ta: Omit<TechnicalAnalysis, "summary">): string {
 
 // ─── Main entry point ───────────────────────────────────────────────────────
 
+// Full name → ticker mappings for common project names not obvious from ticker
+const NAME_TO_SYMBOL: Record<string, string> = {
+  bitcoin: "BTC", ethereum: "ETH", ether: "ETH", solana: "SOL",
+  ripple: "XRP", dogecoin: "DOGE", cardano: "ADA", avalanche: "AVAX",
+  polkadot: "DOT", polygon: "MATIC", pol: "POL", chainlink: "LINK",
+  uniswap: "UNI", arbitrum: "ARB", optimism: "OP", aptos: "APT",
+  celestia: "TIA", injective: "INJ", dogwifhat: "WIF", "fetch.ai": "FET",
+  render: "RENDER", tron: "TRX", toncoin: "TON", shiba: "SHIB",
+  litecoin: "LTC", "bitcoin cash": "BCH", cosmos: "ATOM", hedera: "HBAR",
+  stellar: "XLM", "internet computer": "ICP", vechain: "VET", filecoin: "FIL",
+  algorand: "ALGO", aave: "AAVE", "near protocol": "NEAR",
+  immutable: "IMX", "the sandbox": "SAND", decentraland: "MANA",
+  "axie infinity": "AXS", "the graph": "GRT", lido: "LDO", thorchain: "RUNE",
+  theta: "THETA", "elrond": "EGLD", multiversx: "EGLD", fantom: "FTM",
+  pancakeswap: "CAKE", stepn: "GMT", blur: "BLUR", stacks: "STX",
+  flow: "FLOW", chiliz: "CHZ", zilliqa: "ZIL", "world coin": "WLD",
+  worldcoin: "WLD", "bittensor": "TAO", pendle: "PENDLE",
+  "notcoin": "NOT", eigenlayer: "EIGEN", starknet: "STRK",
+};
+
 export function detectCryptoSymbol(text: string): string | null {
   const haystack = text.toLowerCase();
-  const patterns: Array<[string, (string | RegExp)[]]> = [
-    ["BTC", ["bitcoin", /\bbtc\b/]],
-    ["ETH", ["ethereum", "ether", /\beth\b/]],
-    ["BNB", [/\bbnb\b/, "binance coin"]],
-    ["SOL", ["solana", /\bsol\b/]],
-    ["XRP", [/\bxrp\b/, "ripple"]],
-    ["DOGE", ["dogecoin", /\bdoge\b/]],
-    ["ADA", ["cardano", /\bada\b/]],
-    ["AVAX", ["avalanche", /\bavax\b/]],
-    ["DOT", ["polkadot", /\bdot\b/]],
-    ["MATIC", ["polygon", /\bmatic\b/]],
-    ["LINK", ["chainlink", /\blink\b/]],
-    ["UNI", ["uniswap", /\buni\b/]],
-    ["NEAR", [/\bnear protocol\b/, /\bnear\b/]],
-    ["ARB", ["arbitrum", /\barb\b/]],
-    ["OP", ["optimism"]],
-    ["SUI", [/\bsui\b/]],
-    ["APT", ["aptos", /\bapt\b/]],
-    ["SEI", [/\bsei\b/]],
-    ["PEPE", [/\bpepe\b/]],
-    ["WIF", [/\bwif\b/, "dogwifhat"]],
-    ["TIA", ["celestia", /\btia\b/]],
-    ["INJ", ["injective", /\binj\b/]],
-    ["FET", ["fetch.ai", /\bfet\b/]],
-    ["RENDER", ["render", /\brndr\b/]],
-  ];
-
-  // Find ALL matches with their earliest position in the text
   const matches: Array<{ sym: string; pos: number }> = [];
-  for (const [sym, needles] of patterns) {
-    let earliest = Infinity;
-    for (const n of needles) {
-      if (typeof n === "string") {
-        const idx = haystack.indexOf(n);
-        if (idx !== -1 && idx < earliest) earliest = idx;
-      } else {
-        const m = n.exec(haystack);
-        if (m && m.index < earliest) earliest = m.index;
-      }
+
+  // 1. Full name lookup (longest match first to avoid partial hits)
+  const sortedNames = Object.keys(NAME_TO_SYMBOL).sort((a, b) => b.length - a.length);
+  for (const name of sortedNames) {
+    const idx = haystack.indexOf(name);
+    if (idx !== -1) {
+      matches.push({ sym: NAME_TO_SYMBOL[name], pos: idx });
     }
-    if (earliest < Infinity) {
-      matches.push({ sym, pos: earliest });
+  }
+
+  // 2. Ticker scan — look for ALL-CAPS 2-10 char tokens that match our symbol map
+  // e.g. "Will HBAR hit $1?" — extracts HBAR
+  const tickerRe = /\b([A-Z]{2,10})\b/g;
+  let m: RegExpExecArray | null;
+  while ((m = tickerRe.exec(text)) !== null) {
+    const ticker = m[1];
+    if (BINANCE_SYMBOLS[ticker]) {
+      matches.push({ sym: ticker, pos: m.index });
     }
+  }
+
+  // 3. Some common tickers that are ambiguous as words — explicit patterns
+  const explicit: Array<[string, RegExp]> = [
+    ["BTC", /\bbtc\b/i], ["ETH", /\beth\b/i], ["BNB", /\bbnb\b/i],
+    ["SOL", /\bsol\b/i], ["XRP", /\bxrp\b/i], ["ADA", /\bada\b/i],
+    ["DOT", /\bdot\b/i], ["UNI", /\buni\b/i], ["SEI", /\bsei\b/i],
+    ["SUI", /\bsui\b/i], ["OP", /\bop\b/i], ["INJ", /\binj\b/i],
+    ["ARB", /\barb\b/i], ["FET", /\bfet\b/i], ["TIA", /\btia\b/i],
+    ["WIF", /\bwif\b/i], ["NOT", /\bnot\b/i], ["TAO", /\btao\b/i],
+    ["WLD", /\bwld\b/i], ["STX", /\bstx\b/i], ["GRT", /\bgrt\b/i],
+    ["LDO", /\bldo\b/i], ["IMX", /\bimx\b/i], ["FTM", /\bftm\b/i],
+    ["RNDR", /\brndr\b/i],
+  ];
+  for (const [sym, re] of explicit) {
+    const ex = re.exec(haystack);
+    if (ex) matches.push({ sym: sym === "RNDR" ? "RENDER" : sym, pos: ex.index });
   }
 
   if (!matches.length) return null;
 
-  // Return the FIRST mentioned crypto — it's most likely the subject
+  // Return FIRST mentioned crypto — it's the subject of the question
   matches.sort((a, b) => a.pos - b.pos);
   return matches[0].sym;
 }
 
 export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnalysis | null> {
-  const binanceSymbol = BINANCE_SYMBOLS[asset.toUpperCase()];
+  const upperAsset = asset.toUpperCase();
+
+  // Resolve binance symbol — first check static map, then dynamic Binance validation
+  let binanceSymbol = BINANCE_SYMBOLS[upperAsset];
+
+  if (!binanceSymbol) {
+    // Try XXXUSDT directly against Binance exchange info
+    const candidate = `${upperAsset}USDT`;
+    try {
+      const validSymbols = await getBinanceSymbols();
+      if (validSymbols.has(candidate)) {
+        binanceSymbol = candidate;
+      }
+    } catch {
+      // ignore, will fall through to null
+    }
+  }
+
   if (!binanceSymbol) return null;
 
-  // Check cache (5 minute TTL)
-  const cacheKey = buildCacheKey("ta:analysis:v2", { asset: asset.toUpperCase() });
+  // Check cache (5 minute TTL) — key on binanceSymbol so dynamic lookups share cache
+  const cacheKey = buildCacheKey("ta:analysis:v2", { asset: binanceSymbol });
   const cached = await getJsonCache(cacheKey);
   if (cached) return cached as TechnicalAnalysis;
 
@@ -1603,7 +1698,7 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
     });
 
     const ta: Omit<TechnicalAnalysis, "summary"> = {
-      symbol: `${asset.toUpperCase()}USDT`,
+      symbol: binanceSymbol,
       currentPrice: price,
       htf: { structure, trendStrength: Math.round(trendStrength), bias, swingHigh, swingLow },
       levels,
