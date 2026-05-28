@@ -346,8 +346,12 @@ function qualityBadges(input: {
   endDate?: string
 }) {
   const badges: string[] = []
-  if (isQuickSettle(input.endDate, input.now)) badges.push("Closes today")
-  if (isCryptoMarket(input.text)) badges.push("Crypto")
+  const quick = isQuickSettle(input.endDate, input.now)
+  const crypto = isCryptoMarket(input.text)
+  // Highest-priority combo badge
+  if (quick && crypto) badges.push("24h Crypto")
+  else if (quick) badges.push("Closes today")
+  else if (crypto) badges.push("Crypto")
   if (input.liquidity >= 10_000) badges.push("Deep liquidity")
   else if (input.liquidity >= NICE_MARKET_MIN_LIQUIDITY) badges.push("Tradable")
   if (input.volume >= 5_000) badges.push("Hot volume")
@@ -380,11 +384,15 @@ function smartMarketScore(input: {
       ? 0.25
       : 0
 
+  // 24h crypto combo is the highest-value content on the feed
+  const cryptoQuickBoost = quick && crypto ? 30 : 0
+
   return (
     logScore(input.liquidity) * 32 +
     logScore(input.volume) * 24 +
-    (quick ? 24 : urgency * 12) +
-    (crypto ? (input.normalizedCategory === "crypto" ? 28 : 18) : 0) +
+    (quick ? 22 : urgency * 12) +
+    (crypto ? (input.normalizedCategory === "crypto" ? 26 : 16) : 0) +
+    cryptoQuickBoost +
     priceOpportunityScore(input.market) * 10 +
     (hasTokens ? 8 : 0) +
     (hasVisual ? 5 : 0) +
@@ -411,19 +419,29 @@ function blendSmartMarkets(markets: FeedGammaMarket[], limit: number, now: numbe
   }
 
   const sorted = [...markets].sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0))
-  const quickCount = Math.max(2, Math.round(limit * 0.35))
-  const cryptoCount = Math.max(3, Math.round(limit * 0.35))
+
+  // Priority 1: crypto markets closing within 24h (most valuable slot)
+  const cryptoQuickCount = Math.max(3, Math.round(limit * 0.30))
+  // Priority 2: non-crypto quick-settle markets
+  const quickCount = Math.max(1, Math.round(limit * 0.15))
+  // Priority 3: crypto markets not closing today
+  const cryptoCount = Math.max(2, Math.round(limit * 0.25))
+
+  const cryptoQuick = pick(
+    sorted.filter((m) => m.feedBadges?.includes("24h Crypto")),
+    cryptoQuickCount
+  )
   const quick = pick(
-    sorted.filter((market) => isQuickSettle(market.endDate ?? market.end_date_iso, now)),
+    sorted.filter((m) => isQuickSettle(m.endDate ?? m.end_date_iso, now) && !m.feedBadges?.includes("24h Crypto")),
     quickCount
   )
   const crypto = pick(
-    sorted.filter((market) => market.feedBadges?.includes("Crypto")),
+    sorted.filter((m) => m.feedBadges?.includes("Crypto") && !m.feedBadges?.includes("24h Crypto")),
     cryptoCount
   )
-  const rest = pick(sorted, limit - quick.length - crypto.length)
+  const rest = pick(sorted, limit - cryptoQuick.length - quick.length - crypto.length)
 
-  return [...quick, ...crypto, ...rest]
+  return [...cryptoQuick, ...quick, ...crypto, ...rest]
     .sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0))
     .slice(0, limit)
 }
@@ -517,9 +535,9 @@ function fetchGammaEventsDeduped(url: string): Promise<GammaEventRaw[]> {
   return promise
 }
 
-// For "all" + trending/volume, use only the 4 highest-traffic tags instead of 14.
-// Covers crypto, news, entertainment, sports — the scoring system fills in the rest.
-const FAST_ALL_TAG_IDS = ["21", "2", "596", "1"] // crypto, news, entertainment, sports
+// For "all" + trending/volume, use the highest-traffic tags.
+// All 4 crypto tag IDs included so 24h crypto markets are never missed.
+const FAST_ALL_TAG_IDS = ["21", "235", "101611", "1312", "2", "596", "1"] // all crypto + news + entertainment + sports
 
 export async function fetchPolymarketMarkets(
   category?: string,
@@ -622,7 +640,10 @@ export async function fetchPolymarketMarkets(
         const volume = numberValue(candidate.volume24hr ?? candidate.volume_24hr ?? candidate.volume ?? event.volume24hr ?? event.volume_24hr ?? event.volume)
         const opportunity = priceOpportunityScore(candidate)
         if (sortBy === "daily" && liquidity < DAILY_MARKET_MIN_LIQUIDITY) continue
-        if (sortBy === "trending" && liquidity < NICE_MARKET_MIN_LIQUIDITY && volume < NICE_MARKET_MIN_VOLUME) continue
+        // Crypto markets get a lower liquidity floor — they're always active and valuable even at lower depth
+        const cryptoMarket = isCryptoMarket(haystack)
+        const liquidityFloor = cryptoMarket ? 50 : NICE_MARKET_MIN_LIQUIDITY
+        if (sortBy === "trending" && liquidity < liquidityFloor && volume < NICE_MARKET_MIN_VOLUME) continue
         if ((sortBy === "trending" || sortBy === "daily") && opportunity < 0.04) continue
 
         const key = marketKey(candidate, event)

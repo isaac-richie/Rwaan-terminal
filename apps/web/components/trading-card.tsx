@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Clock, Droplets, TrendingUp, Zap } from "lucide-react"
+import { Clock, Coins, Droplets, Flame, TrendingUp, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { PolymarketMarket } from "@/lib/polymarket"
 
@@ -59,6 +59,31 @@ function MiniSparkline({ points, positive }: { points: number[]; positive: boole
   )
 }
 
+// ─── Feed badge chip ─────────────────────────────────────────────────────────
+const BADGE_STYLES: Record<string, { border: string; bg: string; text: string; icon: React.ElementType }> = {
+  "24h Crypto":     { border: "oklch(0.78 0.16 82 / 0.4)",  bg: "oklch(0.78 0.16 82 / 0.12)",  text: "oklch(0.90 0.18 82)",   icon: Coins },
+  "Crypto":         { border: "oklch(0.62 0.18 230 / 0.35)", bg: "oklch(0.62 0.18 230 / 0.10)", text: "oklch(0.76 0.16 230)",  icon: Coins },
+  "Closes today":   { border: "oklch(0.60 0.18 45 / 0.35)",  bg: "oklch(0.60 0.18 45 / 0.10)",  text: "oklch(0.75 0.18 45)",   icon: Clock },
+  "Deep liquidity": { border: "oklch(0.60 0.18 155 / 0.35)", bg: "oklch(0.60 0.18 155 / 0.10)", text: "oklch(0.74 0.18 155)",  icon: Droplets },
+  "Hot volume":     { border: "oklch(0.70 0.18 25 / 0.35)",  bg: "oklch(0.70 0.18 25 / 0.10)",  text: "oklch(0.80 0.18 25)",   icon: Flame },
+  "Tradable":       { border: "oklch(0.45 0.01 260 / 0.35)", bg: "oklch(0.45 0.01 260 / 0.08)", text: "oklch(0.62 0.01 260)",  icon: TrendingUp },
+}
+
+function FeedBadge({ label }: { label: string }) {
+  const style = BADGE_STYLES[label]
+  if (!style) return null
+  const Icon = style.icon
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide border shrink-0"
+      style={{ borderColor: style.border, background: style.bg, color: style.text }}
+    >
+      <Icon className="h-2.5 w-2.5 shrink-0" />
+      {label}
+    </span>
+  )
+}
+
 interface TradingCardProps {
   market: PolymarketMarket
   index: number
@@ -108,7 +133,7 @@ export function TradingCard({ market, index }: TradingCardProps) {
 
           {/* Category + question */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
                 {market.category ?? "Market"}
               </span>
@@ -117,6 +142,8 @@ export function TradingCard({ market, index }: TradingCardProps) {
                   <Zap className="h-2.5 w-2.5" />Hot
                 </span>
               )}
+              {/* Top feed badge (mobile — show only 1) */}
+              {market.feedBadges?.[0] && <FeedBadge label={market.feedBadges[0]} />}
             </div>
             <h3 className="text-[14px] font-semibold text-foreground leading-snug line-clamp-3">
               {market.question}
@@ -215,6 +242,11 @@ export function TradingCard({ market, index }: TradingCardProps) {
                   <Clock className="h-2.5 w-2.5" /> {endLabel}
                 </span>
               )}
+              {/* Feed quality badges — show up to 2, skip "Closes today" if already shown above */}
+              {market.feedBadges
+                ?.filter((b) => !(closingSoon && b === "Closes today"))
+                .slice(0, closingSoon ? 1 : 2)
+                .map((badge) => <FeedBadge key={badge} label={badge} />)}
             </div>
             <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2 group-hover:text-[oklch(0.95_0.01_90)] transition-colors duration-200">
               {market.question}
