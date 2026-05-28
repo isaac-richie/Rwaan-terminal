@@ -72,6 +72,30 @@ function fmtPrice(n: number) {
   return `$${n.toFixed(6)}`
 }
 
+function compactText(text: string, max = 150) {
+  const cleaned = text
+    .replace(/[•⚠]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+  if (cleaned.length <= max) return cleaned
+  const cut = cleaned.slice(0, max)
+  const lastBreak = Math.max(cut.lastIndexOf("."), cut.lastIndexOf(";"), cut.lastIndexOf(","))
+  return `${cut.slice(0, lastBreak > 80 ? lastBreak : max).trim()}...`
+}
+
+function convictionLabel(confidence: number) {
+  if (confidence >= 70) return "High conviction"
+  if (confidence >= 50) return "Moderate conviction"
+  return "Low conviction"
+}
+
+function topVotes(votes: TASignalVote[], direction: TASignalVote["direction"], limit = 2) {
+  return votes
+    .filter((vote) => vote.direction === direction)
+    .sort((a, b) => (b.conviction * b.weight) - (a.conviction * a.weight))
+    .slice(0, limit)
+}
+
 // ─── Reusable sub-components ──────────────────────────────────────────────────
 
 function CollapsibleSection({
@@ -147,24 +171,55 @@ function StatPill({
 
 // ─── Verdict Banner ───────────────────────────────────────────────────────────
 
-function VerdictBanner({ verdict }: { verdict: PremiumAnalysis["verdict"] }) {
+function VerdictBanner({
+  verdict,
+  ta,
+  fa,
+}: {
+  verdict: PremiumAnalysis["verdict"]
+  ta?: PremiumTechnicalAnalysis
+  fa?: PremiumFundamentalAnalysis
+}) {
   const isYes = verdict.direction === "YES"
   const color = isYes ? GREEN : RED
+  const cv = ta?.computedVerdict
+  const supportDirection = verdict.direction === "YES" ? "bullish" : "bearish"
+  const watchDirection = verdict.direction === "YES" ? "bearish" : "bullish"
+  const supportVotes = cv ? topVotes(cv.votes, supportDirection) : []
+  const watchVotes = cv ? topVotes(cv.votes, watchDirection) : []
+  const fundamentalSupport = fa
+    ? fa.signals
+        .filter((signal) => signal.direction === verdict.direction)
+        .sort((a, b) => (b.conviction * b.weight) - (a.conviction * a.weight))
+        .slice(0, 2)
+    : []
+  const fundamentalWatch = fa
+    ? fa.signals
+        .filter((signal) => signal.direction !== verdict.direction && signal.direction !== "neutral")
+        .sort((a, b) => (b.conviction * b.weight) - (a.conviction * a.weight))
+        .slice(0, 2)
+    : []
+
   return (
     <div
-      className="rounded-lg p-4"
+      className="rounded-xl p-3.5 sm:p-4"
       style={{
         background: `${color.replace(")", " / 0.12)")}`,
         borderLeft: `4px solid ${color}`,
       }}
     >
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-2xl font-bold tracking-tight" style={{ color }}>
-          {verdict.direction}
-        </span>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div>
+          <span className="text-2xl font-bold tracking-tight" style={{ color }}>
+            {verdict.direction}
+          </span>
+          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+            {convictionLabel(verdict.confidence)}
+          </p>
+        </div>
         <Badge
           variant="outline"
-          className="text-xs font-mono"
+          className="shrink-0 text-xs font-mono"
           style={{ borderColor: color, color }}
         >
           {verdict.confidence}% confidence
@@ -176,7 +231,84 @@ function VerdictBanner({ verdict }: { verdict: PremiumAnalysis["verdict"] }) {
           style={{ width: `${verdict.confidence}%`, background: color }}
         />
       </div>
-      <p className="text-sm text-muted-foreground">{verdict.rationale}</p>
+
+      {cv ? (
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-3 gap-1.5 text-center">
+            <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Agree</p>
+              <p className="mt-0.5 font-mono text-xs font-bold text-foreground">{cv.signalAgreement.toFixed(0)}%</p>
+            </div>
+            <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Signals</p>
+              <p className="mt-0.5 font-mono text-xs font-bold text-foreground">{cv.agreeingSignals}/{cv.totalSignals}</p>
+            </div>
+            <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Net</p>
+              <p className="mt-0.5 font-mono text-xs font-bold" style={{ color: cv.netScore >= 0 ? GREEN : RED }}>
+                {cv.netScore > 0 ? "+" : ""}{cv.netScore.toFixed(0)}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 text-[12px] leading-5">
+            <p className="text-muted-foreground/80">
+              Quant read: {cv.signalAgreement.toFixed(0)}% alignment across {cv.totalSignals} signals.
+              {verdict.confidence < 50 ? " Treat this as cautious, not a strong directional call." : ""}
+            </p>
+            {supportVotes.length > 0 && (
+              <p className="text-muted-foreground/75">
+                <span className="font-semibold" style={{ color }}>Supports:</span>{" "}
+                {supportVotes.map((vote) => vote.name).join(", ")}
+              </p>
+            )}
+            {watchVotes.length > 0 && (
+              <p className="text-muted-foreground/75">
+                <span className="font-semibold text-muted-foreground">Watch:</span>{" "}
+                {watchVotes.map((vote) => vote.name).join(", ")}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : fa ? (
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-3 gap-1.5 text-center">
+            <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Net</p>
+              <p className="mt-0.5 font-mono text-xs font-bold" style={{ color: fa.netScore >= 0 ? GREEN : RED }}>
+                {fa.netScore > 0 ? "+" : ""}{fa.netScore.toFixed(0)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Market</p>
+              <p className="mt-0.5 font-mono text-xs font-bold text-foreground">{fa.impliedProbability}%</p>
+            </div>
+            <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Time</p>
+              <p className="mt-0.5 font-mono text-xs font-bold text-foreground">
+                {typeof fa.daysToResolution === "number" ? `${fa.daysToResolution}d` : "Open"}
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1.5 text-[12px] leading-5">
+            <p className="text-muted-foreground/80">{compactText(fa.verdictRationale || verdict.rationale, 150)}</p>
+            {fundamentalSupport.length > 0 && (
+              <p className="text-muted-foreground/75">
+                <span className="font-semibold" style={{ color }}>Supports:</span>{" "}
+                {fundamentalSupport.map((signal) => signal.name).join(", ")}
+              </p>
+            )}
+            {fundamentalWatch.length > 0 && (
+              <p className="text-muted-foreground/75">
+                <span className="font-semibold text-muted-foreground">Watch:</span>{" "}
+                {fundamentalWatch.map((signal) => signal.name).join(", ")}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="text-[12px] leading-5 text-muted-foreground/80">{compactText(verdict.rationale)}</p>
+      )}
     </div>
   )
 }
@@ -1057,7 +1189,7 @@ function UnlockedState({ analysis }: { analysis: PremiumAnalysis }) {
       </div>
 
       {/* Verdict banner */}
-      <VerdictBanner verdict={analysis.verdict} />
+      <VerdictBanner verdict={analysis.verdict} ta={ta} fa={fa} />
 
       {/* Quant score row — crypto markets */}
       {ta?.computedVerdict && (
