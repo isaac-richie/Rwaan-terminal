@@ -50,6 +50,28 @@ const BSC_CHAIN_HEX = "0x38"
 const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
 const BSC_USDT_ADDRESS = "0x55d398326f99059fF775485246999027B3197955"
 const BSC_CHAIN_ID_STR = "56"
+const POLYGON_RPC_URLS = [
+  ...(process.env.NEXT_PUBLIC_POLYGON_RPC_URL ?? "https://polygon-rpc.com")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean),
+  "https://rpc.ankr.com/polygon",
+  "https://polygon.publicnode.com",
+].filter((url, index, urls) => urls.indexOf(url) === index)
+const POLYGON_CHAIN_PARAMS = {
+  chainId: POLYGON_CHAIN_HEX,
+  chainName: "Polygon",
+  nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
+  rpcUrls: POLYGON_RPC_URLS,
+  blockExplorerUrls: ["https://polygonscan.com"],
+}
+const BSC_CHAIN_PARAMS = {
+  chainId: BSC_CHAIN_HEX,
+  chainName: "BNB Smart Chain",
+  nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+  rpcUrls: ["https://bsc-dataseed.binance.org", "https://bsc-rpc.publicnode.com"],
+  blockExplorerUrls: ["https://bscscan.com"],
+}
 
 type FundingAsset = {
   chainId: string
@@ -81,6 +103,23 @@ type FundingModalProps = {
 
 type Eip1193Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
+}
+
+type SwitchableWallet = ConnectedWallet & {
+  switchChain?: (chainId: number) => Promise<void>
+}
+
+type ChainTarget = {
+  id: number
+  hex: string
+  label: string
+  params: {
+    chainId: string
+    chainName: string
+    nativeCurrency: { name: string; symbol: string; decimals: number }
+    rpcUrls: string[]
+    blockExplorerUrls: string[]
+  }
 }
 
 function sortAssets(assets: FundingAsset[]) {
@@ -167,6 +206,105 @@ function extractEvmAddress(payload: any): string | null {
 
 function isDollarLike(symbol?: string) {
   return ["USDC", "USDT", "DAI", "BUSD", "FDUSD"].includes((symbol ?? "").toUpperCase())
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+function errorText(err: unknown): string {
+  if (!err) return ""
+  if (typeof err === "string") return err
+  if (typeof err !== "object") return String(err)
+
+  const parts = [
+    (err as any).message,
+    (err as any).shortMessage,
+    (err as any).details,
+    (err as any).reason,
+    (err as any).error?.message,
+    (err as any).data?.message,
+    (err as any).cause?.message,
+    (err as any).cause?.shortMessage,
+    (err as any).cause?.details,
+  ]
+    .filter((value) => typeof value === "string" && value.trim())
+    .map((value) => value.trim())
+
+  return parts[0] ?? ""
+}
+
+function walletErrorMessage(err: unknown, fallback: string, context: "deposit" | "withdraw" = "withdraw") {
+  const raw = errorText(err)
+  const normalized = raw.toLowerCase()
+  const code = err && typeof err === "object" && "code" in err ? String((err as any).code) : ""
+
+  if (code === "4001" || code === "ACTION_REJECTED" || normalized.includes("user rejected") || normalized.includes("rejected by wallet")) {
+    return context === "deposit" ? "Transaction rejected by wallet." : "Withdrawal request rejected by wallet."
+  }
+
+  if (normalized.includes("unknown connector error") || normalized.includes("connector")) {
+    return "Wallet connector could not complete the withdrawal. Reopen your wallet, approve the Polygon network switch and signature, then try again."
+  }
+
+  if (normalized.includes("chain") || normalized.includes("network")) {
+    return "Rawli could not activate the required wallet network. Approve the network switch in your wallet, then try again."
+  }
+
+  if (!raw || raw === "[object Object]") return fallback
+  return raw.length > 220 ? `${raw.slice(0, 220)}...` : raw
+}
+
+async function waitForChain(provider: Eip1193Provider, targetHex: string, attempts = 15) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const chainId = await provider.request({ method: "eth_chainId" }).catch(() => null)
+    if (String(chainId).toLowerCase() === targetHex) return true
+    await sleep(250)
+  }
+  return false
+}
+
+async function ensureWalletChain(wallet: ConnectedWallet, target: ChainTarget): Promise<Eip1193Provider> {
+  const switchable = wallet as SwitchableWallet
+  let provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+  const currentChain = await provider.request({ method: "eth_chainId" }).catch(() => null)
+  if (String(currentChain).toLowerCase() === target.hex) return provider
+
+  if (typeof switchable.switchChain === "function") {
+    try {
+      await switchable.switchChain(target.id)
+      await sleep(500)
+      provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+      if (await waitForChain(provider, target.hex)) return provider
+    } catch {
+      // Fall back to EIP-1193. Some wallet connectors expose switchChain but
+      // still require the provider-level method to settle the active chain.
+    }
+  }
+
+  provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+  try {
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: target.hex }],
+    })
+  } catch (err: any) {
+    const code = Number(err?.code ?? err?.data?.code)
+    if (code !== 4902) throw err
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [target.params],
+    })
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: target.hex }],
+    })
+  }
+
+  await sleep(300)
+  provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+  if (!(await waitForChain(provider, target.hex))) {
+    throw new Error(`Could not switch wallet to ${target.label}.`)
+  }
+  return provider
 }
 
 export function BnbFundingModal({
@@ -347,15 +485,12 @@ export function BnbFundingModal({
     setSendStatus("switching")
 
     try {
-      const switchable = wallet as ConnectedWallet & { switchChain?: (id: number) => Promise<void> }
-      const provider = await wallet.getEthereumProvider()
-      const currentChain = await (provider as any).request({ method: "eth_chainId" }).catch(() => null)
-
-      if (String(currentChain).toLowerCase() !== BSC_CHAIN_HEX && typeof switchable.switchChain === "function") {
-        await switchable.switchChain(BSC_CHAIN_ID)
-      }
-
-      const freshProvider = await wallet.getEthereumProvider()
+      const freshProvider = await ensureWalletChain(wallet, {
+        id: BSC_CHAIN_ID,
+        hex: BSC_CHAIN_HEX,
+        label: "BNB Smart Chain",
+        params: BSC_CHAIN_PARAMS,
+      })
       const ethersProvider = new BrowserProvider(freshProvider as any)
       const signer = await ethersProvider.getSigner()
 
@@ -388,11 +523,7 @@ export function BnbFundingModal({
       fundingStatus.refresh()
     } catch (err: any) {
       setSendStatus("idle")
-      if (err?.code === "ACTION_REJECTED") {
-        setError("Transaction rejected by wallet")
-      } else {
-        setError(err?.message ?? "Failed to send transaction")
-      }
+      setError(walletErrorMessage(err, "Failed to send transaction", "deposit"))
     }
   }
 
@@ -448,7 +579,12 @@ export function BnbFundingModal({
 
       if (depositWalletWithdrawMode) {
         setWithdrawStatus("switching")
-        const provider = (await wallet.getEthereumProvider()) as Eip1193Provider
+        const provider = await ensureWalletChain(wallet, {
+          id: POLYGON_CHAIN_NUMBER,
+          hex: POLYGON_CHAIN_HEX,
+          label: "Polygon",
+          params: POLYGON_CHAIN_PARAMS,
+        })
         const prepareRes = await fetch(`${API_BASE}/deposit-wallet/withdraw/prepare`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -508,19 +644,12 @@ export function BnbFundingModal({
       }
 
       setWithdrawStatus("switching")
-      const switchable = wallet as ConnectedWallet & { switchChain?: (id: number) => Promise<void> }
-      const provider = await wallet.getEthereumProvider()
-      const currentChain = await (provider as any).request({ method: "eth_chainId" }).catch(() => null)
-      if (String(currentChain).toLowerCase() !== POLYGON_CHAIN_HEX && typeof switchable.switchChain === "function") {
-        await switchable.switchChain(POLYGON_CHAIN_NUMBER)
-      } else if (String(currentChain).toLowerCase() !== POLYGON_CHAIN_HEX) {
-        await (provider as any).request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: POLYGON_CHAIN_HEX }],
-        })
-      }
-
-      const freshProvider = await wallet.getEthereumProvider()
+      const freshProvider = await ensureWalletChain(wallet, {
+        id: POLYGON_CHAIN_NUMBER,
+        hex: POLYGON_CHAIN_HEX,
+        label: "Polygon",
+        params: POLYGON_CHAIN_PARAMS,
+      })
       const ethersProvider = new BrowserProvider(freshProvider as any)
       const signer = await ethersProvider.getSigner()
       const data = encodeErc20Transfer(withdrawalAddress, withdrawAmountBaseUnit)
@@ -547,11 +676,7 @@ export function BnbFundingModal({
       scheduleAccountRefresh({ reason: "withdrawal_submitted", address: tradingWalletAddr })
       onFundingSent?.()   // trigger full account refresh (profile, portfolio, funding status)
     } catch (err: any) {
-      if (err?.code === "ACTION_REJECTED") {
-        setWithdrawError("Withdrawal transaction rejected by wallet.")
-      } else {
-        setWithdrawError(err?.message ?? "Withdraw request failed")
-      }
+      setWithdrawError(walletErrorMessage(err, "Withdraw request failed", "withdraw"))
       setWithdrawStatus("error")
     }
   }
