@@ -259,6 +259,7 @@ export type PremiumAnalysis = {
     generatedAt: string;
     signalHash: string;
     technicalAnalysis?: PremiumTechnicalAnalysis;
+    fundamentalAnalysis?: PremiumFundamentalAnalysis;
 };
 export type PaymentRequirement = {
     chainId: number;
@@ -275,6 +276,27 @@ export type PremiumAnalysisResponse = {
     analysis?: PremiumAnalysis;
     error?: string;
     paymentRequired?: PaymentRequirement;
+};
+export type MarketCategory = "politics" | "economics" | "sports" | "science_tech" | "legal" | "general";
+export type FundamentalSignal = {
+    name: string;
+    direction: "YES" | "NO" | "neutral";
+    weight: number;
+    conviction: number;
+    reason: string;
+};
+export type PremiumFundamentalAnalysis = {
+    direction: "YES" | "NO";
+    confidence: number;
+    yesScore: number;
+    noScore: number;
+    netScore: number;
+    signals: FundamentalSignal[];
+    verdictRationale: string;
+    impliedProbability: number;
+    priceEfficiency: "efficient" | "potentially_mispriced" | "thin_market";
+    daysToResolution: number | null;
+    category: MarketCategory;
 };
 export type TASignalVote = {
     name: string;

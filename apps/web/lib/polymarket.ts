@@ -97,6 +97,23 @@ type FeedGammaMarket = GammaMarketRaw & {
 }
 
 const categoryNeedles: Record<string, string[]> = {
+  africa: [
+    // Nations
+    "nigeria", "ghana", "senegal", "morocco", "egypt", "south africa",
+    "ivory coast", "côte d'ivoire", "cote d'ivoire", "cameroon", "mali",
+    "algeria", "tunisia", "kenya", "ethiopia", "angola", "tanzania",
+    "uganda", "zambia", "zimbabwe", "rwanda", "mozambique", "benin",
+    "burkina faso", "dr congo", "congo", "sudan", "somalia", "libya",
+    "gabon", "togo", "senegal", "sierra leone",
+    // Competitions
+    "afcon", "africa cup", "caf", "super eagles", "black stars",
+    "bafana bafana", "pharaohs", "teranga lions", "atlas lions",
+    "indomitable lions", "eagles of carthage", "harambee stars",
+    // General
+    "african", "africa",
+    // Economic
+    "naira", "cedi", "rand", "birr", "shilling",
+  ],
   entertainment: [
     "entertainment",
     "music",
@@ -200,9 +217,13 @@ const categoryNeedles: Record<string, string[]> = {
   ],
 }
 
-const targetCategoryIds = ["entertainment", "sports", "news", "crypto", "geopolitics"] as const
+const targetCategoryIds = ["africa", "entertainment", "sports", "news", "crypto", "geopolitics"] as const
 const targetCategoryNeedles = targetCategoryIds.flatMap((id) => categoryNeedles[id])
 const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> = {
+  // Africa: AFCON/ACN tags + Soccer + FIFA WC + Egypt PL + Sports (broad catch-all)
+  // 102974 = Africa Cup of Nations, 102969 = Afcon, 100350 = Soccer,
+  // 102350 = 2026 FIFA World Cup, 102232 = FIFA World Cup, 104397 = Egypt Premier League
+  africa: ["102974", "102969", "100350", "102350", "102232", "104397", "2"],
   entertainment: ["596", "100", "53"],
   sports: ["1"],
   news: ["2", "144"],
@@ -329,6 +350,10 @@ function isCryptoMarket(text: string): boolean {
   return categoryNeedles.crypto.some((needle) => includesNeedle(text, needle.toLowerCase()))
 }
 
+function isAfricaMarket(text: string): boolean {
+  return categoryNeedles.africa.some((needle) => includesNeedle(text, needle.toLowerCase()))
+}
+
 function priceOpportunityScore(market: GammaMarketRaw): number {
   const outcomes = parseOutcomes(market)
   const yes = outcomes.find((o) => o.name.toLowerCase().includes("yes"))?.price ?? outcomes[0]?.price ?? 50
@@ -348,10 +373,12 @@ function qualityBadges(input: {
   const badges: string[] = []
   const quick = isQuickSettle(input.endDate, input.now)
   const crypto = isCryptoMarket(input.text)
+  const africa = isAfricaMarket(input.text)
   // Highest-priority combo badge
   if (quick && crypto) badges.push("24h Crypto")
   else if (quick) badges.push("Closes today")
   else if (crypto) badges.push("Crypto")
+  if (africa) badges.push("Africa")
   if (input.liquidity >= 10_000) badges.push("Deep liquidity")
   else if (input.liquidity >= NICE_MARKET_MIN_LIQUIDITY) badges.push("Tradable")
   if (input.volume >= 5_000) badges.push("Hot volume")
@@ -386,6 +413,9 @@ function smartMarketScore(input: {
 
   // 24h crypto combo is the highest-value content on the feed
   const cryptoQuickBoost = quick && crypto ? 30 : 0
+  const africa = isAfricaMarket(input.text)
+  // Africa markets get a boost when browsing the Africa category
+  const africaBoost = africa && input.normalizedCategory === "africa" ? 25 : 0
 
   return (
     logScore(input.liquidity) * 32 +
@@ -393,6 +423,7 @@ function smartMarketScore(input: {
     (quick ? 22 : urgency * 12) +
     (crypto ? (input.normalizedCategory === "crypto" ? 26 : 16) : 0) +
     cryptoQuickBoost +
+    africaBoost +
     priceOpportunityScore(input.market) * 10 +
     (hasTokens ? 8 : 0) +
     (hasVisual ? 5 : 0) +
@@ -537,7 +568,7 @@ function fetchGammaEventsDeduped(url: string): Promise<GammaEventRaw[]> {
 
 // For "all" + trending/volume, use the highest-traffic tags.
 // All 4 crypto tag IDs included so 24h crypto markets are never missed.
-const FAST_ALL_TAG_IDS = ["21", "235", "101611", "1312", "2", "596", "1"] // all crypto + news + entertainment + sports
+const FAST_ALL_TAG_IDS = ["21", "235", "101611", "1312", "2", "596", "1", "102974", "102969"] // all crypto + news + entertainment + sports + AFCON
 
 export async function fetchPolymarketMarkets(
   category?: string,

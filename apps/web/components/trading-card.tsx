@@ -67,6 +67,7 @@ const BADGE_STYLES: Record<string, { border: string; bg: string; text: string; i
   "Deep liquidity": { border: "oklch(0.60 0.18 155 / 0.35)", bg: "oklch(0.60 0.18 155 / 0.10)", text: "oklch(0.74 0.18 155)",  icon: Droplets },
   "Hot volume":     { border: "oklch(0.70 0.18 25 / 0.35)",  bg: "oklch(0.70 0.18 25 / 0.10)",  text: "oklch(0.80 0.18 25)",   icon: Flame },
   "Tradable":       { border: "oklch(0.45 0.01 260 / 0.35)", bg: "oklch(0.45 0.01 260 / 0.08)", text: "oklch(0.62 0.01 260)",  icon: TrendingUp },
+  "Africa":         { border: "oklch(0.68 0.18 140 / 0.4)",  bg: "oklch(0.68 0.18 140 / 0.12)", text: "oklch(0.80 0.18 140)",  icon: TrendingUp },
 }
 
 function FeedBadge({ label }: { label: string }) {
