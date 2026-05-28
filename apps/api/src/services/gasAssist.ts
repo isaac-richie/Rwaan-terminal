@@ -1,4 +1,4 @@
-import { Contract, JsonRpcProvider, Wallet, formatEther, formatUnits, parseEther, parseUnits } from "ethers";
+import { Contract, FallbackProvider, JsonRpcProvider, AbstractProvider, Wallet, formatEther, formatUnits, parseEther, parseUnits } from "ethers";
 import { config } from "../config.js";
 import { getRecentGasAssist, recordGasAssist } from "./db.js";
 
@@ -31,11 +31,33 @@ export type GasAssistStatus = {
   relayerAddress?: string;
 };
 
-function provider() {
-  return new JsonRpcProvider(config.gasAssist.polygonRpcUrl);
+/**
+ * Build a FallbackProvider across all configured Polygon RPC endpoints.
+ * Ethers tries each provider in priority order (lowest number = highest priority),
+ * automatically falling back if one stalls or errors.
+ */
+function provider(): FallbackProvider {
+  const primary = config.gasAssist.polygonRpcUrl;
+  const fallbacks = config.gasAssist.polygonRpcFallbacks ?? [];
+  const all = [primary, ...fallbacks].filter((u, i, arr) => arr.indexOf(u) === i);
+
+  if (all.length === 1) {
+    // Wrap single provider in FallbackProvider for a consistent return type
+    return new FallbackProvider([{ provider: new JsonRpcProvider(all[0]), priority: 1, stallTimeout: 3000 }]);
+  }
+
+  return new FallbackProvider(
+    all.map((url, i) => ({
+      provider: new JsonRpcProvider(url),
+      priority: i + 1,      // 1 = highest priority (primary)
+      stallTimeout: 3000,   // wait 3s before trying next
+      weight: i === 0 ? 2 : 1, // primary gets double weight for quorum
+    })),
+    1 // quorum of 1 — first successful response wins
+  );
 }
 
-function relayerWallet(rpc = provider()) {
+function relayerWallet(rpc: AbstractProvider = provider()) {
   if (!config.gasAssist.relayerPrivateKey) return null;
   try {
     return new Wallet(config.gasAssist.relayerPrivateKey, rpc);
@@ -44,9 +66,9 @@ function relayerWallet(rpc = provider()) {
   }
 }
 
-async function polygonGasPrice(rpc: JsonRpcProvider): Promise<bigint> {
-  const raw = await rpc.send("eth_gasPrice", []);
-  return BigInt(raw);
+async function polygonGasPrice(rpc: AbstractProvider): Promise<bigint> {
+  const feeData = await rpc.getFeeData();
+  return feeData.gasPrice ?? 30_000_000_000n; // fallback 30 gwei
 }
 
 function sinceCooldownIso() {

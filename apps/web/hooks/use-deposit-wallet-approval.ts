@@ -97,7 +97,11 @@ async function ensurePolygon(wallet: ConnectedWallet): Promise<Eip1193Provider> 
           chainId: POLYGON_CHAIN_HEX,
           chainName: "Polygon",
           nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
-          rpcUrls: ["https://polygon-rpc.com"],
+          rpcUrls: [
+            process.env.NEXT_PUBLIC_POLYGON_RPC_URL ?? "https://polygon-rpc.com",
+            "https://rpc.ankr.com/polygon",
+            "https://polygon.publicnode.com",
+          ].filter(Boolean),
           blockExplorerUrls: ["https://polygonscan.com"],
         }],
       })

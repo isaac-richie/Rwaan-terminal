@@ -37,7 +37,18 @@ export const config = {
   },
   gasAssist: {
     enabled: process.env.GAS_ASSIST_ENABLED === "true",
+    // Primary Polygon RPC — set POLYGON_RPC_URL to your Alchemy / QuickNode / Infura endpoint.
+    // Alchemy free tier: 300M CUs/day — best option for Polygon (used by Polymarket itself).
     polygonRpcUrl: process.env.POLYGON_RPC_URL ?? "https://polygon-rpc.com",
+    // Ordered fallback list — tried in sequence when primary fails.
+    polygonRpcFallbacks: [
+      "https://polygon-rpc.com",                   // official Polygon Foundation RPC
+      "https://rpc.ankr.com/polygon",              // Ankr free tier, reliable
+      "https://polygon.publicnode.com",            // community, no rate limits
+      "https://polygon.drpc.org",                  // dRPC, fast free tier
+      "https://1rpc.io/matic",                     // 1RPC privacy proxy
+      "https://matic-mainnet.chainstacklabs.com",  // Chainstack public node
+    ],
     relayerPrivateKey: process.env.POLYGON_GAS_RELAYER_PRIVATE_KEY ?? "",
     minPusdBalance: process.env.GAS_ASSIST_MIN_PUSD_BALANCE ?? "2",
     minPolBalance: process.env.GAS_ASSIST_MIN_POL_BALANCE ?? "0.02",

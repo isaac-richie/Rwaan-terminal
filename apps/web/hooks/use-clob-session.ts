@@ -94,7 +94,13 @@ const POLYGON_CHAIN_PARAMS = {
     symbol: "POL",
     decimals: 18,
   },
-  rpcUrls: ["https://polygon-rpc.com"],
+  // Multiple RPCs so wallets that validate connectivity have fallbacks
+  rpcUrls: [
+    process.env.NEXT_PUBLIC_POLYGON_RPC_URL ?? "https://polygon-rpc.com",
+    "https://rpc.ankr.com/polygon",
+    "https://polygon.publicnode.com",
+    "https://polygon.drpc.org",
+  ].filter(Boolean),
   blockExplorerUrls: ["https://polygonscan.com"],
 }
 

@@ -1,6 +1,6 @@
 import { BuilderConfig } from "@polymarket/builder-signing-sdk";
 import { RelayClient, TransactionType } from "@polymarket/builder-relayer-client";
-import { createWalletClient, http, recoverTypedDataAddress } from "viem";
+import { createWalletClient, fallback, http, recoverTypedDataAddress } from "viem";
 import { polygon } from "viem/chains";
 import { config } from "../config.js";
 
@@ -46,12 +46,25 @@ function requireBuilderConfig() {
   return builder;
 }
 
+/**
+ * Viem fallback transport across all configured Polygon RPC endpoints.
+ * Tries each in order; automatically retries the next on failure.
+ */
+function polygonTransport() {
+  const primary = config.gasAssist.polygonRpcUrl;
+  const extras = config.gasAssist.polygonRpcFallbacks ?? [];
+  const all = [primary, ...extras].filter((u, i, arr) => arr.indexOf(u) === i);
+  return all.length === 1
+    ? http(all[0])
+    : fallback(all.map((url) => http(url, { timeout: 8_000 })));
+}
+
 function depositWalletClient(owner: string): DepositWalletClient {
   assertEvmAddress(owner, "owner");
   const walletClient = createWalletClient({
     account: owner.toLowerCase() as `0x${string}`,
     chain: polygon,
-    transport: http(config.gasAssist.polygonRpcUrl),
+    transport: polygonTransport(),
   });
   const builder = builderConfig();
   return {
