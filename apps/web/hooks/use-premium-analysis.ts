@@ -21,11 +21,68 @@ function cacheKey(marketId: string): string {
   return `smartmarket:premium:${marketId}`
 }
 
+const GENERIC_FALLBACK_RATIONALE =
+  "Insufficient live data for a high-conviction directional call."
+
+function isGenericFallbackRationale(rationale?: string | null): boolean {
+  return String(rationale ?? "")
+    .toLowerCase()
+    .includes(GENERIC_FALLBACK_RATIONALE.toLowerCase())
+}
+
+function normalizePremiumAnalysis(analysis: PremiumAnalysis): PremiumAnalysis {
+  const ta = analysis.technicalAnalysis
+  const cv = ta?.computedVerdict
+  const fa = analysis.fundamentalAnalysis
+
+  const computed = cv
+    ? {
+        direction: cv.direction,
+        confidence: Math.min(95, Math.max(10, cv.confidence)),
+        rationale:
+          cv.verdictRationale ||
+          `Quant engine verdict based on ${ta?.confluenceFactors?.length ?? 0} confluence factors across ${cv.totalSignals ?? 0} technical signals (${cv.signalAgreement ?? 0}% signal agreement).`,
+      }
+    : fa
+    ? {
+        direction: fa.direction,
+        confidence: Math.min(88, Math.max(15, fa.confidence)),
+        rationale: fa.verdictRationale || "Fundamental signal engine verdict based on live news and market scoring.",
+      }
+    : null
+
+  if (!computed) return analysis
+
+  const incomingConfidence = Number(analysis.verdict?.confidence)
+  const confidenceDrift = Number.isFinite(incomingConfidence)
+    ? Math.abs(incomingConfidence - computed.confidence)
+    : Number.POSITIVE_INFINITY
+  const shouldRepair =
+    !analysis.verdict?.rationale ||
+    isGenericFallbackRationale(analysis.verdict.rationale) ||
+    analysis.verdict.direction !== computed.direction ||
+    confidenceDrift > 10
+
+  if (!shouldRepair) return analysis
+
+  return {
+    ...analysis,
+    verdict: {
+      direction: computed.direction,
+      confidence: computed.confidence,
+      rationale: computed.rationale,
+    },
+  }
+}
+
 function loadCached(marketId: string): PremiumAnalysis | null {
   try {
     const raw = localStorage.getItem(cacheKey(marketId))
     if (!raw) return null
-    return JSON.parse(raw) as PremiumAnalysis
+    const parsed = JSON.parse(raw) as PremiumAnalysis
+    const normalized = normalizePremiumAnalysis(parsed)
+    if (normalized !== parsed) saveCached(marketId, normalized)
+    return normalized
   } catch {
     return null
   }
@@ -33,7 +90,7 @@ function loadCached(marketId: string): PremiumAnalysis | null {
 
 function saveCached(marketId: string, analysis: PremiumAnalysis): void {
   try {
-    localStorage.setItem(cacheKey(marketId), JSON.stringify(analysis))
+    localStorage.setItem(cacheKey(marketId), JSON.stringify(normalizePremiumAnalysis(analysis)))
   } catch {}
 }
 

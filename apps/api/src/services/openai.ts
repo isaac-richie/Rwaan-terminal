@@ -275,6 +275,65 @@ export interface PremiumAnalysisResult {
   terminalNote: string;
 }
 
+const GENERIC_PREMIUM_FALLBACK_RATIONALE =
+  "Insufficient live data for a high-conviction directional call.";
+
+function isGenericPremiumFallback(rationale?: string | null) {
+  return String(rationale ?? "")
+    .toLowerCase()
+    .includes(GENERIC_PREMIUM_FALLBACK_RATIONALE.toLowerCase());
+}
+
+function taVerdict(ta: TechnicalAnalysis): PremiumAnalysisResult["verdict"] {
+  return {
+    direction: ta.verdict.direction as "YES" | "NO",
+    confidence: Math.min(95, Math.max(10, ta.verdict.confidence)),
+    rationale: `Quant engine verdict based on ${ta.confluenceFactors?.length ?? 0} confluence factors across 24 technical signals (${ta.verdict.signalAgreement ?? 0}% signal agreement). ${ta.verdict.verdictRationale ?? `${ta.verdict.direction === "YES" ? "Bullish" : "Bearish"} structure confirmed by ${ta.htf?.structure ?? "N/A"} market structure with ${ta.htf?.trendStrength ?? "N/A"} trend strength.`}`
+  };
+}
+
+function fundamentalVerdict(fundamental: FundamentalVerdict): PremiumAnalysisResult["verdict"] {
+  return {
+    direction: fundamental.direction as "YES" | "NO",
+    confidence: Math.min(88, Math.max(15, fundamental.confidence)),
+    rationale: `Fundamental signal engine verdict: ${fundamental.verdictRationale ?? "Based on aggregated news sentiment and event probability scoring."}`
+  };
+}
+
+function enforceComputedPremiumVerdict(
+  result: PremiumAnalysisResult,
+  ta?: TechnicalAnalysis | null,
+  fundamental?: FundamentalVerdict | null
+): PremiumAnalysisResult {
+  const computed = ta?.verdict?.direction
+    ? taVerdict(ta)
+    : fundamental?.direction
+    ? fundamentalVerdict(fundamental)
+    : null;
+
+  if (!computed) return result;
+
+  const incoming = result.verdict;
+  const incomingConfidence = Number(incoming?.confidence);
+  const confidenceDrift = Number.isFinite(incomingConfidence)
+    ? Math.abs(incomingConfidence - computed.confidence)
+    : Number.POSITIVE_INFINITY;
+  const shouldReplaceRationale =
+    !incoming?.rationale ||
+    isGenericPremiumFallback(incoming.rationale) ||
+    incoming.direction !== computed.direction ||
+    confidenceDrift > 10;
+
+  return {
+    ...result,
+    verdict: {
+      direction: computed.direction,
+      confidence: computed.confidence,
+      rationale: shouldReplaceRationale ? computed.rationale : incoming.rationale,
+    },
+  };
+}
+
 function premiumAnalysisSchema() {
   return {
     type: "object",
@@ -530,17 +589,9 @@ function fallbackPremiumAnalysis(
   const hasFundamental = fundamental?.direction;
 
   const verdict = hasTA
-    ? {
-        direction: ta!.verdict.direction as "YES" | "NO",
-        confidence: Math.min(95, Math.max(10, ta!.verdict.confidence)),
-        rationale: `Quant engine verdict based on ${ta!.confluenceFactors?.length ?? 0} confluence factors across 24 technical signals (${ta!.verdict.signalAgreement ?? 0}% signal agreement). ${ta!.verdict.direction === "YES" ? "Bullish" : "Bearish"} structure confirmed by ${ta!.htf?.structure ?? "N/A"} market structure with ${ta!.htf?.trendStrength ?? "N/A"} trend strength.`
-      }
+    ? taVerdict(ta!)
     : hasFundamental
-    ? {
-        direction: fundamental!.direction as "YES" | "NO",
-        confidence: Math.min(88, Math.max(15, fundamental!.confidence)),
-        rationale: `Fundamental signal engine verdict: ${fundamental!.verdictRationale ?? "Based on aggregated news sentiment and event probability scoring."}`
-      }
+    ? fundamentalVerdict(fundamental!)
     : {
         direction: "NO" as const,
         confidence: 50,
@@ -664,7 +715,8 @@ export async function generatePremiumAnalysis(
     if (!jsonText) return fallbackPremiumAnalysis(ta, fundamental);
 
     try {
-      return JSON.parse(jsonText) as PremiumAnalysisResult;
+      const parsed = JSON.parse(jsonText) as PremiumAnalysisResult;
+      return enforceComputedPremiumVerdict(parsed, ta, fundamental);
     } catch {
       return fallbackPremiumAnalysis(ta, fundamental);
     }
