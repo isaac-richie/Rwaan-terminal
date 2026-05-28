@@ -1104,58 +1104,48 @@ export default function MarketDetailPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top rawli-page-bottom">
-        {/* Header */}
-        <div className="pt-6 pb-5">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top rawli-page-bottom pb-20 lg:pb-0">
+        {/* Header — compact on mobile */}
+        <div className="pt-4 sm:pt-6 pb-4 sm:pb-5">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors mb-4"
+            className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors mb-3 sm:mb-4 active:scale-95"
           >
-            <ArrowLeft size={14} /> Back to markets
+            <ArrowLeft size={14} /> Back
           </button>
 
-          <div className="flex items-start gap-3 sm:gap-4">
+          <div className="flex items-start gap-3">
             {market.image ? (
-              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-[oklch(0.16_0.014_255)] border border-[oklch(0.22_0.015_255)] shrink-0">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-[oklch(0.16_0.014_255)] border border-[oklch(0.22_0.015_255)] shrink-0">
                 <img src={market.image} alt="" className="w-full h-full object-cover" />
               </div>
             ) : (
-              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-[oklch(0.16_0.014_255)] border border-[oklch(0.22_0.015_255)] shrink-0" />
+              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-[oklch(0.16_0.014_255)] border border-[oklch(0.22_0.015_255)] shrink-0" />
             )}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-1.5">
-                <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-[oklch(0.18_0.014_255)] border border-[oklch(0.24_0.016_255)] text-[8px] sm:text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="px-1.5 py-0.5 rounded-md bg-[oklch(0.18_0.014_255)] border border-[oklch(0.24_0.016_255)] text-[8px] sm:text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
                   {market.category}
                 </span>
-                <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-[oklch(0.78_0.16_82/0.08)] border border-[oklch(0.78_0.16_82/0.15)] text-[7px] sm:text-[8px] font-bold text-[oklch(0.78_0.16_82)] uppercase tracking-widest">
+                <span className="px-1.5 py-0.5 rounded-md bg-[oklch(0.78_0.16_82/0.08)] border border-[oklch(0.78_0.16_82/0.15)] text-[7px] sm:text-[8px] font-bold text-[oklch(0.78_0.16_82)] uppercase tracking-widest">
                   Polymarket
                 </span>
               </div>
-              <h1 className="text-lg sm:text-2xl font-bold text-foreground leading-snug">{market.title}</h1>
+              <h1 className="text-base sm:text-2xl font-bold text-foreground leading-snug">{market.title}</h1>
             </div>
           </div>
 
-          {/* Stats strip + probability bar */}
-          <div className="mt-3 sm:mt-4 flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-muted-foreground">
-            <span className="flex items-center gap-1 sm:gap-1.5 font-medium">
-              <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[oklch(0.78_0.16_82)]" />
-              Vol {formatCompactUsd(market.volume24h)}
-            </span>
-            <span className="text-[oklch(0.22_0.015_255)]">·</span>
-            <span className="flex items-center gap-1 sm:gap-1.5 font-medium">
-              <Droplets className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[oklch(0.68_0.18_155)]" />
-              Liq {formatCompactUsd(market.liquidity)}
-            </span>
-            <span className="text-[oklch(0.22_0.015_255)]">·</span>
-            <span className="flex items-center gap-1 sm:gap-1.5 font-medium">
-              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-              {market.endsAt || "Open"}
-            </span>
-          </div>
-
-          {/* Probability bar */}
-          <div className="mt-4">
-            <div className="h-2.5 overflow-hidden rounded-full bg-[oklch(0.18_0.014_255)]">
+          {/* Probability bar + inline stats */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs sm:text-sm font-bold text-[oklch(0.74_0.20_155)]">Yes {yesPrice.toFixed(1)}¢</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs sm:text-sm font-bold text-[oklch(0.65_0.20_25)]">No {noPrice.toFixed(1)}¢</span>
+              </div>
+            </div>
+            <div className="h-2 sm:h-2.5 overflow-hidden rounded-full bg-[oklch(0.18_0.014_255)]">
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{
@@ -1164,17 +1154,31 @@ export default function MarketDetailPage() {
                 }}
               />
             </div>
-            <div className="flex items-center justify-between mt-1.5">
-              <span className="text-xs font-bold text-[oklch(0.68_0.18_155)]">Yes {yesPrice.toFixed(1)}¢</span>
-              <span className="text-xs font-bold text-[oklch(0.60_0.18_25)]">No {noPrice.toFixed(1)}¢</span>
-            </div>
+          </div>
+
+          {/* Stats strip */}
+          <div className="mt-2.5 flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-muted-foreground overflow-x-auto no-scrollbar">
+            <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+              <TrendingUp className="w-3 h-3 text-[oklch(0.78_0.16_82)]" />
+              {formatCompactUsd(market.volume24h)}
+            </span>
+            <span className="text-[oklch(0.22_0.015_255)]">·</span>
+            <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+              <Droplets className="w-3 h-3 text-[oklch(0.68_0.18_155)]" />
+              {formatCompactUsd(market.liquidity)}
+            </span>
+            <span className="text-[oklch(0.22_0.015_255)]">·</span>
+            <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+              <Clock className="w-3 h-3" />
+              {market.endsAt || "Open"}
+            </span>
           </div>
         </div>
 
         {/* Main 2-col layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
           {/* Left: Analysis + Info */}
-          <div className="lg:col-span-8 space-y-5">
+          <div className="lg:col-span-8 space-y-4 sm:space-y-5">
             {cryptoAsset && (
               <CryptoAssetChart asset={cryptoAsset} marketTitle={market.title} />
             )}
@@ -1199,21 +1203,20 @@ export default function MarketDetailPage() {
           </div>
 
           {/* Right: Trade Panel */}
-          <div className="lg:col-span-4">
+          <div className="lg:col-span-4" id="trade-panel">
             <div
-              className="surface-card rounded-3xl p-4 sm:p-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain space-y-4"
+              className="surface-card rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain space-y-3 sm:space-y-4"
               style={{ overflowAnchor: "none" }}
             >
               {/* Header + Buy/Sell toggle */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Trade</h3>
+                <div className="flex items-center gap-2">
                   <div className="flex rounded-full border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_255)] p-0.5">
                     <button
                       onClick={() => setTradeSide("buy")}
                       disabled={tradeActionBusy}
                       className={cn(
-                        "px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60",
+                        "px-3.5 sm:px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60",
                         tradeSide === "buy"
                           ? "bg-[oklch(0.28_0.12_155)] border border-[oklch(0.68_0.18_155/0.45)] text-[oklch(0.78_0.20_155)] shadow-[0_2px_8px_oklch(0.68_0.18_155/0.20)]"
                           : "text-muted-foreground hover:text-foreground"
@@ -1225,7 +1228,7 @@ export default function MarketDetailPage() {
                       onClick={() => setTradeSide("sell")}
                       disabled={tradeActionBusy}
                       className={cn(
-                        "px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60",
+                        "px-3.5 sm:px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60",
                         tradeSide === "sell"
                           ? "bg-[oklch(0.24_0.12_25)] border border-[oklch(0.58_0.2_25/0.40)] text-[oklch(0.72_0.20_25)] shadow-[0_2px_8px_oklch(0.58_0.2_25/0.15)]"
                           : "text-muted-foreground hover:text-foreground"
@@ -1312,10 +1315,7 @@ export default function MarketDetailPage() {
               )}
 
               {/* Outcome selector — dynamic, works for 2 or more outcomes */}
-              <div className={cn(
-                "grid gap-2",
-                (market?.outcomes?.length ?? 2) <= 2 ? "grid-cols-2" : "grid-cols-2"
-              )}>
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                 {(market?.outcomes ?? ["Yes", "No"]).map((outcomeName, i) => {
                   const tid = market?.tokenIds?.[i];
                   const book = tid ? liveOrderbooks.books[tid] : undefined;
@@ -1331,7 +1331,7 @@ export default function MarketDetailPage() {
                       onClick={() => setSelectedOutcomeIdx(i)}
                       disabled={tradeActionBusy}
                       className={cn(
-                        "rounded-2xl border p-3.5 text-left transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70",
+                        "rounded-xl sm:rounded-2xl border p-3 sm:p-3.5 text-left transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 active:scale-[0.97]",
                         selectedOutcomeIdx === i
                           ? tradeSide === "buy"
                             ? "border-[oklch(0.68_0.18_155/0.55)] bg-[oklch(0.68_0.18_155/0.10)] shadow-[0_0_16px_oklch(0.68_0.18_155/0.12)]"
@@ -1345,7 +1345,7 @@ export default function MarketDetailPage() {
                       )}>
                         {tradeSide === "buy" ? "Buy" : "Sell"} {outcomeName}
                       </div>
-                      <div className="text-xl font-bold text-foreground mt-1">{displayPrice.toFixed(1)}¢</div>
+                      <div className="text-lg sm:text-xl font-bold text-foreground mt-0.5 sm:mt-1">{displayPrice.toFixed(1)}¢</div>
                     </button>
                   );
                 })}
@@ -1399,18 +1399,18 @@ export default function MarketDetailPage() {
               })()}
 
               {/* Amount input + quick amounts */}
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                   {tradeSide === "buy" ? "Amount (pUSD)" : "Shares to sell"}
                 </label>
-                <div className="flex items-center gap-2 rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] px-4 focus-within:border-[oklch(0.78_0.16_82/0.45)] focus-within:shadow-[0_0_0_3px_oklch(0.78_0.16_82/0.08)] transition-all">
+                <div className="flex items-center gap-2 rounded-xl sm:rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] px-3.5 sm:px-4 focus-within:border-[oklch(0.78_0.16_82/0.45)] focus-within:shadow-[0_0_0_3px_oklch(0.78_0.16_82/0.08)] transition-all">
                   <span className="text-sm font-bold text-muted-foreground">{tradeSide === "buy" ? "$" : "sh"}</span>
                   <input
                     value={orderAmount}
                     onChange={(e) => setOrderAmount(e.target.value)}
                     disabled={tradeActionBusy}
                     inputMode="decimal"
-                    className="h-12 flex-1 bg-transparent outline-none text-lg font-bold text-foreground disabled:cursor-not-allowed"
+                    className="h-11 sm:h-12 flex-1 bg-transparent outline-none text-lg font-bold text-foreground disabled:cursor-not-allowed"
                     placeholder="0.00"
                   />
                 </div>
@@ -2574,7 +2574,7 @@ export default function MarketDetailPage() {
               {/* Main action button */}
               {!connectedWalletAddress ? (
                 <Button
-                  className="w-full h-12 sm:h-11 gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold text-sm sm:text-xs shadow-[0_0_20px_oklch(0.78_0.16_82/0.25)] active:scale-[0.98] transition-transform"
+                  className="w-full h-12 rounded-xl gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold text-sm shadow-[0_0_20px_oklch(0.78_0.16_82/0.25)] active:scale-[0.98] transition-transform"
                   onClick={handleConnectWallet}
                   disabled={!ready}
                 >
@@ -2583,7 +2583,7 @@ export default function MarketDetailPage() {
                 </Button>
               ) : !tradingProfile.profile ? (
                 <Button
-                  className="w-full h-12 sm:h-11 gap-2"
+                  className="w-full h-12 rounded-xl gap-2"
                   disabled
                 >
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -2593,7 +2593,7 @@ export default function MarketDetailPage() {
                 <div className="space-y-2">
                   <Button
                     className={cn(
-                      "w-full h-13 rounded-2xl gap-2 font-bold text-sm active:scale-[0.98] transition-all duration-200",
+                      "w-full h-12 sm:h-13 rounded-xl sm:rounded-2xl gap-2 font-bold text-sm active:scale-[0.98] transition-all duration-200",
                       tradeSide === "buy"
                         ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.01_255)] hover:bg-[oklch(0.83_0.16_82)] shadow-[0_4px_20px_oklch(0.78_0.16_82/0.35)]"
                         : "bg-[oklch(0.58_0.2_25)] text-white hover:bg-[oklch(0.63_0.2_25)] shadow-[0_4px_20px_oklch(0.58_0.2_25/0.25)]"
@@ -2610,6 +2610,40 @@ export default function MarketDetailPage() {
           </div>
         </div>
       </main>
+      {/* ── Mobile sticky bottom trade bar ── */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 glass-surface border-t border-[oklch(0.28_0.016_255/0.55)] safe-bottom">
+        <div className="flex items-center gap-2 px-4 py-2.5 max-w-7xl mx-auto">
+          {/* Price pills */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className="text-xs font-bold text-[oklch(0.74_0.20_155)] tabular-nums">Yes {yesPrice.toFixed(0)}¢</span>
+            <span className="text-[oklch(0.24_0.014_255)]">/</span>
+            <span className="text-xs font-bold text-[oklch(0.65_0.20_25)] tabular-nums">No {noPrice.toFixed(0)}¢</span>
+          </div>
+          {/* Quick trade buttons */}
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setTradeSide("buy");
+                document.getElementById("trade-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="h-10 px-5 rounded-xl btn-yes btn-press flex items-center justify-center"
+            >
+              <span className="text-[12px] font-bold text-[oklch(0.92_0.12_155)]">Buy Yes</span>
+            </button>
+            <button
+              onClick={() => {
+                setTradeSide("buy");
+                setSelectedOutcomeIdx(1);
+                document.getElementById("trade-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="h-10 px-5 rounded-xl btn-no btn-press flex items-center justify-center"
+            >
+              <span className="text-[12px] font-bold text-[oklch(0.90_0.12_25)]">Buy No</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <Footer />
       <BnbFundingModal
         open={fundingOpen}

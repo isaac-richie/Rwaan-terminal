@@ -108,14 +108,22 @@ export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="surface-card rounded-2xl overflow-hidden" style={{ animationDelay: `${i * 60}ms` }}>
-            <div className="h-24 shimmer" />
-            <div className="p-4 space-y-3">
-              <div className="h-4 shimmer rounded-md w-full" />
-              <div className="h-4 shimmer rounded-md w-4/5" />
-              <div className="h-2 shimmer rounded-full w-full mt-4" />
-              <div className="flex gap-2 mt-4">
-                <div className="h-8 shimmer rounded-xl flex-1" />
-                <div className="h-8 shimmer rounded-xl flex-1" />
+            <div className="p-3.5 sm:p-4 space-y-2.5 sm:space-y-3">
+              <div className="flex items-start gap-2.5">
+                <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl shimmer shrink-0" />
+                <div className="flex-1 space-y-2 pt-1">
+                  <div className="h-3 shimmer rounded-md w-16" />
+                  <div className="h-4 shimmer rounded-md w-full" />
+                  <div className="h-4 shimmer rounded-md w-3/4" />
+                </div>
+              </div>
+              <div className="h-1.5 sm:h-2 shimmer rounded-full w-full" />
+              <div className="flex items-center justify-between">
+                <div className="h-3 shimmer rounded-md w-20" />
+                <div className="flex gap-1.5">
+                  <div className="h-8 w-16 shimmer rounded-xl" />
+                  <div className="h-8 w-16 shimmer rounded-xl" />
+                </div>
               </div>
             </div>
           </div>

@@ -217,101 +217,103 @@ export default function PointsPage() {
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 rawli-page-bottom rawli-page-top sm:px-6 lg:px-8">
 
         {/* ── Hero ─────────────────────────────────────────── */}
-        <section className="pt-8">
+        <section className="pt-4 sm:pt-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.08)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.20em] text-[oklch(0.82_0.16_82)]">
             <Award className="h-3 w-3" />
             Season 1 — Pre-launch
           </div>
-          <h1 className="mt-5 max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+          <h1 className="mt-3 sm:mt-5 max-w-2xl text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
             Edge compounds over time.
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            Trade smart, unlock intelligence, refer traders — every action earns points and climbs tiers toward governance-token rewards.
+          <p className="mt-2 sm:mt-3 max-w-xl text-[13px] sm:text-sm leading-relaxed text-muted-foreground">
+            Trade smart, unlock intelligence, refer traders — every action earns points toward governance-token rewards.
           </p>
         </section>
 
         {/* ── Points HUD ───────────────────────────────────── */}
-        <section className="mt-10 grid gap-4 lg:grid-cols-12">
+        <section className="mt-6 sm:mt-10 grid gap-3 sm:gap-4 lg:grid-cols-12">
 
           {/* Left — your score */}
-          <div className="surface-card overflow-hidden rounded-2xl p-6 lg:col-span-4">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Your points</div>
-            <div className="mt-4 font-mono text-6xl font-bold tracking-tighter text-foreground">{totalPoints.toLocaleString()}</div>
-
-            <div className="mt-3 flex items-center gap-2">
+          <div className="surface-card overflow-hidden rounded-2xl p-4 sm:p-6 lg:col-span-4">
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Your points</div>
               <div
-                className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+                className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider"
                 style={{ borderColor: currentTier.border, background: currentTier.bg, color: currentTier.color }}
               >
                 <CurrentTierIcon className="h-2.5 w-2.5" /> {currentTier.name}
               </div>
-              <span className="text-[11px] text-muted-foreground">{connectedWalletAddress ? "Live" : "Connect wallet"}</span>
             </div>
+            <div className="mt-3 sm:mt-4 font-mono text-5xl sm:text-6xl font-bold tracking-tighter text-foreground">{totalPoints.toLocaleString()}</div>
 
             {/* Progress bar */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="mt-4 sm:mt-6">
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.10em] text-muted-foreground">
                 <span>{nextTier ? `→ ${nextTier.name}` : "Top tier"}</span>
                 <span className="font-mono">{nextTier ? `${totalPoints.toLocaleString()} / ${progressMax.toLocaleString()}` : "Max"}</span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-[oklch(0.18_0.014_255)]">
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[oklch(0.18_0.014_255)]">
                 <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progressPct}%`, background: currentTier.color }} />
               </div>
             </div>
 
-            {/* Cashback line */}
-            {connectedWalletAddress && (
-              <div className="mt-5 flex items-center justify-between rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.6)] px-4 py-3">
-                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Cashback</span>
-                <span className="font-mono text-sm font-bold text-[oklch(0.78_0.16_82)]">{formatCashback(summary?.cashbackCents ?? 0)}</span>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setFundingOpen(true)}
-              disabled={!connectedWalletAddress || tradingProfile.loading || !tradingProfile.profile}
-              className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[oklch(0.78_0.16_82)] px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-[oklch(0.10_0.012_260)] transition-all hover:bg-[oklch(0.83_0.16_82)] hover:shadow-[0_4px_16px_oklch(0.78_0.16_82/0.30)] disabled:opacity-40"
-            >
-              <Wallet className="h-3.5 w-3.5" />
-              {connectedWalletAddress ? "Fund account" : "Connect to trade"}
-            </button>
+            {/* Cashback + Fund */}
+            <div className="mt-4 flex items-center gap-2">
+              {connectedWalletAddress && (
+                <div className="flex-1 flex items-center justify-between rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.6)] px-3 py-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground">Cashback</span>
+                  <span className="font-mono text-sm font-bold text-[oklch(0.78_0.16_82)]">{formatCashback(summary?.cashbackCents ?? 0)}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setFundingOpen(true)}
+                disabled={!connectedWalletAddress || tradingProfile.loading || !tradingProfile.profile}
+                className={cn(
+                  "flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[oklch(0.78_0.16_82)] text-[11px] font-bold text-[oklch(0.10_0.012_260)] transition-all hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-40 active:scale-95",
+                  connectedWalletAddress ? "px-4 shrink-0" : "w-full px-4"
+                )}
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                {connectedWalletAddress ? "Fund" : "Connect to trade"}
+              </button>
+            </div>
           </div>
 
           {/* Right — season + stats */}
-          <div className="flex flex-col gap-4 lg:col-span-8">
-            <div className="surface-card rounded-2xl p-5">
+          <div className="flex flex-col gap-3 sm:gap-4 lg:col-span-8">
+            <div className="surface-card rounded-2xl p-4 sm:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Season 1 countdown</div>
-                  <div className="mt-3 flex items-end gap-4">
+                  <div className="mt-2 sm:mt-3 flex items-end gap-3 sm:gap-4">
                     {["--", "--", "--"].map((val, i) => (
                       <div key={i} className="text-center">
-                        <div className="font-mono text-4xl font-bold text-foreground">{val}</div>
-                        <div className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{["Days", "Hrs", "Min"][i]}</div>
+                        <div className="font-mono text-3xl sm:text-4xl font-bold text-foreground">{val}</div>
+                        <div className="mt-0.5 sm:mt-1 text-[9px] sm:text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{["Days", "Hrs", "Min"][i]}</div>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.08)]">
+                <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl sm:rounded-2xl border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.08)]">
                   <Trophy className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
                 </div>
               </div>
-              <p className="mt-4 text-[11px] text-muted-foreground">
+              <p className="mt-3 sm:mt-4 text-[11px] text-muted-foreground">
                 Pre-season is live. All trades and unlocks are tracked for the retroactive snapshot.
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {[
                 { label: "Trades", value: summary?.trades?.toLocaleString() ?? "—", icon: Users },
                 { label: "Volume", value: summary ? `$${summary.volumeUsd.toFixed(0)}` : "—", icon: BarChart3 },
                 { label: "Unlocks", value: summary?.premiumUnlocks?.toLocaleString() ?? "—", icon: Sparkles },
               ].map(({ label, value, icon: Icon }) => (
-                <div key={label} className="surface-card rounded-2xl p-4">
-                  <Icon className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
-                  <div className="mt-3 font-mono text-2xl font-bold text-foreground">{value}</div>
-                  <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+                <div key={label} className="surface-card rounded-xl sm:rounded-2xl p-3 sm:p-4">
+                  <Icon className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-[oklch(0.78_0.16_82)]" />
+                  <div className="mt-2 sm:mt-3 font-mono text-xl sm:text-2xl font-bold text-foreground">{value}</div>
+                  <div className="mt-0.5 sm:mt-1 text-[9px] sm:text-[10px] uppercase tracking-[0.10em] text-muted-foreground">{label}</div>
                 </div>
               ))}
             </div>
@@ -319,22 +321,19 @@ export default function PointsPage() {
         </section>
 
         {/* ── Daily Quests ─────────────────────────────────── */}
-        <section className="mt-12">
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-muted-foreground">Daily quests</div>
-                <h2 className="mt-1 text-2xl font-bold text-foreground">Small actions. Auto rewards.</h2>
-              </div>
-              {pointsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        <section className="mt-8 sm:mt-12">
+          <div className="mb-4 sm:mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg sm:text-2xl font-bold text-foreground">Daily Quests</h2>
+              {pointsLoading && <Loader2 className="mt-1 h-3 w-3 animate-spin text-muted-foreground" />}
             </div>
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] px-3 py-2 text-[11px] font-semibold text-muted-foreground">
-              <Target className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
-              {completedQuests}/{quests.length} done · resets {resetLabel}
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] px-2.5 py-1.5 text-[10px] sm:text-[11px] font-semibold text-muted-foreground shrink-0">
+              <Target className="h-3 w-3 text-[oklch(0.78_0.16_82)]" />
+              {completedQuests}/{quests.length}
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 md:grid-cols-3">
             {quests.slice(0, 6).map((quest) => {
               const pct = Math.max(0, Math.min(100, (quest.progress / Math.max(quest.target, 1)) * 100));
               return (

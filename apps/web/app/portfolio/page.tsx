@@ -222,7 +222,7 @@ function TabButton({ active, children, count, onClick }: {
       type="button"
       onClick={onClick}
       className={cn(
-        "relative flex h-9 items-center gap-2 rounded-full px-5 text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200",
+        "relative flex h-8 sm:h-9 items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-full px-3.5 sm:px-5 text-[11px] font-bold uppercase tracking-[0.10em] sm:tracking-[0.12em] transition-all duration-200 active:scale-95",
         active
           ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] shadow-[0_4px_16px_oklch(0.78_0.16_82/0.30)]"
           : "text-muted-foreground hover:bg-[oklch(0.16_0.014_255/0.7)] hover:text-foreground"
@@ -231,7 +231,7 @@ function TabButton({ active, children, count, onClick }: {
       <span>{children}</span>
       {typeof count === "number" && (
         <span className={cn(
-          "rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
+          "rounded px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold tabular-nums",
           active ? "bg-black/20 text-inherit" : "bg-[oklch(0.18_0.015_255)] text-muted-foreground"
         )}>
           {count}
@@ -617,69 +617,64 @@ function PortfolioContent() {
         {/* ── Header ─────────────────────────────────────── */}
 
         {/* ─ Mobile header ─ */}
-        <div className="sm:hidden pt-4">
+        <div className="sm:hidden pt-3">
           {/* Title row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">My Portfolio</span>
-              {walletAddress && (
-                <span className="rounded-full border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.012_260)] px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  {shortAddress(walletAddress)}
-                </span>
+              <span className="text-xs font-bold text-foreground">Portfolio</span>
+              {portfolio.loading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+              {!portfolio.loading && portfolio.lastUpdated && (
+                <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
               )}
             </div>
-            <button
-              onClick={handleRefreshAll}
-              disabled={portfolio.loading || !tradingWalletAddress}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[oklch(0.22_0.015_255)] text-muted-foreground disabled:opacity-40"
-              aria-label="Refresh"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", portfolio.loading && "animate-spin")} />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleRefreshAll}
+                disabled={portfolio.loading || !tradingWalletAddress}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-[oklch(0.22_0.015_255)] text-muted-foreground disabled:opacity-40 active:scale-95"
+                aria-label="Refresh"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", portfolio.loading && "animate-spin")} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setFundingOpen(true)}
+                disabled={!walletAddress || tradingProfile.loading || !tradingProfile.profile}
+                className="flex h-8 items-center gap-1.5 rounded-lg bg-[oklch(0.78_0.16_82)] px-3 text-[11px] font-bold text-[oklch(0.10_0.012_260)] disabled:opacity-40 active:scale-95"
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                Fund
+              </button>
+            </div>
           </div>
 
-          {/* Account value */}
-          <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground">
-            {data || pUsdBalance !== null ? formatPortfolioMoney(accountValue) : "$0.00"}
-          </h1>
+          {/* Account value — large, centered */}
+          <div className="mt-4 text-center">
+            <h1 className="text-[42px] font-bold tracking-tight text-foreground leading-none">
+              {data || pUsdBalance !== null ? formatPortfolioMoney(accountValue) : "$0.00"}
+            </h1>
 
-          {/* P/L row */}
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
-              stats.unrealizedPositive
-                ? "border-[oklch(0.68_0.18_155/0.30)] bg-[oklch(0.68_0.18_155/0.08)] text-[oklch(0.72_0.18_155)]"
-                : "border-[oklch(0.60_0.18_25/0.30)] bg-[oklch(0.60_0.18_25/0.08)] text-[oklch(0.64_0.18_25)]"
-            )}>
-              {stats.unrealizedPositive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-              Unrealized {data ? portfolio.summary.unrealized : "$0.00"}
-            </span>
-            <span className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
-              stats.realizedPositive
-                ? "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.05)] text-[oklch(0.72_0.18_155)]"
-                : "border-[oklch(0.60_0.18_25/0.20)] bg-[oklch(0.60_0.18_25/0.05)] text-[oklch(0.64_0.18_25)]"
-            )}>
-              Realized {data ? portfolio.summary.realized : "$0.00"}
-            </span>
-            {portfolio.loading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-            {!portfolio.loading && portfolio.lastUpdated && (
-              <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" /> Live
+            {/* P/L pills */}
+            <div className="mt-2.5 flex items-center justify-center gap-2 flex-wrap">
+              <span className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold",
+                stats.unrealizedPositive
+                  ? "border-[oklch(0.68_0.18_155/0.30)] bg-[oklch(0.68_0.18_155/0.08)] text-[oklch(0.72_0.18_155)]"
+                  : "border-[oklch(0.60_0.18_25/0.30)] bg-[oklch(0.60_0.18_25/0.08)] text-[oklch(0.64_0.18_25)]"
+              )}>
+                {stats.unrealizedPositive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+                {data ? portfolio.summary.unrealized : "$0.00"}
               </span>
-            )}
+              <span className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold",
+                stats.realizedPositive
+                  ? "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.05)] text-[oklch(0.72_0.18_155)]"
+                  : "border-[oklch(0.60_0.18_25/0.20)] bg-[oklch(0.60_0.18_25/0.05)] text-[oklch(0.64_0.18_25)]"
+              )}>
+                {data ? portfolio.summary.realized : "$0.00"}
+              </span>
+            </div>
           </div>
-
-          {/* Fund button — full width CTA */}
-          <button
-            type="button"
-            onClick={() => setFundingOpen(true)}
-            disabled={!walletAddress || tradingProfile.loading || !tradingProfile.profile}
-            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[oklch(0.78_0.16_82)] text-sm font-bold text-[oklch(0.10_0.012_260)] transition-all hover:bg-[oklch(0.83_0.16_82)] hover:shadow-[0_4px_16px_oklch(0.78_0.16_82/0.30)] disabled:opacity-40"
-          >
-            <Wallet className="h-4 w-4" />
-            Fund Account
-          </button>
         </div>
 
         {/* ─ Desktop header ─ */}
@@ -826,9 +821,9 @@ function PortfolioContent() {
         </div>
 
         {/* ── Tabs ────────────────────────────────────────── */}
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="no-scrollbar overflow-x-auto">
-            <div className="flex w-max min-w-full gap-1 rounded-2xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.10_0.012_260/0.65)] p-1">
+        <div className="mt-5 sm:mt-8 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="no-scrollbar overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="flex w-max min-w-full gap-0.5 sm:gap-1 rounded-xl sm:rounded-2xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.10_0.012_260/0.65)] p-0.5 sm:p-1">
               <TabButton active={activeTab === "positions"} count={openPositions.length} onClick={() => setActiveTab("positions")}>
                 Positions
               </TabButton>
@@ -840,7 +835,7 @@ function PortfolioContent() {
               </TabButton>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
+          <div className="hidden sm:flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
             <Clock3 className="h-3 w-3" />
             {portfolio.loading ? "Syncing…" : "Live · Polymarket API"}
           </div>
@@ -878,30 +873,28 @@ function PortfolioContent() {
                   };
 
                   return (
-                    <article key={`pos-${idx}`} className="group surface-card rounded-2xl overflow-hidden border border-[oklch(0.20_0.015_255)] transition-all hover:border-[oklch(0.26_0.016_255)] hover:shadow-[0_8px_32px_oklch(0_0_0/0.30)]">
+                    <article key={`pos-${idx}`} className="group surface-card rounded-xl sm:rounded-2xl overflow-hidden border border-[oklch(0.20_0.015_255)] transition-all hover:border-[oklch(0.26_0.016_255)] hover:shadow-[0_8px_32px_oklch(0_0_0/0.30)]">
                       {/* Accent bar */}
                       <div className={cn("h-0.5 w-full", pnlPositive ? "bg-gradient-to-r from-[oklch(0.68_0.18_155/0.8)] to-transparent" : "bg-gradient-to-r from-[oklch(0.60_0.18_25/0.8)] to-transparent")} />
 
-                      <div className="p-4 sm:p-5">
-                        <div className="flex items-start justify-between gap-3">
+                      <div className="p-3.5 sm:p-5">
+                        {/* Header: badges + P/L */}
+                        <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                            <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mb-1.5 sm:mb-2">
                               <span className={cn(
-                                "rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]",
+                                "rounded-md border px-1.5 sm:px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.10em]",
                                 isYes ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.08)] text-[oklch(0.72_0.18_155)]"
                                 : isNo ? "border-[oklch(0.60_0.18_25/0.25)] bg-[oklch(0.60_0.18_25/0.08)] text-[oklch(0.64_0.18_25)]"
                                 : "border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.014_255)] text-muted-foreground"
                               )}>
                                 {outcome}
                               </span>
-                              <span className="rounded-md border border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.06)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[oklch(0.68_0.18_155)]">
-                                {positionStatus(pos)}
-                              </span>
                               {timeLeft.label && (
                                 <span className={cn(
-                                  "flex items-center gap-1 rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]",
+                                  "flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.10em]",
                                   timeLeft.urgency === "critical"
-                                    ? "border-[oklch(0.60_0.18_25/0.35)] bg-[oklch(0.60_0.18_25/0.10)] text-[oklch(0.72_0.18_25)] animate-pulse"
+                                    ? "border-[oklch(0.60_0.18_25/0.35)] bg-[oklch(0.60_0.18_25/0.10)] text-[oklch(0.72_0.18_25)]"
                                     : timeLeft.urgency === "soon"
                                     ? "border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.08)] text-[oklch(0.84_0.16_82)]"
                                     : "border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.014_255)] text-muted-foreground"
@@ -911,19 +904,19 @@ function PortfolioContent() {
                                 </span>
                               )}
                             </div>
-                            <h3 className="text-[14px] font-semibold leading-snug text-foreground line-clamp-2">
+                            <h3 className="text-[13px] sm:text-[14px] font-semibold leading-snug text-foreground line-clamp-2">
                               {positionLabel(pos)}
                             </h3>
                           </div>
 
                           {/* P/L block */}
                           <div className="shrink-0 text-right">
-                            <div className={cn("text-xl font-bold tabular-nums",
+                            <div className={cn("text-lg sm:text-xl font-bold tabular-nums",
                               pnlPositive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.60_0.18_25)]"
                             )}>
                               {formatPortfolioPnl(pnl)}
                             </div>
-                            <div className={cn("mt-0.5 text-[11px] font-semibold tabular-nums",
+                            <div className={cn("text-[10px] sm:text-[11px] font-semibold tabular-nums",
                               pnlPositive ? "text-[oklch(0.68_0.18_155/0.7)]" : "text-[oklch(0.60_0.18_25/0.7)]"
                             )}>
                               {formatPercent(pnlPercent)}
@@ -933,7 +926,7 @@ function PortfolioContent() {
 
                         {/* Price journey bar */}
                         {avgCents > 0 && curCents > 0 && (
-                          <div className="mt-3">
+                          <div className="mt-2.5 sm:mt-3">
                             <div className="relative h-1 w-full overflow-hidden rounded-full bg-[oklch(0.16_0.014_255)]">
                               <div
                                 className={cn("absolute inset-y-0 left-0 rounded-full transition-all duration-700",
@@ -955,58 +948,43 @@ function PortfolioContent() {
                           </div>
                         )}
 
-                        {/* Stats row + actions */}
-                        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                          <div className="grid grid-cols-3 gap-x-3 gap-y-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
-                            <div>
-                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Shares</div>
-                              <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPortfolioNumber(shares)}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Value</div>
-                              <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPortfolioMoney(value)}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Max Payout</div>
-                              <div className="mt-0.5 font-mono text-[13px] font-semibold text-[oklch(0.72_0.18_155)]">{formatPortfolioMoney(maxPayout)}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Avg</div>
-                              <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPrice(avgPrice)}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Now</div>
-                              <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPrice(currentPrice)}</div>
-                            </div>
-                            {endDateStr && (
-                              <div>
-                                <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Closes</div>
-                                <div className={cn("mt-0.5 font-mono text-[13px] font-semibold",
-                                  timeLeft.urgency === "critical" ? "text-[oklch(0.72_0.18_25)]"
-                                  : timeLeft.urgency === "soon" ? "text-[oklch(0.84_0.16_82)]"
-                                  : "text-foreground"
-                                )}>{endDateStr}</div>
-                              </div>
-                            )}
+                        {/* Stats — compact grid on mobile */}
+                        <div className="mt-2.5 sm:mt-3 grid grid-cols-4 gap-x-2 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
+                          <div>
+                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground">Shares</div>
+                            <div className="mt-0.5 font-mono text-[12px] sm:text-[13px] font-semibold text-foreground">{formatPortfolioNumber(shares)}</div>
                           </div>
+                          <div>
+                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground">Value</div>
+                            <div className="mt-0.5 font-mono text-[12px] sm:text-[13px] font-semibold text-foreground">{formatPortfolioMoney(value)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground">Payout</div>
+                            <div className="mt-0.5 font-mono text-[12px] sm:text-[13px] font-semibold text-[oklch(0.72_0.18_155)]">{formatPortfolioMoney(maxPayout)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground">Avg</div>
+                            <div className="mt-0.5 font-mono text-[12px] sm:text-[13px] font-semibold text-foreground">{formatPrice(avgPrice)}</div>
+                          </div>
+                        </div>
 
-                          <div className="flex w-full items-center gap-2 sm:w-auto">
-                            <button
-                              onClick={() => marketHref && router.push(marketHref)}
-                              disabled={!marketHref}
-                              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-[oklch(0.24_0.016_255)] bg-transparent px-4 text-[11px] font-bold text-muted-foreground transition-colors hover:border-[oklch(0.32_0.016_255)] hover:text-foreground disabled:opacity-40 sm:flex-none"
-                            >
-                              View <ArrowUpRight className="h-3 w-3" />
-                            </button>
-                            <button
-                              onClick={handleSell}
-                              disabled={!marketHref}
-                              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[oklch(0.78_0.16_82)] px-4 text-[11px] font-bold text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-40 sm:flex-none"
-                            >
-                              <ArrowDownUp className="h-3 w-3" />
-                              Sell
-                            </button>
-                          </div>
+                        {/* Actions */}
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            onClick={() => marketHref && router.push(marketHref)}
+                            disabled={!marketHref}
+                            className="flex h-9 flex-1 items-center justify-center gap-1 rounded-xl border border-[oklch(0.24_0.016_255)] bg-transparent text-[11px] font-bold text-muted-foreground transition-colors hover:border-[oklch(0.32_0.016_255)] hover:text-foreground disabled:opacity-40 active:scale-[0.97]"
+                          >
+                            View <ArrowUpRight className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={handleSell}
+                            disabled={!marketHref}
+                            className="flex h-9 flex-1 items-center justify-center gap-1 rounded-xl bg-[oklch(0.78_0.16_82)] text-[11px] font-bold text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-40 active:scale-[0.97]"
+                          >
+                            <ArrowDownUp className="h-3 w-3" />
+                            Sell
+                          </button>
                         </div>
                       </div>
                     </article>
