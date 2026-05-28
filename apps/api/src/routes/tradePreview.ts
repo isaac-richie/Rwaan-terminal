@@ -106,6 +106,11 @@ function isMarketClosed(market: UnknownRecord): boolean {
   return market.closed === true || market.active === false;
 }
 
+function isMissingOrderbookError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  return /Request failed:\s*404/i.test(message) || /No orderbook/i.test(message);
+}
+
 export async function tradePreviewRoutes(app: FastifyInstance): Promise<void> {
   app.post("/trade/preview", async (req, reply) => {
     const parsed = previewSchema.safeParse(req.body ?? null);
@@ -125,27 +130,22 @@ export async function tradePreviewRoutes(app: FastifyInstance): Promise<void> {
       return { ok: false, error: "market_lookup_failed" };
     }
 
-    if (!market) {
-      reply.status(404);
-      return { ok: false, error: "market_not_found" };
-    }
-
-    if (isMarketClosed(market)) {
+    if (market && isMarketClosed(market)) {
       reply.status(409);
       return { ok: false, error: "market_closed" };
     }
 
-    const tokenIds = marketTokenIds(market);
-    if (!tokenIds.includes(tokenId)) {
+    const tokenIds = market ? marketTokenIds(market) : [tokenId];
+    if (tokenIds.length > 0 && !tokenIds.includes(tokenId)) {
       reply.status(400);
       return { ok: false, error: "token_not_in_market", tokenIds };
     }
 
-    const outcomes = parseStringArray((market as UnknownRecord).outcomes ?? (market as UnknownRecord).clobTokenIds);
-    const marketQuestion = String((market as UnknownRecord).question ?? "");
-    const marketCategory = String((market as UnknownRecord).category ?? "");
-    const marketVolume = String((market as UnknownRecord).volume_24hr ?? (market as UnknownRecord).volume ?? "");
-    const marketOutcomePrices = parseStringArray((market as UnknownRecord).outcomePrices);
+    const outcomes = market ? parseStringArray(market.outcomes ?? market.clobTokenIds) : [outcome];
+    const marketQuestion = market ? String(market.question ?? "") : "";
+    const marketCategory = market ? String(market.category ?? "") : "";
+    const marketVolume = market ? String(market.volume_24hr ?? market.volume ?? "") : "";
+    const marketOutcomePrices = market ? parseStringArray(market.outcomePrices) : [];
 
     // Fetch book with a single retry (Polymarket CLOB can be flaky)
     const fetchBookWithRetry = async () => {
@@ -178,6 +178,15 @@ export async function tradePreviewRoutes(app: FastifyInstance): Promise<void> {
     ]);
 
     if (bookResult.status === "rejected") {
+      if (isMissingOrderbookError(bookResult.reason)) {
+        req.log.warn({ err: bookResult.reason, marketId, tokenId }, "CLOB book is unavailable for trade preview");
+        reply.status(409);
+        return {
+          ok: false,
+          error: "orderbook_unavailable",
+          message: "This market does not have an active order book. It may be closed, resolved, or waiting for settlement."
+        };
+      }
       req.log.error({ err: bookResult.reason, tokenId }, "Unable to load CLOB book for trade preview (after retry)");
       reply.status(502);
       return { ok: false, error: "orderbook_lookup_failed" };

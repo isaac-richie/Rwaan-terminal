@@ -125,6 +125,7 @@ function previewErrorLabel(error: string) {
     market_not_found: "Market not found.",
     market_closed: "This market is closed.",
     token_not_in_market: "Selected outcome is not tradable on this market.",
+    orderbook_unavailable: "This market has no active order book. It may be closed, resolved, or waiting for settlement.",
     orderbook_lookup_failed: "Order book lookup failed. Try again in a moment.",
   };
   return labels[error] ?? error;
@@ -586,6 +587,10 @@ export default function MarketDetailPage() {
     (tradeSide === "sell"
       ? activeBidPrice ?? activeAskPrice
       : activeAskPrice ?? activeBidPrice) ?? baseActivePrice;
+  const sellOrderbookUnavailable =
+    tradeSide === "sell" &&
+    (activePrice <= 0.05 || activePrice >= 99.95) &&
+    !activeBook?.bestBid;
 
   useEffect(() => {
     setTradePreview(null);
@@ -865,6 +870,11 @@ export default function MarketDetailPage() {
 
     if (!tradingWalletAddress) {
       setPreviewError("Connect a wallet before previewing a trade.");
+      return;
+    }
+
+    if (sellOrderbookUnavailable) {
+      setPreviewError("This outcome is already at settlement price and has no active sell book. Wait for settlement or redemption.");
       return;
     }
 
@@ -2640,10 +2650,10 @@ export default function MarketDetailPage() {
                         : "bg-[oklch(0.58_0.2_25)] text-white hover:bg-[oklch(0.63_0.2_25)] shadow-[0_4px_20px_oklch(0.58_0.2_25/0.25)]"
                     )}
                     onClick={handlePreviewTrade}
-                    disabled={tradeActionBusy || !activeTokenId || amountNumber <= 0 || readiness.readiness?.canPreview === false}
+                    disabled={tradeActionBusy || !activeTokenId || amountNumber <= 0 || readiness.readiness?.canPreview === false || sellOrderbookUnavailable}
                   >
                     {previewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : tradeSide === "buy" ? <TrendingUp className="w-4 h-4" /> : <ArrowDownUp className="w-4 h-4" />}
-                    Preview {tradeSide === "buy" ? "Buy" : "Sell"} {activeOutcomeName}
+                    {sellOrderbookUnavailable ? "Market settling" : `Preview ${tradeSide === "buy" ? "Buy" : "Sell"} ${activeOutcomeName}`}
                   </Button>
                 </div>
               )}
