@@ -216,7 +216,7 @@ export function CryptoAssetChart({ asset, marketTitle }: { asset: CryptoAsset; m
                 {meta.name} market structure
               </h2>
               <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                Spot price action for {asset}/USDT, layered beside this Polymarket question for cleaner entry analysis.
+                Live {asset}/USDT spot price alongside this market's prediction odds.
               </p>
             </div>
           </div>

@@ -361,10 +361,14 @@ function toSignedOrderPreview(order: SignedOrder, side: "BUY" | "SELL" = "BUY", 
 function normalizeOrderSubmission(raw: unknown): OrderSubmission {
   const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {}
   const success = value.success === true
+  // Exclude raw HTTP status codes (e.g. "400") from the display status field —
+  // they look confusing and the error message already conveys the failure.
+  const rawStatus = value.status ? String(value.status) : undefined
+  const status = rawStatus && /^\d{3}$/.test(rawStatus) ? undefined : rawStatus
   return {
     success,
     orderId: value.orderID ? String(value.orderID) : value.orderId ? String(value.orderId) : undefined,
-    status: value.status ? String(value.status) : undefined,
+    status,
     takingAmount: value.takingAmount ? String(value.takingAmount) : undefined,
     makingAmount: value.makingAmount ? String(value.makingAmount) : undefined,
     transactionHashes: Array.isArray(value.transactionHashes)
@@ -930,7 +934,12 @@ export function useClobSession(wallet?: ConnectedWallet | null, profile?: Tradin
 
       if (!submission.success) {
         setSubmitStatus("error")
-        setError(submission.errorMsg ?? "Order submission failed.")
+        // Clear the signed order so the user cannot accidentally re-submit
+        // the same order hash (which Polymarket would reject as "Duplicated")
+        signedOrderRef.current = null
+        setSignedOrderPreview(null)
+        // Do NOT set session-level error here — the error lives in orderSubmission
+        // and is displayed in the Order Submission panel, not Trading Access
         return submission
       }
 

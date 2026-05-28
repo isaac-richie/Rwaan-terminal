@@ -127,6 +127,10 @@ function previewErrorLabel(error: string) {
 function friendlyTradeError(error?: string | null) {
   const raw = String(error ?? "").toLowerCase();
 
+  if (raw.includes("duplicat")) {
+    return "This order was already submitted. Sign a fresh order and try again.";
+  }
+
   if (
     raw.includes("transfer amount exceeds balance") ||
     raw.includes("insufficient funds") ||
@@ -149,6 +153,10 @@ function friendlyTradeError(error?: string | null) {
 
   if (raw.includes("region") || raw.includes("restricted")) {
     return "Trading is not available for this wallet or region right now.";
+  }
+
+  if (raw.includes("invalid") || raw.includes("bad request") || raw.includes("400")) {
+    return "The order was rejected by the exchange. Please sign a new order and try again.";
   }
 
   return "We could not submit that order. Please check the amount and try again in a moment.";
@@ -910,6 +918,8 @@ export default function MarketDetailPage() {
   };
 
   const handleSubmitSignedOrder = async () => {
+    // Guard: prevent double-submission if already in flight
+    if (clobSession.submitStatus === "submitting") return;
     setSubmitDialogError(null);
 
     const submittingBuy = clobSession.signedOrderPreview?.side === "BUY";
@@ -2406,7 +2416,9 @@ export default function MarketDetailPage() {
                   {(clobSession.error || depositWalletStatus.error) && (
                     <div className="flex min-w-0 gap-2 rounded-lg border border-[oklch(0.58_0.2_25/0.3)] bg-[oklch(0.58_0.2_25/0.08)] p-2.5 text-[11px] text-[oklch(0.74_0.14_25)]">
                       <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                      <span className="min-w-0 overflow-hidden break-words leading-snug">{clobSession.error ?? depositWalletStatus.error}</span>
+                      <span className="min-w-0 overflow-hidden break-words leading-snug">
+                        {depositWalletStatus.error ?? friendlyTradeError(clobSession.error)}
+                      </span>
                     </div>
                   )}
                 </div>
