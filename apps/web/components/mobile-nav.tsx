@@ -15,7 +15,7 @@ export function MobileNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 sm:hidden border-t border-[oklch(0.18_0.014_255/0.6)] bg-[oklch(0.09_0.011_260/0.96)] backdrop-blur-2xl">
+    <nav className="fixed bottom-0 inset-x-0 z-50 sm:hidden border-t border-[oklch(0.18_0.014_255/0.6)] bg-[oklch(0.09_0.011_260)] pb-safe-bottom shadow-[0_-12px_34px_oklch(0_0_0/0.42)]">
       <div className="flex items-stretch h-16">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href
@@ -44,8 +44,6 @@ export function MobileNav() {
           )
         })}
       </div>
-      {/* Safe area spacer for iOS home bar */}
-      <div className="h-safe-bottom bg-[oklch(0.09_0.011_260/0.96)]" />
     </nav>
   )
 }

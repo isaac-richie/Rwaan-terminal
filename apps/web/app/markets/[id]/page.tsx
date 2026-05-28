@@ -1045,7 +1045,7 @@ export default function MarketDetailPage() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <Navbar />
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 sm:pb-16 pt-24">
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top rawli-page-bottom">
           <div className="flex items-center justify-center min-h-[50vh]">
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-3 border-[oklch(0.78_0.16_82)] border-t-transparent rounded-full animate-spin" />
@@ -1062,7 +1062,7 @@ export default function MarketDetailPage() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <Navbar />
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 sm:pb-16 pt-24">
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top rawli-page-bottom">
           <div className="flex min-h-[50vh] items-center justify-center">
             <div className="surface-card max-w-md rounded-2xl p-6 text-center">
               <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-[oklch(0.58_0.2_25/0.3)] bg-[oklch(0.58_0.2_25/0.08)]">
@@ -1086,7 +1086,7 @@ export default function MarketDetailPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 sm:pb-16 pt-20">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top rawli-page-bottom">
         {/* Header */}
         <div className="pt-6 pb-5">
           <button

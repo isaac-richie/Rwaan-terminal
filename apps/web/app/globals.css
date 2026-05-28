@@ -57,6 +57,9 @@
   --green-bull: oklch(0.68 0.18 155);
   --red-bear: oklch(0.58 0.2 25);
 
+  --rawli-navbar-height: 70px;
+  --rawli-mobile-nav-height: calc(64px + env(safe-area-inset-bottom, 0px));
+
   --sidebar: oklch(0.13 0.013 255);
   --sidebar-foreground: oklch(0.94 0.008 90);
   --sidebar-primary: oklch(0.78 0.16 82);
@@ -121,6 +124,7 @@
   html {
     scroll-behavior: smooth;
     overflow-x: hidden;
+    scroll-padding-top: calc(var(--rawli-navbar-height) + env(safe-area-inset-top, 0px) + 16px);
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
@@ -406,8 +410,29 @@
      on every scroll on iOS — kill it on mobile. Same for scanline overlay,
      ambient glow pseudo-element, and card entrance animations. */
   /* iOS safe area for bottom nav */
+  .pt-safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
   .h-safe-bottom {
     height: env(safe-area-inset-bottom, 0px);
+  }
+  .rawli-page-top {
+    padding-top: calc(var(--rawli-navbar-height) + env(safe-area-inset-top, 0px) + 16px);
+  }
+  .rawli-page-bottom {
+    padding-bottom: calc(var(--rawli-mobile-nav-height) + 20px);
+  }
+
+  @media (min-width: 640px) {
+    .rawli-page-top {
+      padding-top: calc(var(--rawli-navbar-height) + 24px);
+    }
+    .rawli-page-bottom {
+      padding-bottom: 4rem;
+    }
   }
 
   @media (max-width: 639px) {

@@ -28,7 +28,7 @@ function HomeContent() {
       {/* Hero: always shown — mobile gets compact swipeable version */}
       <MarketHero />
 
-      <main id="markets" className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-0 pb-24 sm:pb-16 relative z-[1]">
+      <main id="markets" className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-0 rawli-page-bottom relative z-[1]">
         {/* Desktop heading */}
         <div className="hidden sm:flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 pb-3">
           <div>

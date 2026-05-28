@@ -666,7 +666,7 @@ export function Navbar() {
     <>
       <header
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transform-gpu bg-[oklch(0.09_0.012_260/0.94)] backdrop-blur-xl [backface-visibility:hidden] [contain:paint] [will-change:transform] transition-[background-color,box-shadow] duration-200",
+          "fixed top-0 left-0 right-0 z-50 pt-safe-top transform-gpu bg-[oklch(0.09_0.012_260)] sm:bg-[oklch(0.09_0.012_260/0.96)] backdrop-blur-xl [backface-visibility:hidden] [contain:paint] [will-change:transform] transition-[background-color,box-shadow] duration-200",
           scrolled
             ? "shadow-[0_1px_0_oklch(0.78_0.16_82/0.12),0_10px_34px_oklch(0_0_0/0.26)]"
             : "shadow-none"

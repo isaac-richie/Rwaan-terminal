@@ -72,7 +72,7 @@ function ProbArc({ pct, size = 140 }: { pct: number; size?: number }) {
 
 function HeroSkeleton() {
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-7 relative z-[1] overflow-hidden">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top pb-7 relative z-[1] overflow-hidden">
       <div className="space-y-5">
         <div className="h-8 w-48 shimmer rounded-full" />
         <div className="h-16 w-3/4 shimmer rounded-2xl" />
@@ -153,7 +153,7 @@ export function MarketHero() {
   if (!activeMarket) return null
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-4 sm:pb-7 relative z-[1]">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top pb-4 sm:pb-7 relative z-[1]">
 
       {/* ── Hero headline — hidden on mobile to keep it light ── */}
       <div className="mb-8 hidden sm:block">

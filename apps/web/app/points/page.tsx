@@ -214,7 +214,7 @@ export default function PointsPage() {
   return (
     <div className="terminal-grid-bg ambient-glow flex min-h-screen flex-col bg-background">
       <Navbar />
-      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-24 pt-24 sm:px-6 lg:px-8">
+      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 rawli-page-bottom rawli-page-top sm:px-6 lg:px-8">
 
         {/* ── Hero ─────────────────────────────────────────── */}
         <section className="pt-8">

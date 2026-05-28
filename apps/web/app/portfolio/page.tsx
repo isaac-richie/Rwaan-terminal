@@ -612,7 +612,7 @@ function PortfolioContent() {
   return (
     <div className="terminal-grid-bg ambient-glow flex min-h-screen flex-col bg-background">
       <Navbar />
-      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-20 pt-24 sm:px-6 lg:px-8">
+      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 rawli-page-bottom rawli-page-top sm:px-6 lg:px-8">
 
         {/* ── Header ─────────────────────────────────────── */}
 
@@ -1305,7 +1305,7 @@ function MissingPrivyPortfolio() {
   return (
     <div className="terminal-grid-bg ambient-glow flex min-h-screen flex-col bg-background">
       <Navbar />
-      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 px-4 pb-24 sm:pb-16 pt-24 sm:px-6 lg:px-8">
+      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 px-4 rawli-page-bottom rawli-page-top sm:px-6 lg:px-8">
         <div className="surface-card mt-10 h-fit w-full rounded-2xl p-6 sm:p-8">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[oklch(0.24_0.016_255)] bg-[oklch(0.15_0.014_255)]">
