@@ -6,6 +6,14 @@ import type { ConnectedWallet } from "@privy-io/react-auth"
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"
 const POLYGON_CHAIN_ID = 137
 const POLYGON_CHAIN_HEX = "0x89"
+const POLYGON_RPC_URLS = [
+  ...(process.env.NEXT_PUBLIC_POLYGON_RPC_URL ?? "https://polygon-rpc.com")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean),
+  "https://rpc.ankr.com/polygon",
+  "https://polygon.publicnode.com",
+].filter((url, index, urls) => urls.indexOf(url) === index)
 
 type ApprovalStatus = "idle" | "preparing" | "signing" | "submitting" | "approved" | "error"
 
@@ -97,11 +105,7 @@ async function ensurePolygon(wallet: ConnectedWallet): Promise<Eip1193Provider> 
           chainId: POLYGON_CHAIN_HEX,
           chainName: "Polygon",
           nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
-          rpcUrls: [
-            process.env.NEXT_PUBLIC_POLYGON_RPC_URL ?? "https://polygon-rpc.com",
-            "https://rpc.ankr.com/polygon",
-            "https://polygon.publicnode.com",
-          ].filter(Boolean),
+          rpcUrls: POLYGON_RPC_URLS,
           blockExplorerUrls: ["https://polygonscan.com"],
         }],
       })

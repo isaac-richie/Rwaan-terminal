@@ -22,6 +22,11 @@ function buildRpcList(): string[] {
 
 const RPC_LIST = buildRpcList();
 
+function rpcLabel(endpoint: string) {
+  const slot = RPC_LIST.indexOf(endpoint);
+  return slot >= 0 ? `slot ${slot}` : "custom endpoint";
+}
+
 // Track which endpoint is currently healthy to avoid always retrying from slot 0.
 // In practice payment.ts is called once per unlock so this is a lightweight hint.
 let preferredRpcIndex = 0;
@@ -74,13 +79,13 @@ async function bscRpc(method: string, params: unknown[]): Promise<unknown> {
       if (globalIdx !== preferredRpcIndex) {
         preferredRpcIndex = globalIdx;
         if (i > 0) {
-          console.log(`[bsc-rpc] Promoted ${endpoint} to preferred (slot ${globalIdx})`);
+          console.log(`[bsc-rpc] Promoted ${rpcLabel(endpoint)} to preferred`);
         }
       }
       return result;
     } catch (err: any) {
       lastError = err;
-      console.warn(`[bsc-rpc] ${endpoint} failed (${err.message ?? err}) — trying next`);
+      console.warn(`[bsc-rpc] ${rpcLabel(endpoint)} failed (${err.message ?? err}) — trying next`);
     }
   }
 
@@ -96,10 +101,10 @@ export async function checkRpcHealth(): Promise<void> {
       try {
         await rpcCall(url, "eth_blockNumber", []);
         const latencyMs = Date.now() - start;
-        console.log(`[bsc-rpc] slot ${i} ${url} ✓ (${latencyMs}ms)`);
+        console.log(`[bsc-rpc] slot ${i} ok (${latencyMs}ms)`);
         return { url, latencyMs };
       } catch (err: any) {
-        console.warn(`[bsc-rpc] slot ${i} ${url} ✗ (${err.message})`);
+        console.warn(`[bsc-rpc] slot ${i} failed (${err.message})`);
         throw err;
       }
     })
@@ -120,7 +125,7 @@ export async function checkRpcHealth(): Promise<void> {
     const bestResult = best.result as PromiseFulfilledResult<{ url: string; latencyMs: number }>;
     preferredRpcIndex = RPC_LIST.indexOf(bestResult.value.url);
     console.log(
-      `[bsc-rpc] Best endpoint: slot ${preferredRpcIndex} ${bestResult.value.url} (${bestResult.value.latencyMs}ms)`
+      `[bsc-rpc] Best endpoint: slot ${preferredRpcIndex} (${bestResult.value.latencyMs}ms)`
     );
   } else {
     console.error("[bsc-rpc] ⚠ All RPC endpoints are unreachable — payment verification will fail");

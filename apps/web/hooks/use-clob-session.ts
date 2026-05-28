@@ -35,6 +35,15 @@ const CLOB_OPERATORS = [
   "0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296",
 ]
 const MAX_UINT256 = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+const POLYGON_RPC_URLS = [
+  ...(process.env.NEXT_PUBLIC_POLYGON_RPC_URL ?? "https://polygon-rpc.com")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean),
+  "https://rpc.ankr.com/polygon",
+  "https://polygon.publicnode.com",
+  "https://polygon.drpc.org",
+].filter((url, index, urls) => urls.indexOf(url) === index)
 
 type StoredClobSession = {
   walletAddress: string
@@ -95,12 +104,7 @@ const POLYGON_CHAIN_PARAMS = {
     decimals: 18,
   },
   // Multiple RPCs so wallets that validate connectivity have fallbacks
-  rpcUrls: [
-    process.env.NEXT_PUBLIC_POLYGON_RPC_URL ?? "https://polygon-rpc.com",
-    "https://rpc.ankr.com/polygon",
-    "https://polygon.publicnode.com",
-    "https://polygon.drpc.org",
-  ].filter(Boolean),
+  rpcUrls: POLYGON_RPC_URLS,
   blockExplorerUrls: ["https://polygonscan.com"],
 }
 
