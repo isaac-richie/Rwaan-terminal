@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { Loader2, RefreshCw, AlertCircle } from "lucide-react"
 import { TradingCard } from "./trading-card"
-import { fetchMarkets, getCachedMarkets } from "@/lib/markets"
+import { fetchMarkets, getCachedMarkets, scheduleCategoryPrefetch } from "@/lib/markets"
 import type { PolymarketMarket } from "@/lib/polymarket"
 
 interface MarketsGridProps {
@@ -49,8 +49,22 @@ export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
     async (nextPage: number, reset = false) => {
       const key = `${category}-${sortBy}-${search ?? ""}`
       fetchKey.current = key
-      setLoading(true)
       setError(null)
+
+      // On reset (category switch), show cached data immediately if available
+      if (reset) {
+        const cached = getCachedMarkets(category, 12, sortBy, 0, search)
+        if (cached && cached.length > 0) {
+          setMarkets(dedupeMarkets(cached))
+          setPage(1)
+          setHasMore(cached.length >= 12)
+          // Still fetch fresh data in the background, but don't show loading state
+        } else {
+          setLoading(true)
+        }
+      } else {
+        setLoading(true)
+      }
 
       try {
         const limit = 12
@@ -67,9 +81,14 @@ export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
           setPage(nextPage + 1)
         }
         setHasMore(data.length === limit)
+        // After first successful load, prefetch other categories in background
+        if (reset && nextPage === 0) scheduleCategoryPrefetch()
       } catch (err) {
         if (fetchKey.current !== key) return
-        setError("Failed to load events. Please try again.")
+        // Only show error if we have no cached data to display
+        if (markets.length === 0) {
+          setError("Failed to load events. Please try again.")
+        }
       } finally {
         if (fetchKey.current === key) setLoading(false)
       }

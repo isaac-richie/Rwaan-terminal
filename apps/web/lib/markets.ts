@@ -4,8 +4,8 @@ import { fetchPolymarketMarkets, type PolymarketMarket } from "./polymarket"
 // ─── Client-side cache ──────────────────────────────────────────────────────
 // Prevents shimmer flash when navigating back to '/'. Data is returned instantly
 // from cache and a background revalidation refreshes it for the next visit.
-const CACHE_TTL_MS = 45_000 // 45s — fresh enough, avoids redundant fetches
-const STALE_TTL_MS = 120_000 // 2min — serve stale while revalidating
+const CACHE_TTL_MS = 30_000 // 30s — fresh enough, avoids redundant fetches
+const STALE_TTL_MS = 5 * 60_000 // 5min — serve stale while revalidating (category switch = instant)
 
 type CacheEntry = {
   data: PolymarketMarket[]
@@ -84,6 +84,32 @@ export async function fetchMarkets(
     return cached.data
   }
 
+  // If stale but within window, return stale immediately + refresh in background
+  if (cached && Date.now() - cached.fetchedAt < STALE_TTL_MS) {
+    // Fire background refresh (don't await it)
+    const doRefresh = async () => {
+      try {
+        const includeKalshi = (process.env.NEXT_PUBLIC_ENABLE_KALSHI ?? "false") === "true"
+        const requests = [
+          fetchPolymarketMarkets(category, limit, sortBy, offset, search),
+          includeKalshi ? fetchKalshiMarkets(category ?? "all", limit, sortBy, offset, search) : Promise.resolve([])
+        ]
+        const [polyResult, kalshiResult] = await Promise.allSettled(requests)
+        const poly = polyResult.status === "fulfilled" ? polyResult.value : []
+        const kalshi = kalshiResult.status === "fulfilled" ? kalshiResult.value : []
+        const merged = dedupeMarkets([...poly, ...kalshi])
+        if (sortBy === "volume") merged.sort((a, b) => volumeToNumber(b.volume) - volumeToNumber(a.volume))
+        else if (sortBy === "newest") merged.sort((a, b) => timeToNumber(b.createdAt) - timeToNumber(a.createdAt))
+        else if (sortBy === "daily") merged.sort((a, b) => volumeToNumber(b.liquidity) - volumeToNumber(a.liquidity))
+        else if (sortBy === "ending") merged.sort((a, b) => timeToNumber(a.endDate) - timeToNumber(b.endDate))
+        const result = merged.slice(0, limit)
+        marketCache.set(key, { data: result, fetchedAt: Date.now() })
+      } catch { /* background refresh — swallow errors */ }
+    }
+    void doRefresh()
+    return cached.data
+  }
+
   const includeKalshi = (process.env.NEXT_PUBLIC_ENABLE_KALSHI ?? "false") === "true"
   const requests = [
     fetchPolymarketMarkets(category, limit, sortBy, offset, search),
@@ -111,4 +137,23 @@ export async function fetchMarkets(
   marketCache.set(key, { data: result, fetchedAt: Date.now() })
 
   return result
+}
+
+// ─── Background prefetch ───────────────────────────────────────────────────
+// Warms the cache for popular categories so switching feels instant.
+// Called once after the initial "all" load completes.
+let prefetchScheduled = false
+export function scheduleCategoryPrefetch() {
+  if (prefetchScheduled || typeof window === "undefined") return
+  prefetchScheduled = true
+  // Wait 2s after initial load so we don't compete with the user's first view
+  setTimeout(() => {
+    const cats = ["Crypto", "Sports", "Entertainment", "News", "Africa"]
+    for (const cat of cats) {
+      // Only prefetch if not already cached
+      if (!getCachedMarkets(cat, 12, "trending", 0)) {
+        void fetchMarkets(cat, 12, "trending", 0).catch(() => {})
+      }
+    }
+  }, 2000)
 }

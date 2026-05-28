@@ -566,6 +566,22 @@ function fetchGammaEventsDeduped(url: string): Promise<GammaEventRaw[]> {
   return promise
 }
 
+/**
+ * Batch fetch: sends all tag IDs in ONE request to the backend batch endpoint.
+ * Backend fans out to Gamma API (with cache) and merges results server-side.
+ * This eliminates N parallel round-trips from the browser.
+ */
+function fetchGammaEventsBatch(
+  baseParams: URLSearchParams,
+  tagIds: string[]
+): Promise<GammaEventRaw[]> {
+  const params = new URLSearchParams(baseParams)
+  params.set("tag_ids", tagIds.join(","))
+  params.set("compact", "true")
+  const url = `${API_BASE}/gamma/events/batch?${params.toString()}`
+  return fetchGammaEventsDeduped(url)
+}
+
 // For "all" + trending/volume, use the highest-traffic tags.
 // All 4 crypto tag IDs included so 24h crypto markets are never missed.
 const FAST_ALL_TAG_IDS = ["21", "235", "101611", "1312", "2", "596", "1", "102974", "102969"] // all crypto + news + entertainment + sports + AFCON
@@ -604,36 +620,19 @@ export async function fetchPolymarketMarkets(
     }
 
     const normalizedCat = normalizeCategory(category)
-    // Fast path: "all" with trending/volume uses only 4 broad tags (not 14)
+    // Fast path: "all" with trending/volume uses only broad tags (not 14)
     const tagIds = normalizedCat === "all" && (sortBy === "trending" || sortBy === "volume") && !search
       ? FAST_ALL_TAG_IDS
       : getCategoryFeedTagIds(category)
     if (tagIds.length === 0) return []
 
-    const eventResults = await Promise.allSettled(
-      tagIds.map((tagId) => {
-        const params = new URLSearchParams(baseParams)
-        params.set("tag_id", tagId)
-        params.set("related_tags", "true")
-        params.set("compact", "true")
-        return fetchGammaEventsDeduped(`${API_BASE}/gamma/events?${params.toString()}`)
-      })
-    )
+    // Single batch request — backend fans out to Gamma API with caching
+    const batchEvents = await fetchGammaEventsBatch(baseParams, tagIds)
 
     const mergedEvents = new Map<string, GammaEventRaw>()
-    for (const result of eventResults) {
-      if (result.status !== "fulfilled") {
-        console.warn("[rawli] Polymarket category feed skipped:", result.reason)
-        continue
-      }
-      for (const event of result.value) {
-        const key = event.id ?? event.slug ?? event.title
-        if (key && !mergedEvents.has(key)) mergedEvents.set(key, event)
-      }
-    }
-    if (mergedEvents.size === 0) {
-      const failed = eventResults.find((result) => result.status === "rejected")
-      if (failed && failed.status === "rejected") throw failed.reason
+    for (const event of batchEvents) {
+      const key = event.id ?? event.slug ?? event.title
+      if (key && !mergedEvents.has(key)) mergedEvents.set(key, event)
     }
 
     const events = sortGammaEvents(Array.from(mergedEvents.values()), sortBy)

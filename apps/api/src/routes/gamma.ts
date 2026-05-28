@@ -8,12 +8,12 @@ const MARKET_CACHE_TTL_SECONDS = 60;
 const EVENT_CACHE_TTL_SECONDS = 120;
 const FEED_STALE_TTL_SECONDS = 15 * 60;
 const FEED_PREWARM_INTERVAL_MS = 60_000;
-const FEED_PREWARM_QUERIES: Array<Record<string, string>> = [
-  { active: "true", closed: "false", compact: "true", limit: "96", offset: "0", order: "volume_24hr", ascending: "false", tag_id: "21", related_tags: "true" },
-  { active: "true", closed: "false", compact: "true", limit: "96", offset: "0", order: "volume_24hr", ascending: "false", tag_id: "2", related_tags: "true" },
-  { active: "true", closed: "false", compact: "true", limit: "96", offset: "0", order: "volume_24hr", ascending: "false", tag_id: "596", related_tags: "true" },
-  { active: "true", closed: "false", compact: "true", limit: "96", offset: "0", order: "volume_24hr", ascending: "false", tag_id: "1", related_tags: "true" },
-];
+// Prewarm all tag IDs used by the "all" feed so category switches are instant
+const PREWARM_TAG_IDS = ["21", "235", "101611", "1312", "2", "596", "1", "102974", "102969"];
+const FEED_PREWARM_QUERIES: Array<Record<string, string>> = PREWARM_TAG_IDS.map((tagId) => ({
+  active: "true", closed: "false", compact: "true", limit: "96", offset: "0",
+  order: "volume_24hr", ascending: "false", tag_id: tagId, related_tags: "true",
+}));
 const inFlightRefreshes = new Map<string, Promise<unknown>>();
 
 type UnknownRecord = Record<string, unknown>;
@@ -222,6 +222,47 @@ export async function gammaRoutes(app: FastifyInstance): Promise<void> {
       EVENT_CACHE_TTL_SECONDS,
       FEED_STALE_TTL_SECONDS,
     );
+  });
+
+  // Batch endpoint: fetch multiple tag_ids in a single request, merge server-side.
+  // Eliminates N parallel requests from the frontend per category switch.
+  app.get("/gamma/events/batch", async (req) => {
+    const query = gammaQuerySchema.parse(req.query ?? {});
+    const tagIdsRaw = query.tag_ids ?? "";
+    const tagIds = tagIdsRaw.split(",").map((s: string) => s.trim()).filter(Boolean);
+    if (tagIds.length === 0) return [];
+
+    // Build per-tag queries (reuse existing cache)
+    const perTagResults = await Promise.allSettled(
+      tagIds.map((tagId: string) => {
+        const perTagQuery: Record<string, string> = { ...query, tag_id: tagId, related_tags: "true" };
+        delete perTagQuery.tag_ids;
+        const isCompact = perTagQuery.compact === "true";
+        const cacheKey = buildCacheKey("gamma:events", perTagQuery);
+        return getCachedOrRefresh(
+          cacheKey,
+          async () => {
+            const events = await getGamma("/events", withoutInternalQuery(perTagQuery));
+            return isCompact ? compactGammaEvents(events) : events;
+          },
+          EVENT_CACHE_TTL_SECONDS,
+          FEED_STALE_TTL_SECONDS,
+        );
+      })
+    );
+
+    // Merge + dedupe events across all tags
+    const mergedEvents = new Map<string, unknown>();
+    for (const result of perTagResults) {
+      if (result.status !== "fulfilled" || !Array.isArray(result.value)) continue;
+      for (const event of result.value) {
+        const e = event as Record<string, unknown>;
+        const key = String(e.id ?? e.slug ?? e.title ?? "");
+        if (key && !mergedEvents.has(key)) mergedEvents.set(key, event);
+      }
+    }
+
+    return Array.from(mergedEvents.values());
   });
 
   app.get("/gamma/tags", async (req) => {
