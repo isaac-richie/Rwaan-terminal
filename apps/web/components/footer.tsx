@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   TrendingUp,
   Lock,
+  ChevronRight,
 } from "lucide-react"
 
 // ─── Legal sheet (Terms / Privacy) ───────────────────────────────────────────
@@ -196,42 +197,179 @@ const PRIVACY_CONTENT = (
 
 // ─── Docs feature cards ───────────────────────────────────────────────────────
 
-const DOCS = [
+const DOCS: Array<{
+  icon: React.ElementType
+  color: string
+  title: string
+  body: string
+  detail: React.ReactNode
+}> = [
   {
     icon: BarChart3,
     color: "oklch(0.78 0.16 82)",
     title: "Prediction Markets",
-    body: "Trade on real-world event outcomes. Every market resolves YES or NO — you buy shares at 0–100¢ and collect $1 if you're right. Rawli routes your orders through Polymarket's professional order book.",
+    body: "Trade on real-world event outcomes. Every market resolves YES or NO — you buy shares at 0–100¢ and collect $1 if you're right.",
+    detail: (
+      <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
+        <p>Prediction markets let you trade on the probability of real-world events. Every market has exactly two outcomes — YES and NO. Shares trade between 0¢ and 100¢, where the price represents the crowd's collective probability estimate.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.78_0.16_82)]">How payouts work</p>
+          <p>Buy YES at 62¢ → If the event happens, each share pays $1.00 (38¢ profit). If not, shares expire worthless. Buy NO at 38¢ → inverse payout.</p>
+        </div>
+        <p>Rawli routes all order execution directly through Polymarket's Central Limit Order Book (CLOB) on Polygon. This means you trade against real liquidity from thousands of global participants — not a market maker or internal pool.</p>
+        <p>Markets resolve based on real-world data from verified oracles. Once resolved, winning shares are automatically redeemable for $1.00 USDC each.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.78_0.16_82)]">Market types on Rawli</p>
+          <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
+            <li>24-Hour crypto markets — fast resolution, high velocity</li>
+            <li>Geopolitical events — elections, treaties, summits</li>
+            <li>Sports outcomes — match results, tournament winners</li>
+            <li>Africa & emerging market events — exclusive focus</li>
+            <li>Economic indicators — inflation, rate decisions, GDP</li>
+          </ul>
+        </div>
+      </div>
+    ),
   },
   {
     icon: Brain,
     color: "oklch(0.68 0.18 230)",
     title: "AI Intelligence Engine",
-    body: "Unlock a $1 deep-research report on any market. Our engine pulls live news, runs a 16-signal quant model for crypto or a 5-factor fundamental model for other events, and delivers a definitive YES/NO verdict with full rationale.",
+    body: "Unlock a $1 deep-research report on any market. Live news + quant model → definitive YES/NO verdict with full rationale.",
+    detail: (
+      <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
+        <p>The AI Intelligence Engine is Rawli's premium research layer. For $1 USDT (paid on-chain via BNB Chain), you get a full institutional-grade analysis of any active prediction market.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_230)]">What's in a Premium Report</p>
+          <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
+            <li>Definitive YES/NO verdict with confidence score (0–100)</li>
+            <li>Live news sourced within the last hour</li>
+            <li>Event brief + global context analysis</li>
+            <li>Structural drivers (3–5 key factors)</li>
+            <li>Market signal interpretation</li>
+            <li>Information asymmetry analysis</li>
+            <li>Risk landscape with 3–4 specific risks</li>
+            <li>Strategic insight and terminal note</li>
+          </ul>
+        </div>
+        <p>For crypto markets, the engine also runs a 16-signal quantitative model including RSI, MACD, Bollinger Bands, volume delta, open interest shifts, and taker ratio. For event markets, a 5-factor fundamental model evaluates sentiment, precedent, timeline, and consensus divergence.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_230)]">Payment flow</p>
+          <p>Payment happens entirely on-chain. Your wallet sends 1 USDT on BNB Chain to Rawli's receiver address. The backend verifies the transaction directly via BSC JSON-RPC before generating your report — no intermediaries, no subscriptions.</p>
+        </div>
+        <p className="text-[11px] text-muted-foreground/50">AI analysis is for informational purposes only and does not constitute financial advice.</p>
+      </div>
+    ),
   },
   {
     icon: Coins,
     color: "oklch(0.68 0.18 155)",
     title: "BNB-Native Funding",
-    body: "Fund your trading wallet with USDT on BNB Chain. Our bridge routes it to Polygon where Polymarket trades happen — no manual bridging needed. Gas fees on Polygon are covered by the gas assist system for qualifying wallets.",
+    body: "Fund your trading wallet with USDT on BNB Chain. Bridged to Polygon automatically — no manual steps needed.",
+    detail: (
+      <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
+        <p>Rawli is built for BNB Chain users. You can fund your prediction market wallet using USDT on BNB Chain (BSC) — no need to manually bridge to Polygon first.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">Funding flow</p>
+          <ol className="space-y-1.5 list-decimal list-inside text-muted-foreground/80">
+            <li>Connect your BNB Chain wallet via Privy</li>
+            <li>Deposit USDT from BNB Chain to your Rawli trading wallet</li>
+            <li>Platform auto-bridges to Polygon USDC for trading</li>
+            <li>Trade on any active prediction market instantly</li>
+          </ol>
+        </div>
+        <p>On Polygon, gas fees are extremely low (fractions of a cent per transaction). Qualifying wallets also benefit from gas assistance for CLOB order approvals so you can start trading without holding MATIC.</p>
+        <p>Withdrawals follow the same path in reverse — USDC from Polygon can be withdrawn back to your BNB Chain wallet as USDT.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">Supported networks</p>
+          <ul className="space-y-1 list-disc list-inside text-muted-foreground/80">
+            <li>BNB Chain (BSC) — deposit & AI report payments</li>
+            <li>Polygon — live order execution</li>
+          </ul>
+        </div>
+      </div>
+    ),
   },
   {
     icon: Lock,
     color: "oklch(0.74 0.14 25)",
     title: "Non-Custodial & Self-Sovereign",
-    body: "Your keys, your funds. Every order is signed locally in your wallet — Rawli never touches your private key or holds assets. Orders go directly to Polymarket's on-chain CLOB. You can verify every transaction on-chain.",
+    body: "Your keys, your funds. Every order is signed locally — Rawli never holds assets or touches your private key.",
+    detail: (
+      <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
+        <p>Rawli is fully non-custodial. This means the platform never holds your funds, never has access to your private key, and cannot freeze, move, or recover your assets under any circumstances.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.74_0.14_25)]">What non-custodial means for you</p>
+          <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
+            <li>Every trade order is signed in your wallet before submission</li>
+            <li>Rawli servers only see the signed order — never your key</li>
+            <li>Your funds sit in your own Polygon wallet at all times</li>
+            <li>You can verify every single transaction on-chain independently</li>
+            <li>If Rawli goes offline, your funds remain safely in your wallet</li>
+          </ul>
+        </div>
+        <p>Wallet connections are handled by Privy — a battle-tested authentication layer that lets you connect with embedded wallets, MetaMask, WalletConnect, and more. Rawli only ever receives your public wallet address from this process.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.74_0.14_25)]">Order execution security</p>
+          <p>When you place a trade, your wallet signs an EIP-712 typed order off-chain. This signature is submitted to the CLOB. The exchange verifies the signature cryptographically — Rawli is simply the courier, never the custodian.</p>
+        </div>
+      </div>
+    ),
   },
   {
     icon: TrendingUp,
     color: "oklch(0.72 0.18 45)",
     title: "Rawli Points & Rewards",
-    body: "Earn points on every trade. Bonus multipliers for 24h markets, crypto markets, and Premium Analysis-backed trades. Points track your platform activity and unlock future rewards.",
+    body: "Earn points on every trade. Bonus multipliers for 24h markets, crypto markets, and AI-backed trades.",
+    detail: (
+      <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
+        <p>The Rawli Points system tracks and rewards your platform activity. Points accumulate automatically as you trade and engage with the platform's premium features.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.72_0.18_45)]">How you earn points</p>
+          <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
+            <li>Base trade points — awarded on every executed order</li>
+            <li>24h market bonus — higher velocity = higher multiplier</li>
+            <li>Crypto market bonus — extra points on crypto prediction trades</li>
+            <li>Premium Analysis bonus — points for using AI reports to inform trades</li>
+            <li>Referral activity — earn when users you refer trade</li>
+          </ul>
+        </div>
+        <p>Points are tracked on-chain and stored alongside your wallet address. They cannot be transferred, sold, or forfeited — they reflect your authentic activity on the platform.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.72_0.18_45)]">Future rewards</p>
+          <p>Points will unlock future platform rewards including fee discounts, exclusive market access, and token allocations. The points system is designed to reward early, active traders most generously.</p>
+        </div>
+        <p>View your points balance and full activity history in the Portfolio section.</p>
+      </div>
+    ),
   },
   {
     icon: Zap,
     color: "oklch(0.78 0.16 82)",
     title: "Live Market Feed",
-    body: "Browse hundreds of active prediction markets filtered by Africa 🌍, Crypto, Sports, News, and Geopolitics. The smart feed surfaces 24h crypto markets and high-liquidity opportunities first.",
+    body: "Hundreds of active markets filtered by Africa 🌍, Crypto, Sports, News, and Geopolitics — surfacing the best opportunities first.",
+    detail: (
+      <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
+        <p>The Rawli market feed aggregates hundreds of live prediction markets and applies a smart ranking algorithm to surface the highest-quality trading opportunities first.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.78_0.16_82)]">Feed categories</p>
+          <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
+            <li>🪙 Crypto — BTC, ETH, SOL price & event markets</li>
+            <li>🌍 Africa — Nigerian elections, AFCON, African markets</li>
+            <li>⚽ Sports — football, basketball, tennis, F1</li>
+            <li>📰 News — geopolitics, breaking events</li>
+            <li>🏛️ Politics — global elections, governance</li>
+            <li>📈 Economics — rate decisions, inflation, GDP</li>
+          </ul>
+        </div>
+        <p>24-hour crypto markets are pinned to the top of the feed — these markets resolve within a day, giving you fast feedback loops and high trading frequency opportunities.</p>
+        <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.78_0.16_82)]">Smart badges</p>
+          <p>Each market card displays contextual badges — 24h Crypto, Deep Liquidity, Hot Volume, Closes Today — so you can assess opportunity quality at a glance without opening the market detail page.</p>
+        </div>
+        <p>The feed updates in real time. Market prices, volume, and liquidity are refreshed continuously from live order book data.</p>
+      </div>
+    ),
   },
 ]
 
@@ -240,6 +378,7 @@ const DOCS = [
 export function Footer() {
   const [termsOpen, setTermsOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [activeDoc, setActiveDoc] = useState<number | null>(null)
 
   return (
     <>
@@ -249,6 +388,15 @@ export function Footer() {
       <LegalSheet open={privacyOpen} onClose={() => setPrivacyOpen(false)} title="Privacy Policy">
         {PRIVACY_CONTENT}
       </LegalSheet>
+      {activeDoc !== null && (
+        <LegalSheet
+          open
+          onClose={() => setActiveDoc(null)}
+          title={DOCS[activeDoc].title}
+        >
+          {DOCS[activeDoc].detail}
+        </LegalSheet>
+      )}
 
       <footer className="relative mt-24 overflow-hidden">
         {/* Top separator */}
@@ -274,22 +422,32 @@ export function Footer() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {DOCS.map((d) => {
+                {DOCS.map((d, i) => {
                   const Icon = d.icon
                   return (
-                    <div
+                    <button
                       key={d.title}
-                      className="rounded-xl border border-[oklch(0.18_0.014_255)] bg-[oklch(0.11_0.012_260)] p-4 hover:border-[oklch(0.26_0.016_255)] transition-colors"
+                      onClick={() => setActiveDoc(i)}
+                      className="group text-left rounded-xl border border-[oklch(0.18_0.014_255)] bg-[oklch(0.11_0.012_260)] p-4 hover:border-[oklch(0.30_0.018_255)] hover:bg-[oklch(0.13_0.013_260)] active:scale-[0.98] transition-all duration-150 cursor-pointer"
                     >
-                      <div
-                        className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-lg"
-                        style={{ background: `${d.color.replace(")", " / 0.12)")}`}}
-                      >
-                        <Icon className="h-4 w-4" style={{ color: d.color }} />
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                          style={{ background: `${d.color.replace(")", " / 0.12)")}`}}
+                        >
+                          <Icon className="h-4 w-4" style={{ color: d.color }} />
+                        </div>
+                        <ChevronRight
+                          className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60 group-hover:translate-x-0.5 transition-all duration-150"
+                        />
                       </div>
-                      <h3 className="text-[13px] font-semibold text-foreground mb-1.5">{d.title}</h3>
-                      <p className="text-[12px] leading-5.5 text-muted-foreground/70">{d.body}</p>
-                    </div>
+                      <h3 className="text-[13px] font-semibold text-foreground mb-1.5 group-hover:text-white transition-colors">{d.title}</h3>
+                      <p className="text-[12px] leading-5 text-muted-foreground/70">{d.body}</p>
+                      <div className="mt-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: d.color, opacity: 0.7 }}>
+                        <span>Learn more</span>
+                        <ChevronRight className="h-2.5 w-2.5" />
+                      </div>
+                    </button>
                   )
                 })}
               </div>
