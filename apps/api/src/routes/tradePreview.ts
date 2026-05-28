@@ -27,16 +27,79 @@ const previewSchema = z.object({
 
 type UnknownRecord = Record<string, unknown>;
 
-function firstMarket(raw: unknown): UnknownRecord | null {
+function matchingMarket(raw: unknown, matches?: (market: UnknownRecord) => boolean): UnknownRecord | null {
   if (Array.isArray(raw)) {
-    const first = raw[0];
-    return first && typeof first === "object" ? (first as UnknownRecord) : null;
+    const found = matches
+      ? raw.find((item) => item && typeof item === "object" && matches(item as UnknownRecord))
+      : raw[0];
+    return found && typeof found === "object" ? (found as UnknownRecord) : null;
   }
-  return raw && typeof raw === "object" ? (raw as UnknownRecord) : null;
+  if (!raw || typeof raw !== "object") return null;
+  const market = raw as UnknownRecord;
+  return !matches || matches(market) ? market : null;
 }
 
 function marketTokenIds(market: UnknownRecord): string[] {
   return parseStringArray(market.clobTokenIds ?? market.clob_token_ids);
+}
+
+function marketIdentifierMatches(market: UnknownRecord, identifier: string) {
+  const normalized = identifier.trim().toLowerCase();
+  return (
+    String(market.id ?? "").toLowerCase() === normalized ||
+    String(market.slug ?? "").toLowerCase() === normalized ||
+    String(market.conditionId ?? market.condition_id ?? "").toLowerCase() === normalized ||
+    marketTokenIds(market).some((tokenId) => tokenId.toLowerCase() === normalized)
+  );
+}
+
+async function lookupGammaMarket(
+  query: Record<string, string>,
+  matches?: (market: UnknownRecord) => boolean
+): Promise<UnknownRecord | null> {
+  return matchingMarket(await getGamma("/markets", query), matches);
+}
+
+async function resolvePreviewMarket(marketId: string, tokenId: string): Promise<UnknownRecord | null> {
+  const normalizedMarketId = decodeURIComponent(marketId).trim();
+  const normalizedTokenId = tokenId.trim();
+  const attempts: Array<() => Promise<UnknownRecord | null>> = [];
+
+  if (normalizedTokenId) {
+    attempts.push(() =>
+      lookupGammaMarket({ clob_token_ids: normalizedTokenId }, (market) => marketTokenIds(market).includes(normalizedTokenId))
+    );
+  }
+
+  if (/^\d+$/.test(normalizedMarketId)) {
+    const tokenAttempts = [
+      () => lookupGammaMarket({ clob_token_ids: normalizedMarketId }, (market) => marketTokenIds(market).includes(normalizedMarketId)),
+      () => lookupGammaMarket({ token_id: normalizedMarketId }, (market) => marketTokenIds(market).includes(normalizedMarketId)),
+    ];
+    const idAttempt = () => lookupGammaMarket({ id: normalizedMarketId }, (market) => String(market.id) === normalizedMarketId);
+    attempts.push(...(normalizedMarketId.length > 18 ? [...tokenAttempts, idAttempt] : [idAttempt, ...tokenAttempts]));
+  } else if (normalizedMarketId) {
+    attempts.push(
+      () => lookupGammaMarket({ slug: normalizedMarketId }, (market) => marketIdentifierMatches(market, normalizedMarketId)),
+      () => lookupGammaMarket({ condition_id: normalizedMarketId }, (market) => marketIdentifierMatches(market, normalizedMarketId)),
+      () => lookupGammaMarket({ conditionId: normalizedMarketId }, (market) => marketIdentifierMatches(market, normalizedMarketId))
+    );
+  }
+
+  let lastError: unknown = null;
+  let sawResponse = false;
+  for (const attempt of attempts) {
+    try {
+      const market = await attempt();
+      sawResponse = true;
+      if (market?.id) return market;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (lastError && !sawResponse) throw lastError;
+  return null;
 }
 
 function isMarketClosed(market: UnknownRecord): boolean {
@@ -55,9 +118,9 @@ export async function tradePreviewRoutes(app: FastifyInstance): Promise<void> {
 
     let market: UnknownRecord | null = null;
     try {
-      market = firstMarket(await getGamma("/markets", { id: marketId }));
+      market = await resolvePreviewMarket(marketId, tokenId);
     } catch (err) {
-      req.log.error({ err, marketId }, "Unable to load Gamma market for trade preview");
+      req.log.error({ err, marketId, tokenId }, "Unable to load Gamma market for trade preview");
       reply.status(502);
       return { ok: false, error: "market_lookup_failed" };
     }
