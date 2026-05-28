@@ -142,6 +142,15 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
             confluenceFactors: taResult.confluenceFactors,
             computedVerdict: taResult.verdict,
             riskReward: taResult.riskReward,
+            // V3 indicators
+            ichimoku: taResult.ichimoku,
+            adx: taResult.adx,
+            stochRsi: taResult.stochRsi,
+            cvd: taResult.cvd,
+            volumeProfileData: taResult.volumeProfileData,
+            orderBook: taResult.orderBook,
+            liquidations: taResult.liquidations,
+            anchoredVwap: taResult.anchoredVwap,
           },
         }),
         // Include fundamental signal metadata when available (non-crypto markets only)

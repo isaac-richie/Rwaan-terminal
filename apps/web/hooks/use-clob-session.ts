@@ -952,8 +952,12 @@ export function useClobSession(wallet?: ConnectedWallet | null, profile?: Tradin
       return submission
     } catch (err: any) {
       setSubmitStatus("error")
+      // Clear the signed order to prevent duplicate re-submission
+      signedOrderRef.current = null
+      setSignedOrderPreview(null)
       const message = errorMessage(err, "Order submission failed.")
-      setError(message)
+      // Do NOT set session-level error — keep it in orderSubmission only
+      // so it shows in the Order Submission panel, not in Trading Access
       const submission = { success: false, errorMsg: message }
       setOrderSubmission(submission)
       return submission

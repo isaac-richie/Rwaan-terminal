@@ -521,13 +521,89 @@ function buildPremiumPrompt(
   ].join("\n");
 }
 
-function fallbackPremiumAnalysis(): PremiumAnalysisResult {
+function fallbackPremiumAnalysis(
+  ta?: TechnicalAnalysis | null,
+  fundamental?: FundamentalVerdict | null
+): PremiumAnalysisResult {
+  // Use TA-computed verdict when available instead of generic fallback
+  const hasTA = ta?.verdict?.direction;
+  const hasFundamental = fundamental?.direction;
+
+  const verdict = hasTA
+    ? {
+        direction: ta!.verdict.direction as "YES" | "NO",
+        confidence: Math.min(95, Math.max(10, ta!.verdict.confidence)),
+        rationale: `Quant engine verdict based on ${ta!.confluenceFactors?.length ?? 0} confluence factors across 24 technical signals (${ta!.verdict.signalAgreement ?? 0}% signal agreement). ${ta!.verdict.direction === "YES" ? "Bullish" : "Bearish"} structure confirmed by ${ta!.htf?.structure ?? "N/A"} market structure with ${ta!.htf?.trendStrength ?? "N/A"} trend strength.`
+      }
+    : hasFundamental
+    ? {
+        direction: fundamental!.direction as "YES" | "NO",
+        confidence: Math.min(88, Math.max(15, fundamental!.confidence)),
+        rationale: `Fundamental signal engine verdict: ${fundamental!.verdictRationale ?? "Based on aggregated news sentiment and event probability scoring."}`
+      }
+    : {
+        direction: "NO" as const,
+        confidence: 50,
+        rationale: "Insufficient live data for a high-conviction directional call. The structural balance of forces does not strongly favor either outcome at this time."
+      };
+
+  // When TA data is available, build data-rich fallback sections
+  if (hasTA) {
+    const t = ta!;
+    const priceStr = `$${t.currentPrice?.toLocaleString() ?? "N/A"}`;
+    const structure = t.htf?.structure ?? "undefined";
+    const bias = t.htf?.bias ?? "neutral";
+    const rsi = t.rsi14 != null ? t.rsi14.toFixed(1) : "N/A";
+    const macdHist = t.macd?.histogram?.toFixed(2) ?? "N/A";
+    const bbPos = t.bollinger ? ((t.currentPrice - t.bollinger.lower) / (t.bollinger.upper - t.bollinger.lower) * 100).toFixed(0) : "N/A";
+    const funding = t.funding?.rate != null ? (t.funding.rate * 100).toFixed(4) + "%" : "N/A";
+    const oi = t.openInterest ? (t.openInterest.change24h > 0 ? "+" : "") + t.openInterest.change24h.toFixed(1) + "%" : "N/A";
+    const lsGlobal = t.longShort ? `${t.longShort.globalLongPct.toFixed(0)}/${t.longShort.globalShortPct.toFixed(0)}` : "N/A";
+    const ichStatus = t.ichimoku?.priceVsCloud ?? "N/A";
+    const adxVal = t.adx?.adx?.toFixed(1) ?? "N/A";
+    const adxTrend = t.adx?.trendStrength ?? "N/A";
+    const stochK = t.stochRsi?.k?.toFixed(1) ?? "N/A";
+    const cvdTrend = t.cvd?.trend ?? "N/A";
+
+    // Find the golden ratio fib level (0.618)
+    const goldenFib = t.fibLevels?.find(f => f.level === "0.618");
+
+    // Determine relevant anchored VWAP value
+    const anchoredVwapVal = t.anchoredVwap
+      ? (t.anchoredVwap.anchorType === "swing_low" ? t.anchoredVwap.swingLowVwap : t.anchoredVwap.swingHighVwap)
+      : null;
+
+    // Risk/reward — use longRR or shortRR based on verdict direction
+    const rr = t.riskReward
+      ? (t.verdict.direction === "YES" ? t.riskReward.longRR : t.riskReward.shortRR)
+      : null;
+
+    return {
+      verdict,
+      eventBrief: `${t.symbol} at ${priceStr} with ${structure} market structure and ${bias} bias. The quant engine processed 24 signals across multiple timeframes with ${t.verdict.signalAgreement ?? 0}% agreement, producing a ${t.verdict.confidence}-confidence ${t.verdict.direction} verdict.`,
+      globalContext: `Market regime: ${t.regime ?? "N/A"}. Fear & Greed Index: ${t.fearGreed?.value ?? "N/A"} (${t.fearGreed?.classification ?? "N/A"}). Funding rate at ${funding} with OI change ${oi} over 24h. Long/Short ratio: ${lsGlobal}. ${t.takerRatio?.trend ?? "Balanced"} taker flow detected.`,
+      structuralDrivers: [
+        `EMA Alignment: ${t.ema?.ribbonState ?? "N/A"} (price ${t.ema?.priceVsEma200 ?? "N/A"} EMA200)`,
+        `MACD: Histogram at ${macdHist}, ${t.macd?.crossover ?? "no signal"} — ${Number(macdHist) > 0 ? "bullish momentum" : Number(macdHist) < 0 ? "bearish pressure" : "neutral"}`,
+        `Bollinger Position: Price at ${bbPos}% of band width (RSI ${rsi}) — ${Number(bbPos) > 80 ? "overbought zone" : Number(bbPos) < 20 ? "oversold zone" : "mid-range"}`,
+        `Ichimoku: ${ichStatus} cloud, ${t.ichimoku?.tkCross ?? "no TK cross"} — ${ichStatus === "above" ? "bullish cloud confirmation" : ichStatus === "below" ? "bearish cloud signal" : "within cloud = indecision"}`,
+        `ADX: ${adxVal} (${adxTrend}) — ${Number(adxVal) > 25 ? "strong directional movement" : "weak trend, range-bound action likely"}`,
+      ],
+      marketSignalInterpretation: `Stochastic RSI K=${stochK} with CVD trend ${cvdTrend}. OBV is ${t.obv?.trend ?? "N/A"} with ${t.obv?.divergence ?? "no"} divergence. Volume profile shows ${t.volumeProfile ?? "N/A"} positioning. Confluence score: ${t.confluenceScore?.toFixed(0) ?? "N/A"}/100 across ${t.confluenceFactors?.length ?? 0} factors.`,
+      informationAsymmetry: `Order book depth: ${t.orderBook ? (t.orderBook.imbalanceRatio1pct > 1 ? "bid-heavy (" + ((t.orderBook.imbalanceRatio1pct - 1) * 100).toFixed(0) + "% bid skew)" : "ask-heavy (" + ((1 - t.orderBook.imbalanceRatio1pct) * 100).toFixed(0) + "% ask skew)") : "balanced"}. ${t.liquidations?.nearestLongLiq || t.liquidations?.nearestShortLiq ? "Nearest liquidation cluster: " + (t.liquidations.magnetDirection === "down" && t.liquidations.nearestLongLiq ? "$" + t.liquidations.nearestLongLiq.toLocaleString() + " (long liquidations)" : t.liquidations.nearestShortLiq ? "$" + t.liquidations.nearestShortLiq.toLocaleString() + " (short liquidations)" : "balanced") : "No significant liquidation clusters detected"}. VWAP distance: ${t.vwapDistance != null ? (t.vwapDistance > 0 ? "+" : "") + (t.vwapDistance * 100).toFixed(2) + "% from VWAP" : "N/A"}.`,
+      riskLandscape: [
+        `Volatility: ${t.volatilityPct != null ? t.volatilityPct.toFixed(1) + "% 24h range" : "N/A"} — ${(t.volatilityPct ?? 0) > 5 ? "elevated risk, size positions accordingly" : "contained volatility"}`,
+        `Support/Resistance: Key support at $${t.nearestSupport?.toLocaleString() ?? "N/A"}, resistance at $${t.nearestResistance?.toLocaleString() ?? "N/A"}`,
+        `Risk/Reward: ${rr?.toFixed(2) ?? "N/A"} R:R — ${(rr ?? 0) > 2 ? "favorable asymmetry" : (rr ?? 0) > 1 ? "marginally positive" : "unfavorable, caution warranted"}`,
+        `RSI Divergence: ${t.rsiDivergence?.type ?? "none"} — ${t.rsiDivergence?.type === "bullish" ? "hidden buying pressure" : t.rsiDivergence?.type === "bearish" ? "hidden selling pressure" : "price action aligns with momentum"}`,
+      ],
+      strategicInsight: `With ${t.confluenceFactors?.length ?? 0} confluence factors and ${t.verdict.signalAgreement ?? 0}% signal agreement, the quant engine identifies a ${verdict.confidence >= 70 ? "high" : verdict.confidence >= 50 ? "moderate" : "low"}-conviction ${verdict.direction} setup. Key levels to watch: Fibonacci 0.618 at $${goldenFib?.price?.toLocaleString() ?? "N/A"}, anchored VWAP at $${anchoredVwapVal?.toLocaleString() ?? "N/A"}.`,
+      terminalNote: `[SIA] AI narration unavailable — this report was generated by the 24-signal quant engine fallback. All data points are computed directly from market data. Signal hash derived from ${t.symbol} at ${priceStr}.`
+    };
+  }
+
   return {
-    verdict: {
-      direction: "NO",
-      confidence: 50,
-      rationale: "Insufficient live data for a high-conviction directional call. The structural balance of forces does not strongly favor either outcome at this time."
-    },
+    verdict,
     eventBrief: "This event has emerged as a focal point for participants attempting to price complex, multi-factor dynamics under conditions of significant uncertainty.",
     globalContext: "Broad macroeconomic conditions and localized policy dynamics form the backdrop. Participants face elevated systemic ambiguity, limiting strong conviction in either direction.",
     structuralDrivers: [
@@ -554,7 +630,7 @@ export async function generatePremiumAnalysis(
   fundamental?: FundamentalVerdict | null
 ): Promise<PremiumAnalysisResult> {
   if (!config.openai.apiKey) {
-    return fallbackPremiumAnalysis();
+    return fallbackPremiumAnalysis(ta, fundamental);
   }
 
   const controller = new AbortController();
@@ -581,19 +657,19 @@ export async function generatePremiumAnalysis(
       signal: controller.signal
     });
 
-    if (!response.ok) return fallbackPremiumAnalysis();
+    if (!response.ok) return fallbackPremiumAnalysis(ta, fundamental);
 
     const body = await response.json();
     const jsonText = body?.choices?.[0]?.message?.content;
-    if (!jsonText) return fallbackPremiumAnalysis();
+    if (!jsonText) return fallbackPremiumAnalysis(ta, fundamental);
 
     try {
       return JSON.parse(jsonText) as PremiumAnalysisResult;
     } catch {
-      return fallbackPremiumAnalysis();
+      return fallbackPremiumAnalysis(ta, fundamental);
     }
   } catch {
-    return fallbackPremiumAnalysis();
+    return fallbackPremiumAnalysis(ta, fundamental);
   } finally {
     clearTimeout(timeout);
   }

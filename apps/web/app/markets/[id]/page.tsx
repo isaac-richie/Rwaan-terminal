@@ -2100,7 +2100,7 @@ export default function MarketDetailPage() {
                       Order submission
                     </span>
                     <span className="font-mono text-foreground">
-                      {clobSession.orderSubmission.status ?? (clobSession.orderSubmission.success ? "submitted" : "failed")}
+                      {clobSession.orderSubmission.success ? (clobSession.orderSubmission.status ?? "submitted") : "failed"}
                     </span>
                   </div>
 
