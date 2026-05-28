@@ -810,29 +810,43 @@ export default function MarketDetailPage() {
     }
 
     setPreviewLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/trade/preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          marketId: market!.id,
-          tokenId: activeTokenId,
-          outcome: activeOutcomeName,
-          side: tradeSide.toUpperCase(),
-          amountUsd: amountNumber,
-          tradingWalletAddress,
-        }),
-      });
-      const body: TradePreviewResponse = await res.json();
-      if (!res.ok || !body.ok) {
-        throw new Error(body.error ? previewErrorLabel(body.error) : "Preview failed.");
+    const MAX_RETRIES = 2;
+    let lastError: string | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 800 * attempt));
+        const res = await fetch(`${API_BASE}/trade/preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            marketId: market!.id,
+            tokenId: activeTokenId,
+            outcome: activeOutcomeName,
+            side: tradeSide.toUpperCase(),
+            amountUsd: amountNumber,
+            tradingWalletAddress,
+          }),
+        });
+        const body: TradePreviewResponse = await res.json();
+        if (!res.ok || !body.ok) {
+          const isRetryable = body.error === "orderbook_lookup_failed" || body.error === "market_lookup_failed";
+          if (isRetryable && attempt < MAX_RETRIES) {
+            lastError = body.error ? previewErrorLabel(body.error) : "Preview failed.";
+            continue;
+          }
+          throw new Error(body.error ? previewErrorLabel(body.error) : "Preview failed.");
+        }
+        setTradePreview(body);
+        lastError = null;
+        break;
+      } catch (err: any) {
+        lastError = err?.message ?? "Preview failed.";
+        if (attempt >= MAX_RETRIES) {
+          setPreviewError(lastError);
+        }
       }
-      setTradePreview(body);
-    } catch (err: any) {
-      setPreviewError(err?.message ?? "Preview failed.");
-    } finally {
-      setPreviewLoading(false);
     }
+    setPreviewLoading(false);
   };
 
   const handleCreateSignedOrder = async () => {

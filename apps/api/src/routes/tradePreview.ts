@@ -84,8 +84,19 @@ export async function tradePreviewRoutes(app: FastifyInstance): Promise<void> {
     const marketVolume = String((market as UnknownRecord).volume_24hr ?? (market as UnknownRecord).volume ?? "");
     const marketOutcomePrices = parseStringArray((market as UnknownRecord).outcomePrices);
 
+    // Fetch book with a single retry (Polymarket CLOB can be flaky)
+    const fetchBookWithRetry = async () => {
+      try {
+        return await getClobPublic("/book", { token_id: tokenId });
+      } catch (firstErr) {
+        req.log.warn({ err: firstErr, tokenId }, "CLOB book first attempt failed, retrying...");
+        await new Promise((r) => setTimeout(r, 500));
+        return getClobPublic("/book", { token_id: tokenId });
+      }
+    };
+
     const [bookResult, insightResult] = await Promise.allSettled([
-      getClobPublic("/book", { token_id: tokenId }),
+      fetchBookWithRetry(),
       generateTradeInsight({
         marketQuestion,
         category: marketCategory,
@@ -104,7 +115,7 @@ export async function tradePreviewRoutes(app: FastifyInstance): Promise<void> {
     ]);
 
     if (bookResult.status === "rejected") {
-      req.log.error({ err: bookResult.reason, tokenId }, "Unable to load CLOB book for trade preview");
+      req.log.error({ err: bookResult.reason, tokenId }, "Unable to load CLOB book for trade preview (after retry)");
       reply.status(502);
       return { ok: false, error: "orderbook_lookup_failed" };
     }
