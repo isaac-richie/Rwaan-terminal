@@ -562,7 +562,10 @@ function fetchGammaEventsDeduped(url: string): Promise<GammaEventRaw[]> {
   })()
   inflightGamma.set(url, promise)
   // Remove after 8s so next load gets fresh data
-  promise.finally(() => setTimeout(() => inflightGamma.delete(url), 8000))
+  promise.then(
+    () => setTimeout(() => inflightGamma.delete(url), 8000),
+    () => setTimeout(() => inflightGamma.delete(url), 8000)
+  )
   return promise
 }
 
@@ -582,6 +585,20 @@ function fetchGammaEventsBatch(
   return fetchGammaEventsDeduped(url)
 }
 
+function fetchGammaMarketsAsEvents(baseParams: URLSearchParams): Promise<GammaEventRaw[]> {
+  const params = new URLSearchParams(baseParams)
+  const url = `${API_BASE}/gamma/markets?${params.toString()}`
+  return fetchGammaEventsDeduped(url).then((markets) => [
+    {
+      id: "fallback-markets",
+      title: "Fallback markets",
+      active: true,
+      closed: false,
+      markets: Array.isArray(markets) ? (markets as unknown as GammaMarketRaw[]) : [],
+    },
+  ])
+}
+
 // For "all" + trending/volume, use the highest-traffic tags.
 // All 4 crypto tag IDs included so 24h crypto markets are never missed.
 const FAST_ALL_TAG_IDS = ["21", "235", "101611", "1312", "2", "596", "1", "102974", "102969"] // all crypto + news + entertainment + sports + AFCON
@@ -594,8 +611,12 @@ export async function fetchPolymarketMarkets(
   search?: string
 ): Promise<PolymarketMarket[]> {
   try {
+    const normalizedCat = normalizeCategory(category)
+    const fastAllFeed = normalizedCat === "all" && (sortBy === "trending" || sortBy === "volume") && !search
     const fetchLimit =
-      sortBy === "daily"
+      fastAllFeed
+        ? Math.max(limit * 2, 24)
+        : sortBy === "daily"
         ? Math.max(limit * 24, 240)
         : Math.max(limit * 4, 48)
     const baseParams = new URLSearchParams({
@@ -619,15 +640,23 @@ export async function fetchPolymarketMarkets(
       baseParams.set("offset", "0")
     }
 
-    const normalizedCat = normalizeCategory(category)
     // Fast path: "all" with trending/volume uses only broad tags (not 14)
-    const tagIds = normalizedCat === "all" && (sortBy === "trending" || sortBy === "volume") && !search
+    const tagIds = fastAllFeed
       ? FAST_ALL_TAG_IDS
       : getCategoryFeedTagIds(category)
     if (tagIds.length === 0) return []
 
-    // Single batch request — backend fans out to Gamma API with caching
-    const batchEvents = await fetchGammaEventsBatch(baseParams, tagIds)
+    let batchEvents: GammaEventRaw[]
+    try {
+      // The broad All feed is fastest through Gamma's markets index. Category
+      // feeds still use the batched event route for tighter tag targeting.
+      batchEvents = fastAllFeed
+        ? await fetchGammaMarketsAsEvents(baseParams)
+        : await fetchGammaEventsBatch(baseParams, tagIds)
+    } catch (err) {
+      if (!fastAllFeed) throw err
+      batchEvents = await fetchGammaEventsBatch(baseParams, tagIds)
+    }
 
     const mergedEvents = new Map<string, GammaEventRaw>()
     for (const event of batchEvents) {

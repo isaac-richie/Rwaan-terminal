@@ -14,6 +14,21 @@ type CacheEntry = {
 
 const marketCache = new Map<string, CacheEntry>()
 
+function visibleMarketFeedFailure(
+  includeKalshi: boolean,
+  polyResult: PromiseSettledResult<PolymarketMarket[]>,
+  kalshiResult: PromiseSettledResult<PolymarketMarket[]>
+): unknown | null {
+  if (polyResult.status === "rejected" && (!includeKalshi || kalshiResult.status === "rejected")) {
+    return polyResult.reason
+  }
+  return null
+}
+
+function marketFeedError(reason: unknown): Error {
+  return reason instanceof Error ? reason : new Error("Market feed unavailable")
+}
+
 function cacheKey(
   category?: string,
   limit = 24,
@@ -95,6 +110,10 @@ export async function fetchMarkets(
           includeKalshi ? fetchKalshiMarkets(category ?? "all", limit, sortBy, offset, search) : Promise.resolve([])
         ]
         const [polyResult, kalshiResult] = await Promise.allSettled(requests)
+        const feedFailure = visibleMarketFeedFailure(includeKalshi, polyResult, kalshiResult)
+        if (feedFailure) {
+          throw marketFeedError(feedFailure)
+        }
         const poly = polyResult.status === "fulfilled" ? polyResult.value : []
         const kalshi = kalshiResult.status === "fulfilled" ? kalshiResult.value : []
         const merged = dedupeMarkets([...poly, ...kalshi])
@@ -117,6 +136,10 @@ export async function fetchMarkets(
   ]
 
   const [polyResult, kalshiResult] = await Promise.allSettled(requests)
+  const feedFailure = visibleMarketFeedFailure(includeKalshi, polyResult, kalshiResult)
+  if (feedFailure) {
+    throw marketFeedError(feedFailure)
+  }
   const poly = polyResult.status === "fulfilled" ? polyResult.value : []
   const kalshi = kalshiResult.status === "fulfilled" ? kalshiResult.value : []
 
