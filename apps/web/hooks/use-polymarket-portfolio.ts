@@ -65,9 +65,13 @@ function parsePositionTimestamp(value: any) {
     return Number.isFinite(millis) ? millis : null
   }
   if (typeof value === "string" && value.trim()) {
-    const numeric = Number(value)
+    const raw = value.trim()
+    const numeric = Number(raw)
     if (Number.isFinite(numeric)) return parsePositionTimestamp(numeric)
-    const parsed = Date.parse(value)
+    const parsed = Date.parse(raw)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return Number.isFinite(parsed) ? parsed + 24 * 60 * 60 * 1000 - 1 : null
+    }
     return Number.isFinite(parsed) ? parsed : null
   }
   return null
