@@ -416,7 +416,7 @@ export default function MarketDetailPage() {
   const connectedWalletAddress = activePrivyWallet.walletAddress;
   const connectedWallet = activePrivyWallet.wallet;
   const polymarketDepositWallet = usePolymarketDepositWallet(connectedWallet);
-  const profileConnectedWalletAddress = connectedWalletAddress && polymarketDepositWallet.address ? connectedWalletAddress : null;
+  const profileConnectedWalletAddress = connectedWalletAddress ?? null;
   const tradingProfile = useTradingProfile(
     profileConnectedWalletAddress,
     polymarketDepositWallet.address,

@@ -39,16 +39,23 @@ export function useTradingProfile(
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/trading-profile/resolve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          connectedWalletAddress,
-          ...(tradingWalletAddress ? { tradingWalletAddress } : {}),
-          ...(tradingWalletKind ? { tradingWalletKind } : {}),
-        }),
-      })
+      const hasTradingWallet = Boolean(tradingWalletAddress)
+      const res = hasTradingWallet
+        ? await fetch(`${API_BASE}/trading-profile/resolve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              connectedWalletAddress,
+              tradingWalletAddress,
+              ...(tradingWalletKind ? { tradingWalletKind } : {}),
+            }),
+          })
+        : await fetch(`${API_BASE}/trading-profile/${connectedWalletAddress}`)
       const payload = await res.json()
+      if (!hasTradingWallet && res.status === 404) {
+        setProfile(null)
+        return
+      }
       if (!res.ok) {
         throw new Error(payload?.error ?? "Trading profile setup failed")
       }

@@ -83,7 +83,7 @@ function NavbarBalanceBreakdown() {
   const panelRef = useRef<HTMLDivElement>(null)
   const { walletAddress, wallet: connectedWallet } = useActivePrivyWallet()
   const polymarketDepositWallet = usePolymarketDepositWallet(connectedWallet)
-  const profileConnectedWalletAddress = walletAddress && polymarketDepositWallet.address ? walletAddress : null
+  const profileConnectedWalletAddress = walletAddress ?? null
   const tradingProfile = useTradingProfile(
     profileConnectedWalletAddress,
     polymarketDepositWallet.address,

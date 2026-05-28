@@ -408,7 +408,7 @@ function PortfolioContent() {
   const walletAddress = activePrivyWallet.walletAddress;
   const connectedWallet = activePrivyWallet.wallet;
   const polymarketDepositWallet = usePolymarketDepositWallet(connectedWallet);
-  const profileConnectedWalletAddress = walletAddress && polymarketDepositWallet.address ? walletAddress : null;
+  const profileConnectedWalletAddress = walletAddress ?? null;
   const tradingProfile = useTradingProfile(
     profileConnectedWalletAddress,
     polymarketDepositWallet.address,

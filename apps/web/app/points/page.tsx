@@ -153,7 +153,7 @@ export default function PointsPage() {
   const [showAll, setShowAll] = useState(false);
   const { walletAddress: connectedWalletAddress, wallet: connectedWallet } = useActivePrivyWallet();
   const polymarketDepositWallet = usePolymarketDepositWallet(connectedWallet);
-  const profileConnectedWalletAddress = connectedWalletAddress && polymarketDepositWallet.address ? connectedWalletAddress : null;
+  const profileConnectedWalletAddress = connectedWalletAddress ?? null;
   const tradingProfile = useTradingProfile(profileConnectedWalletAddress, polymarketDepositWallet.address, polymarketDepositWallet.address ? "deposit" : undefined);
   const readiness = useTradeReadiness({ connectedWalletAddress, profile: tradingProfile.profile });
   const collateral = readiness.readiness?.collateral ?? null;
