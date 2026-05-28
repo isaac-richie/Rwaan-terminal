@@ -47,7 +47,21 @@ export const config = {
   },
   payment: {
     receiverAddress: process.env.PAYMENT_RECEIVER_ADDRESS ?? "",
+    // Primary RPC — set BSC_RPC_URL to your premium endpoint (NodeReal / QuickNode / Ankr)
+    // Falls back through a prioritised list of public nodes if primary fails
     bscRpcUrl: process.env.BSC_RPC_URL ?? "https://bsc-dataseed1.binance.org",
+    // Ordered fallback list — tried in sequence when the primary fails
+    // Add your premium URL as BSC_RPC_URL and it will always be tried first
+    bscRpcFallbacks: [
+      "https://bsc-dataseed1.binance.org",
+      "https://bsc-dataseed2.binance.org",
+      "https://bsc-dataseed3.binance.org",
+      "https://bsc-dataseed4.binance.org",
+      "https://bsc.publicnode.com",           // unlimited, community run
+      "https://rpc.ankr.com/bsc",             // 30 req/s free tier
+      "https://bsc-dataseed1.defibit.io",
+      "https://bsc-dataseed1.ninicoin.io",
+    ],
     usdtContract: "0x55d398326f99059fF775485246999027B3197955",
     usdtDecimals: 18,
     priceRaw: "1000000000000000000",
