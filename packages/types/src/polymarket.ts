@@ -302,6 +302,8 @@ export type PremiumAnalysis = {
   newsSources: PremiumNewsSource[];
   generatedAt: string;
   signalHash: string;
+  // Populated for crypto markets only
+  technicalAnalysis?: PremiumTechnicalAnalysis;
 };
 
 export type PaymentRequirement = {
@@ -320,4 +322,117 @@ export type PremiumAnalysisResponse = {
   analysis?: PremiumAnalysis;
   error?: string;
   paymentRequired?: PaymentRequirement;
+};
+
+// ── Quant Engine TA types (mirrors ta-engine.ts, safe to import on frontend) ──
+
+export type TASignalVote = {
+  name: string;
+  direction: "bullish" | "bearish" | "neutral";
+  weight: number;
+  conviction: number;
+  reason: string;
+};
+
+export type TAComputedVerdict = {
+  direction: "YES" | "NO";
+  confidence: number;
+  bullishScore: number;
+  bearishScore: number;
+  netScore: number;
+  signalAgreement: number;
+  totalSignals: number;
+  agreeingSignals: number;
+  votes: TASignalVote[];
+  regimeAdjustment: number;
+  contrariansFlags: string[];
+  verdictRationale: string;
+};
+
+export type TAOpenInterest = {
+  current: number;
+  change24h: number;
+  trend: "rising" | "falling" | "flat";
+  signal: "bullish" | "bearish" | "neutral";
+  interpretation: string;
+};
+
+export type TALongShort = {
+  globalLongPct: number;
+  globalShortPct: number;
+  topTraderLongPct: number;
+  topTraderShortPct: number;
+  retailBias: "long_heavy" | "short_heavy" | "balanced";
+  smartMoneyBias: "long_heavy" | "short_heavy" | "balanced";
+  contrarian: "bullish" | "bearish" | "neutral";
+  interpretation: string;
+};
+
+export type TATakerRatio = {
+  buyRatio: number;
+  sellRatio: number;
+  trend: "buyers_dominant" | "sellers_dominant" | "balanced";
+  strength: "strong" | "moderate" | "weak";
+  interpretation: string;
+};
+
+export type PremiumTechnicalAnalysis = {
+  symbol: string;
+  currentPrice: number;
+  structure: string;
+  trendStrength: number;
+  bias: string;
+  swingHigh: number | null;
+  swingLow: number | null;
+  ema: {
+    ema9: number;
+    ema21: number;
+    ema50: number;
+    ema200: number;
+    stack: "bullish" | "bearish" | "compressed" | "mixed";
+  };
+  macd: {
+    macd: number;
+    signal: number;
+    histogram: number;
+    trend: string;
+    histogramTrend: string;
+    crossover: string | null;
+  };
+  bollinger: {
+    upper: number;
+    middle: number;
+    lower: number;
+    bandwidth: number;
+    squeeze: boolean;
+    percentB: number;
+  };
+  rsi14: number;
+  rsiDivergence: { type: "bullish" | "bearish"; strength: "weak" | "moderate" | "strong" } | null;
+  multiTfRsi: { tf4h: number; tf1h: number; tf15m: number; alignment: string };
+  obv: { trend: "rising" | "falling" | "flat"; divergence: { type: "bullish" | "bearish" } | null };
+  volumeProfile: string;
+  nearestSupport: number | null;
+  nearestResistance: number | null;
+  vwapDistance: number;
+  volatilityPct: number;
+  regime: string;
+  funding: { fundingRate: number; nextFunding: string } | null;
+  fearGreed: { value: number; classification: string } | null;
+  openInterest: TAOpenInterest | null;
+  longShort: TALongShort | null;
+  takerRatio: TATakerRatio | null;
+  confluenceScore: number;
+  confluenceFactors: string[];
+  computedVerdict: TAComputedVerdict;
+  riskReward: {
+    longEntry: number;
+    longStop: number;
+    longTarget: number;
+    longRR: number;
+    shortEntry: number;
+    shortStop: number;
+    shortTarget: number;
+    shortRR: number;
+  } | null;
 };
