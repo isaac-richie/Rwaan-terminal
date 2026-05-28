@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   TrendingUp,
   Lock,
+  ChevronDown,
   ChevronRight,
 } from "lucide-react"
 
@@ -379,6 +380,7 @@ export function Footer() {
   const [termsOpen, setTermsOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [activeDoc, setActiveDoc] = useState<number | null>(null)
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false)
 
   return (
     <>
@@ -411,46 +413,71 @@ export function Footer() {
         <div className="relative bg-[oklch(0.09_0.011_260)]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
 
-            {/* ── How it works / Docs section ── */}
-            <div className="mb-14">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-px bg-[oklch(0.78_0.16_82/0.4)]" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[oklch(0.78_0.16_82)]">
-                  How Rawli Works
-                </span>
-                <div className="flex-1 h-px bg-[oklch(0.20_0.014_255)]" />
-              </div>
+            {/* ── How it works / Docs drawer ── */}
+            <div className="mb-10">
+              <button
+                type="button"
+                aria-expanded={howItWorksOpen}
+                aria-controls="rawli-docs-drawer"
+                onClick={() => setHowItWorksOpen((open) => !open)}
+                className="group flex w-full items-center gap-3 rounded-xl border border-[oklch(0.18_0.014_255)] bg-[oklch(0.11_0.012_260)] px-4 py-4 text-left transition-all duration-150 hover:border-[oklch(0.30_0.018_255)] hover:bg-[oklch(0.13_0.013_260)] active:scale-[0.99]"
+              >
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[oklch(0.78_0.16_82/0.12)] text-[oklch(0.78_0.16_82)]">
+                  <BarChart3 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-3">
+                    <div className="h-px w-6 bg-[oklch(0.78_0.16_82/0.4)]" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[oklch(0.78_0.16_82)]">
+                      How Rawli Works
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[12px] leading-5 text-muted-foreground/70">
+                    Prediction markets, funding, AI reports, security, points, and live feeds.
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="hidden rounded-full border border-[oklch(0.22_0.015_255)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sm:inline-flex">
+                    {DOCS.length} guides
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${howItWorksOpen ? "rotate-180" : ""}`}
+                  />
+                </div>
+              </button>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {DOCS.map((d, i) => {
-                  const Icon = d.icon
-                  return (
-                    <button
-                      key={d.title}
-                      onClick={() => setActiveDoc(i)}
-                      className="group text-left rounded-xl border border-[oklch(0.18_0.014_255)] bg-[oklch(0.11_0.012_260)] p-4 hover:border-[oklch(0.30_0.018_255)] hover:bg-[oklch(0.13_0.013_260)] active:scale-[0.98] transition-all duration-150 cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <div
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                          style={{ background: `${d.color.replace(")", " / 0.12)")}`}}
-                        >
-                          <Icon className="h-4 w-4" style={{ color: d.color }} />
+              {howItWorksOpen && (
+                <div id="rawli-docs-drawer" className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {DOCS.map((d, i) => {
+                    const Icon = d.icon
+                    return (
+                      <button
+                        key={d.title}
+                        onClick={() => setActiveDoc(i)}
+                        className="group text-left rounded-xl border border-[oklch(0.18_0.014_255)] bg-[oklch(0.11_0.012_260)] p-4 hover:border-[oklch(0.30_0.018_255)] hover:bg-[oklch(0.13_0.013_260)] active:scale-[0.98] transition-all duration-150 cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                            style={{ background: `${d.color.replace(")", " / 0.12)")}`}}
+                          >
+                            <Icon className="h-4 w-4" style={{ color: d.color }} />
+                          </div>
+                          <ChevronRight
+                            className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60 group-hover:translate-x-0.5 transition-all duration-150"
+                          />
                         </div>
-                        <ChevronRight
-                          className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60 group-hover:translate-x-0.5 transition-all duration-150"
-                        />
-                      </div>
-                      <h3 className="text-[13px] font-semibold text-foreground mb-1.5 group-hover:text-white transition-colors">{d.title}</h3>
-                      <p className="text-[12px] leading-5 text-muted-foreground/70">{d.body}</p>
-                      <div className="mt-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: d.color, opacity: 0.7 }}>
-                        <span>Learn more</span>
-                        <ChevronRight className="h-2.5 w-2.5" />
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
+                        <h3 className="text-[13px] font-semibold text-foreground mb-1.5 group-hover:text-white transition-colors">{d.title}</h3>
+                        <p className="text-[12px] leading-5 text-muted-foreground/70">{d.body}</p>
+                        <div className="mt-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: d.color, opacity: 0.7 }}>
+                          <span>Learn more</span>
+                          <ChevronRight className="h-2.5 w-2.5" />
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             {/* ── Main footer grid ── */}
