@@ -71,6 +71,29 @@ function positionLabel(pos: any) {
   return pos?.title ?? pos?.market ?? pos?.question ?? pos?.event ?? pos?.conditionId ?? pos?.condition_id ?? "Position";
 }
 
+function formatTimeLeft(endTime: number | null): { label: string; urgency: "critical" | "soon" | "normal" | null } {
+  if (!endTime) return { label: "", urgency: null };
+  const now = Date.now();
+  const diff = endTime - now;
+  if (diff <= 0) return { label: "Closed", urgency: "critical" };
+  const totalMins = Math.floor(diff / 60_000);
+  const totalHours = Math.floor(diff / 3_600_000);
+  const days = Math.floor(diff / 86_400_000);
+  if (totalMins < 60) return { label: `${totalMins}m left`, urgency: "critical" };
+  if (totalHours < 24) {
+    const mins = totalMins % 60;
+    return { label: `${totalHours}h ${mins}m left`, urgency: "critical" };
+  }
+  if (days === 1) return { label: "Closes tomorrow", urgency: "soon" };
+  if (days <= 7) return { label: `${days}d left`, urgency: "soon" };
+  return { label: `${days}d left`, urgency: "normal" };
+}
+
+function formatEndDate(endTime: number | null): string {
+  if (!endTime) return "";
+  return new Date(endTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function positionOutcome(pos: any) {
   return pos?.outcome ?? pos?.outcomeName ?? pos?.outcome_name ?? pos?.assetName ?? pos?.asset_name ?? "Outcome";
 }
@@ -843,6 +866,10 @@ function PortfolioContent() {
                   const outcome = positionOutcome(pos);
                   const isYes = outcome.toLowerCase().includes("yes");
                   const isNo = outcome.toLowerCase().includes("no");
+                  const endTime = getPositionEndTime(pos);
+                  const timeLeft = formatTimeLeft(endTime);
+                  const endDateStr = formatEndDate(endTime);
+                  const maxPayout = shares; // $1 per share
 
                   const handleSell = () => {
                     if (marketHref) {
@@ -870,6 +897,19 @@ function PortfolioContent() {
                               <span className="rounded-md border border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.06)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[oklch(0.68_0.18_155)]">
                                 {positionStatus(pos)}
                               </span>
+                              {timeLeft.label && (
+                                <span className={cn(
+                                  "flex items-center gap-1 rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]",
+                                  timeLeft.urgency === "critical"
+                                    ? "border-[oklch(0.60_0.18_25/0.35)] bg-[oklch(0.60_0.18_25/0.10)] text-[oklch(0.72_0.18_25)] animate-pulse"
+                                    : timeLeft.urgency === "soon"
+                                    ? "border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.08)] text-[oklch(0.84_0.16_82)]"
+                                    : "border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.014_255)] text-muted-foreground"
+                                )}>
+                                  <Clock3 className="h-2.5 w-2.5" />
+                                  {timeLeft.label}
+                                </span>
+                              )}
                             </div>
                             <h3 className="text-[14px] font-semibold leading-snug text-foreground line-clamp-2">
                               {positionLabel(pos)}
@@ -917,7 +957,7 @@ function PortfolioContent() {
 
                         {/* Stats row + actions */}
                         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                          <div className="grid grid-cols-4 gap-3 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
+                          <div className="grid grid-cols-3 gap-x-3 gap-y-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
                             <div>
                               <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Shares</div>
                               <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPortfolioNumber(shares)}</div>
@@ -927,6 +967,10 @@ function PortfolioContent() {
                               <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPortfolioMoney(value)}</div>
                             </div>
                             <div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Max Payout</div>
+                              <div className="mt-0.5 font-mono text-[13px] font-semibold text-[oklch(0.72_0.18_155)]">{formatPortfolioMoney(maxPayout)}</div>
+                            </div>
+                            <div>
                               <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Avg</div>
                               <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPrice(avgPrice)}</div>
                             </div>
@@ -934,6 +978,16 @@ function PortfolioContent() {
                               <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Now</div>
                               <div className="mt-0.5 font-mono text-[13px] font-semibold text-foreground">{formatPrice(currentPrice)}</div>
                             </div>
+                            {endDateStr && (
+                              <div>
+                                <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Closes</div>
+                                <div className={cn("mt-0.5 font-mono text-[13px] font-semibold",
+                                  timeLeft.urgency === "critical" ? "text-[oklch(0.72_0.18_25)]"
+                                  : timeLeft.urgency === "soon" ? "text-[oklch(0.84_0.16_82)]"
+                                  : "text-foreground"
+                                )}>{endDateStr}</div>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex w-full items-center gap-2 sm:w-auto">
