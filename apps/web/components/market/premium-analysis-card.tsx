@@ -27,6 +27,8 @@ import { usePremiumAnalysis } from "@/hooks/use-premium-analysis"
 import type {
   PremiumAnalysis,
   PremiumTechnicalAnalysis,
+  PremiumFundamentalAnalysis,
+  FundamentalSignal,
   TAComputedVerdict,
   TASignalVote,
 } from "@smartmarket/types"
@@ -873,10 +875,160 @@ function TechLevelsPanel({ ta }: { ta: PremiumTechnicalAnalysis }) {
   )
 }
 
+// ─── Fundamental Signal Row ───────────────────────────────────────────────────
+
+function FundamentalSignalRow({ signal }: { signal: FundamentalSignal }) {
+  const color =
+    signal.direction === "YES" ? GREEN : signal.direction === "NO" ? RED : MUTED
+  const Icon =
+    signal.direction === "YES"
+      ? TrendingUp
+      : signal.direction === "NO"
+      ? TrendingDown
+      : Minus
+  const convictionPct = Math.round(signal.conviction * 100)
+
+  return (
+    <div className="flex items-start gap-2 py-2 border-b border-border/30 last:border-0">
+      <Icon className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color }} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="text-xs font-semibold text-foreground truncate">
+            {signal.name}
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[9px] font-mono" style={{ color: "oklch(0.55 0.01 260)" }}>
+              w:{(signal.weight * 100).toFixed(0)}
+            </span>
+            <div className="w-12 h-1 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${convictionPct}%`, background: color }}
+              />
+            </div>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground/70 leading-snug line-clamp-2">
+          {signal.reason}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Fundamental Panel ────────────────────────────────────────────────────────
+
+function FundamentalPanel({ fa }: { fa: PremiumFundamentalAnalysis }) {
+  const yesSignals = fa.signals.filter((s) => s.direction === "YES")
+  const noSignals = fa.signals.filter((s) => s.direction === "NO")
+  const neutralSignals = fa.signals.filter((s) => s.direction === "neutral")
+  const totalYes = fa.yesScore + fa.noScore || 1
+
+  const efficiencyColor =
+    fa.priceEfficiency === "efficient"
+      ? GREEN
+      : fa.priceEfficiency === "potentially_mispriced"
+      ? RED
+      : AMBER
+
+  return (
+    <div className="space-y-3">
+      {/* Score bar */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+          <span style={{ color: GREEN }}>YES {fa.yesScore.toFixed(1)}</span>
+          <span>{fa.signals.filter((s) => s.direction === fa.direction).length}/{fa.signals.length} signals agree</span>
+          <span style={{ color: RED }}>NO {fa.noScore.toFixed(1)}</span>
+        </div>
+        <div className="relative w-full h-2 rounded-full overflow-hidden bg-[oklch(0.15_0.01_260)]">
+          <div
+            className="absolute right-1/2 top-0 h-full rounded-l-full"
+            style={{
+              width: `${Math.min(50, (fa.noScore / totalYes) * 100)}%`,
+              background: RED,
+            }}
+          />
+          <div
+            className="absolute left-1/2 top-0 h-full rounded-r-full"
+            style={{
+              width: `${Math.min(50, (fa.yesScore / totalYes) * 100)}%`,
+              background: GREEN,
+            }}
+          />
+          <div className="absolute left-1/2 top-0 w-px h-full bg-muted-foreground/40 -translate-x-px" />
+        </div>
+      </div>
+
+      {/* Market stats row */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-lg p-2.5 bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] text-center">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1">Implied Prob</p>
+          <p className="text-sm font-mono font-bold" style={{ color: fa.impliedProbability >= 60 ? GREEN : fa.impliedProbability <= 40 ? RED : AMBER }}>
+            {fa.impliedProbability}%
+          </p>
+        </div>
+        <div className="rounded-lg p-2.5 bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] text-center">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1">Efficiency</p>
+          <p className="text-[10px] font-semibold leading-tight" style={{ color: efficiencyColor }}>
+            {fa.priceEfficiency === "potentially_mispriced" ? "Mispriced?" : fa.priceEfficiency.replace("_", " ")}
+          </p>
+        </div>
+        <div className="rounded-lg p-2.5 bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] text-center">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1">Days Left</p>
+          <p className="text-sm font-mono font-bold text-foreground">
+            {fa.daysToResolution !== null ? fa.daysToResolution : "—"}
+          </p>
+        </div>
+      </div>
+
+      {/* Mispricing alert */}
+      {fa.priceEfficiency === "potentially_mispriced" && (
+        <div className="rounded-md p-2.5 bg-[oklch(0.58_0.2_25_/_0.08)] border border-[oklch(0.58_0.2_25_/_0.2)]">
+          <p className="text-[10px]" style={{ color: RED }}>
+            ⚠ News sentiment diverges from market price — potential mispricing detected
+          </p>
+        </div>
+      )}
+
+      {/* Signal lists */}
+      {yesSignals.length > 0 && (
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: GREEN }}>
+            YES signals ({yesSignals.length})
+          </p>
+          {yesSignals.map((s, i) => <FundamentalSignalRow key={i} signal={s} />)}
+        </div>
+      )}
+      {noSignals.length > 0 && (
+        <div className="mt-2">
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: RED }}>
+            NO signals ({noSignals.length})
+          </p>
+          {noSignals.map((s, i) => <FundamentalSignalRow key={i} signal={s} />)}
+        </div>
+      )}
+      {neutralSignals.length > 0 && (
+        <div className="mt-2">
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1 text-muted-foreground/60">
+            Neutral ({neutralSignals.length})
+          </p>
+          {neutralSignals.map((s, i) => <FundamentalSignalRow key={i} signal={s} />)}
+        </div>
+      )}
+
+      {/* Rationale */}
+      <p className="text-[11px] text-muted-foreground/70 leading-relaxed pt-1 border-t border-border/30">
+        {fa.verdictRationale}
+      </p>
+    </div>
+  )
+}
+
 // ─── Full unlocked state ───────────────────────────────────────────────────────
 
 function UnlockedState({ analysis }: { analysis: PremiumAnalysis }) {
   const ta = analysis.technicalAnalysis
+  const fa = analysis.fundamentalAnalysis
 
   return (
     <div className="space-y-4">
@@ -893,14 +1045,50 @@ function UnlockedState({ analysis }: { analysis: PremiumAnalysis }) {
             {ta.symbol} · {fmtPrice(ta.currentPrice)}
           </Badge>
         )}
+        {fa && !ta && (
+          <Badge
+            variant="outline"
+            className="ml-auto text-[9px] uppercase tracking-widest"
+            style={{ borderColor: AMBER, color: AMBER }}
+          >
+            {fa.category.replace("_", "/")} · {fa.daysToResolution !== null ? `${fa.daysToResolution}d` : "open"}
+          </Badge>
+        )}
       </div>
 
       {/* Verdict banner */}
       <VerdictBanner verdict={analysis.verdict} />
 
-      {/* Quant score row — only when TA data exists */}
+      {/* Quant score row — crypto markets */}
       {ta?.computedVerdict && (
         <QuantScoreRow cv={ta.computedVerdict} regime={ta.regime} />
+      )}
+
+      {/* Fundamental score row — non-crypto markets */}
+      {fa && !ta && (
+        <div className="grid grid-cols-3 gap-2 my-3">
+          <StatPill
+            label="Net Score"
+            value={`${fa.netScore > 0 ? "+" : ""}${fa.netScore.toFixed(0)}`}
+            color={fa.netScore > 5 ? GREEN : fa.netScore < -5 ? RED : MUTED}
+          />
+          <StatPill
+            label="Category"
+            value={fa.category.replace("_", "/")}
+            color={AMBER}
+          />
+          <StatPill
+            label="Implied"
+            value={`${fa.impliedProbability}%`}
+            color={
+              fa.impliedProbability >= 65
+                ? GREEN
+                : fa.impliedProbability <= 35
+                ? RED
+                : AMBER
+            }
+          />
+        </div>
       )}
 
       {/* TA-specific collapsible panels (crypto only) */}
@@ -923,6 +1111,18 @@ function UnlockedState({ analysis }: { analysis: PremiumAnalysis }) {
             icon={<Target className="w-3.5 h-3.5 text-muted-foreground" />}
           >
             <TechLevelsPanel ta={ta} />
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {/* Fundamental signal panels (non-crypto markets only) */}
+      {fa && (
+        <div className="divide-y divide-border/50">
+          <CollapsibleSection
+            title="Fundamental Signal Breakdown"
+            icon={<BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />}
+          >
+            <FundamentalPanel fa={fa} />
           </CollapsibleSection>
         </div>
       )}

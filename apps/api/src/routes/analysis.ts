@@ -6,6 +6,7 @@ import { paymentGate } from "../middleware/paymentGate.js";
 import { fetchPremiumNews } from "../services/news.js";
 import { buildPaymentRequirement } from "../services/payment.js";
 import { detectCryptoSymbol, runTechnicalAnalysis } from "../services/ta-engine.js";
+import { computeFundamentalVerdict } from "../services/fundamental-engine.js";
 
 const marketSchema = z.object({
   id: z.string().min(1),
@@ -73,9 +74,11 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       // Detect crypto asset from market question for TA enrichment
       const cryptoSymbol = detectCryptoSymbol(market.question);
 
-      // Fetch news and TA in parallel (TA only runs for crypto markets)
+      // Fetch news + TA/fundamental signals in parallel
+      // - TA engine: crypto markets only
+      // - Fundamental engine: non-crypto markets (runs after news fetch, needs articles)
       const [newsArticles, taResult] = await Promise.all([
-        fetchPremiumNews(market.question),
+        fetchPremiumNews(market.question, market.category),
         cryptoSymbol
           ? runTechnicalAnalysis(cryptoSymbol).catch((err) => {
               console.warn(`[smartmarket] TA engine failed for ${cryptoSymbol}:`, err);
@@ -84,7 +87,12 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
           : Promise.resolve(null),
       ]);
 
-      const raw = await generatePremiumAnalysis(market, newsArticles, taResult);
+      // Compute fundamental verdict for non-crypto markets using the fetched articles
+      const fundamentalResult = !cryptoSymbol
+        ? computeFundamentalVerdict(market, newsArticles)
+        : null;
+
+      const raw = await generatePremiumAnalysis(market, newsArticles, taResult, fundamentalResult);
 
       const generatedAt = new Date().toISOString();
       const signalHash = createHash("sha256")
@@ -111,24 +119,17 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
             bias: taResult.htf.bias,
             swingHigh: taResult.htf.swingHigh,
             swingLow: taResult.htf.swingLow,
-            // EMA Ribbon
             ema: taResult.ema,
-            // MACD
             macd: taResult.macd,
-            // Bollinger
             bollinger: taResult.bollinger,
-            // RSI suite
             rsi14: taResult.rsi14,
             rsiDivergence: taResult.rsiDivergence,
             multiTfRsi: taResult.multiTfRsi,
-            // Volume
             obv: taResult.obv,
             volumeProfile: taResult.volumeProfile,
-            // Levels
             nearestSupport: taResult.nearestSupport,
             nearestResistance: taResult.nearestResistance,
             fibLevels: taResult.fibLevels,
-            // Context
             vwapDistance: taResult.vwapDistance,
             volatilityPct: taResult.volatilityPct,
             regime: taResult.regime,
@@ -137,12 +138,26 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
             openInterest: taResult.openInterest,
             longShort: taResult.longShort,
             takerRatio: taResult.takerRatio,
-            // Conviction
             confluenceScore: taResult.confluenceScore,
             confluenceFactors: taResult.confluenceFactors,
-            // Deterministic verdict from quant engine
             computedVerdict: taResult.verdict,
             riskReward: taResult.riskReward,
+          },
+        }),
+        // Include fundamental signal metadata when available (non-crypto markets only)
+        ...(fundamentalResult && {
+          fundamentalAnalysis: {
+            direction: fundamentalResult.direction,
+            confidence: fundamentalResult.confidence,
+            yesScore: fundamentalResult.yesScore,
+            noScore: fundamentalResult.noScore,
+            netScore: fundamentalResult.netScore,
+            signals: fundamentalResult.signals,
+            verdictRationale: fundamentalResult.verdictRationale,
+            impliedProbability: fundamentalResult.impliedProbability,
+            priceEfficiency: fundamentalResult.priceEfficiency,
+            daysToResolution: fundamentalResult.daysToResolution,
+            category: fundamentalResult.category,
           },
         }),
       };

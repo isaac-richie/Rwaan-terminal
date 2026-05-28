@@ -1,6 +1,8 @@
 import { config } from "../config.js";
 import { createHash } from "node:crypto";
 import type { TechnicalAnalysis } from "./ta-engine.js";
+import type { FundamentalVerdict } from "./fundamental-engine.js";
+import { buildCategoryFramework } from "./fundamental-engine.js";
 
 const OPENAI_ANALYSIS_TIMEOUT_MS = Number(process.env.OPENAI_ANALYSIS_TIMEOUT_MS ?? 25000);
 
@@ -308,7 +310,8 @@ function premiumAnalysisSchema() {
 function buildPremiumPrompt(
   market: PremiumAnalysisInput,
   articles: PremiumNewsArticle[],
-  ta?: TechnicalAnalysis | null
+  ta?: TechnicalAnalysis | null,
+  fundamental?: FundamentalVerdict | null
 ): string {
   const consensusStr = market.outcomes?.length
     ? market.outcomes.map(o => `${o.name}: ${o.price}%`).join(" / ")
@@ -342,12 +345,43 @@ function buildPremiumPrompt(
       ].join("\n")
     : "";
 
+  // ── Category framework (non-crypto only) ──────────────────────────────────
+  const categoryFramework = !ta && fundamental
+    ? [
+        ``,
+        buildCategoryFramework(fundamental.category, fundamental.impliedProbability),
+      ].join("\n")
+    : "";
+
+  // ── Fundamental verdict block (non-crypto only) ────────────────────────────
+  const fundamentalVerdictBlock = !ta && fundamental
+    ? [
+        ``,
+        `PRE-COMPUTED VERDICT FROM FUNDAMENTAL SIGNAL ENGINE:`,
+        `Direction: ${fundamental.direction}`,
+        `Confidence: ${fundamental.confidence}%`,
+        `Yes Score: ${fundamental.yesScore} / No Score: ${fundamental.noScore} / Net: ${fundamental.netScore > 0 ? "+" : ""}${fundamental.netScore}`,
+        `Market Implied Probability: ${fundamental.impliedProbability}%`,
+        `Price Efficiency: ${fundamental.priceEfficiency.replace(/_/g, " ")}`,
+        ...(fundamental.daysToResolution !== null
+          ? [`Days to Resolution: ${fundamental.daysToResolution}`]
+          : []),
+        ``,
+        `SIGNAL BREAKDOWN (${fundamental.signals.length} signals):`,
+        ...fundamental.signals.map(
+          (s) =>
+            `- ${s.name}: ${s.direction.toUpperCase()} (weight ${(s.weight * 100).toFixed(0)}%, conviction ${(s.conviction * 100).toFixed(0)}%) — ${s.reason}`
+        ),
+      ].join("\n")
+    : "";
+
+  // ── TA instructions (crypto only) ─────────────────────────────────────────
   const taInstructions = ta
     ? [
         ``,
         `CRITICAL — CRYPTO MARKET WITH FULL QUANTITATIVE TA SUITE:`,
         `This is a crypto asset market. A deterministic quant engine has already computed a verdict`,
-        `from 13 weighted signal votes across multi-timeframe technical analysis.`,
+        `from 16 weighted signal votes across multi-timeframe technical analysis.`,
         ``,
         `The quant engine analyzed 16 weighted signal votes:`,
         `- 4H/1H/15m market structure, EMA ribbon (9/21/50/200): ${ta.ema.ribbonState.replace("_", " ")}`,
@@ -376,35 +410,89 @@ function buildPremiumPrompt(
         `  the direction but MUST explicitly state why and reduce confidence to 30-45%`,
         `- Include specific price levels for entries, stops, and targets from the R:R data`,
       ].join("\n")
+    : !ta && fundamental
+    ? [
+        ``,
+        `YOUR ROLE IS TO EXPLAIN AND JUSTIFY — NOT TO OVERRIDE:`,
+        `- Your verdict MUST match the fundamental engine: ${fundamental.direction}`,
+        `- Your confidence MUST be within ±10 of the computed ${fundamental.confidence}%`,
+        `- Reference the category framework above — apply its specific analytical lenses`,
+        `- Use the signal breakdown to explain WHY each driver supports the verdict`,
+        `- Call out the news sentiment findings explicitly — which articles are most relevant?`,
+        `- Address the market consensus (${fundamental.impliedProbability}% implied) — is the crowd right or is this a mispricing?`,
+        ...(fundamental.priceEfficiency === "potentially_mispriced"
+          ? [`- ⚠ POTENTIAL MISPRICING DETECTED: news sentiment diverges from market price — address this directly`]
+          : []),
+        ...(fundamental.daysToResolution !== null && fundamental.daysToResolution <= 14
+          ? [`- Resolution is imminent (${fundamental.daysToResolution} days) — focus on near-term catalysts and resolution mechanics`]
+          : []),
+        `- If news contradicts the fundamental verdict, acknowledge but maintain direction unless evidence is overwhelming`,
+      ].join("\n")
     : "";
+
+  const isNonCryptoWithFundamental = !ta && !!fundamental;
 
   return [
     `You are a senior quantitative intelligence analyst producing a premium market report.`,
     `You have been paid $1 for this analysis. Deliver maximum value.`,
-    `Your analysis is backed by a real-time quantitative engine processing live Binance data.`,
+    ta
+      ? `Your analysis is backed by a real-time quantitative engine processing live Binance data.`
+      : `Your analysis is backed by a fundamental signal engine and live news intelligence.`,
     ``,
     `MARKET: ${market.question}`,
     `CATEGORY: ${market.category ?? "Events"}`,
     `CONSENSUS: ${consensusStr}`,
     `VOLUME: ${market.volume ?? "N/A"} | LIQUIDITY: ${market.liquidity ?? "N/A"}`,
     `CLOSES: ${market.endDate ?? "N/A"}`,
+    categoryFramework,
     ``,
-    `LIVE INTELLIGENCE (sourced ${new Date().toISOString()}):`,
+    `LIVE INTELLIGENCE (sourced ${new Date().toISOString()}, ${articles.length} articles):`,
     newsSection,
     taSection,
+    fundamentalVerdictBlock,
     verdictBlock,
     taInstructions,
     ``,
     `REQUIRED OUTPUT:`,
-    `1. VERDICT: ${ta?.verdict ? `You MUST output "${ta.verdict.direction}" as direction. Confidence within ±10 of ${ta.verdict.confidence}%. Write a 2-3 sentence rationale explaining the technical AND fundamental basis.` : `You MUST choose YES or NO. Include confidence 0-100 and a 2-3 sentence rationale.`}`,
+    `1. VERDICT: ${
+      ta?.verdict
+        ? `You MUST output "${ta.verdict.direction}" as direction. Confidence within ±10 of ${ta.verdict.confidence}%. Write a 2-3 sentence rationale explaining the technical AND fundamental basis.`
+        : isNonCryptoWithFundamental
+        ? `You MUST output "${fundamental!.direction}" as direction. Confidence within ±10 of ${fundamental!.confidence}%. Write a 2-3 sentence rationale explaining BOTH the signal engine findings AND the news evidence.`
+        : `You MUST choose YES or NO. Include confidence 0-100 and a 2-3 sentence rationale.`
+    }`,
     `2. EVENT BRIEF: Why this event matters and what broader system it belongs to (3-4 sentences).`,
-    `3. GLOBAL CONTEXT: Macro trends, geopolitical forces, and structural factors at play.`,
-    `4. STRUCTURAL DRIVERS: 3-5 named forces driving the outcome. Each must be concrete and specific.${ta ? " Include at least 2 technical drivers with exact price levels." : ""}`,
-    `5. MARKET SIGNAL INTERPRETATION: ${ta ? "Interpret the EMA ribbon, MACD histogram, Bollinger position, RSI readings, and volume flow. Use specific numbers." : "What current pricing and volume reveal about conviction and positioning."}`,
-    `6. INFORMATION ASYMMETRY: What the public narrative misses. ${ta ? "Include what the quant engine detects that retail traders cannot see (divergences, smart money flow, crowded positioning)." : "Where hidden or opaque factors exist."}`,
-    `7. RISK LANDSCAPE: 3-4 specific risks framed as uncertainties. Not generic.${ta ? " Include at least 1 technical risk with a specific price level that would invalidate the thesis." : ""}`,
-    `8. STRATEGIC INSIGHT: ${ta ? "Provide specific entry zones, stop levels, and targets from the technical data. Tell the user exactly what to watch." : "How to think about this situation. What signals matter most going forward."}`,
-    `9. TERMINAL NOTE: Closing note. ${ta ? "Reference the quant engine's signal agreement and confluence score." : "Reinforce the analytical framework."}`,
+    `3. GLOBAL CONTEXT: ${isNonCryptoWithFundamental ? `Apply the ${fundamental!.category.replace("_", "/") } framework above — connect global/macro forces to this specific resolution question.` : "Macro trends, geopolitical forces, and structural factors at play."}`,
+    `4. STRUCTURAL DRIVERS: 3-5 named forces driving the outcome. Each must be concrete and specific.${ta ? " Include at least 2 technical drivers with exact price levels." : isNonCryptoWithFundamental ? ` Map at least 2 drivers directly to signals from the fundamental engine.` : ""}`,
+    `5. MARKET SIGNAL INTERPRETATION: ${
+      ta
+        ? "Interpret the EMA ribbon, MACD histogram, Bollinger position, RSI readings, and volume flow. Use specific numbers."
+        : isNonCryptoWithFundamental
+        ? `Interpret what the market price of ${fundamental!.impliedProbability}% implies about crowd conviction. Reference the news sentiment signal and whether it confirms or contradicts the price.`
+        : "What current pricing and volume reveal about conviction and positioning."
+    }`,
+    `6. INFORMATION ASYMMETRY: What the public narrative misses. ${
+      ta
+        ? "Include what the quant engine detects that retail traders cannot see (divergences, smart money flow, crowded positioning)."
+        : isNonCryptoWithFundamental
+        ? `Highlight where the category base rate diverges from market price and what this implies. Surface what retail participants are likely missing.`
+        : "Where hidden or opaque factors exist."
+    }`,
+    `7. RISK LANDSCAPE: 3-4 specific risks framed as uncertainties. Not generic.${ta ? " Include at least 1 technical risk with a specific price level that would invalidate the thesis." : isNonCryptoWithFundamental ? " Include the specific scenario that would flip the verdict." : ""}`,
+    `8. STRATEGIC INSIGHT: ${
+      ta
+        ? "Provide specific entry zones, stop levels, and targets from the technical data. Tell the user exactly what to watch."
+        : isNonCryptoWithFundamental
+        ? `What specific catalyst, data release, or event should participants monitor? What is the highest-signal indicator to watch before resolution?`
+        : "How to think about this situation. What signals matter most going forward."
+    }`,
+    `9. TERMINAL NOTE: Closing note. ${
+      ta
+        ? "Reference the quant engine's signal agreement and confluence score."
+        : isNonCryptoWithFundamental
+        ? `Reference the fundamental engine's signal count and price efficiency rating (${fundamental!.priceEfficiency.replace(/_/g, " ")}).`
+        : "Reinforce the analytical framework."
+    }`,
     ``,
     `VERDICT RULES:`,
     ...(ta?.verdict
@@ -413,6 +501,15 @@ function buildPremiumPrompt(
           `- Your confidence MUST be between ${Math.max(10, ta.verdict.confidence - 10)} and ${Math.min(95, ta.verdict.confidence + 10)}`,
           `- ${ta.verdict.signalAgreement >= 70 ? "High signal agreement — express conviction clearly" : "Lower signal agreement — acknowledge the contrarian signals but maintain direction"}`,
         ]
+      : isNonCryptoWithFundamental
+      ? [
+          `- Your direction MUST be ${fundamental!.direction} (from the fundamental engine)`,
+          `- Your confidence MUST be between ${Math.max(15, fundamental!.confidence - 10)} and ${Math.min(88, fundamental!.confidence + 10)}`,
+          `- ${fundamental!.confidence >= 65 ? "Sufficient signal strength — express conviction clearly and back it with evidence" : "Mixed signals — be direct about the verdict but acknowledge the key uncertainties"}`,
+          ...(fundamental!.priceEfficiency === "potentially_mispriced"
+            ? [`- This market may be mispriced — explicitly discuss the divergence between news and market price`]
+            : []),
+        ]
       : [
           `- Confidence 70-100: Strong directional evidence from news + structural factors`,
           `- Confidence 40-69: Leaning direction but significant uncertainty remains`,
@@ -420,7 +517,7 @@ function buildPremiumPrompt(
         ]),
     `- Be opinionated. The user paid for a clear signal, not hedging.`,
     ``,
-    `STYLE: No fluff. No generic phrases. Every sentence must carry insight. Use precise, confident language.${ta ? " Include specific dollar amounts and percentages throughout." : ""}`
+    `STYLE: No fluff. No generic phrases. Every sentence must carry insight. Use precise, confident language.${ta ? " Include specific dollar amounts and percentages throughout." : isNonCryptoWithFundamental ? " Reference specific data points from the news articles and signal engine throughout." : ""}`
   ].join("\n");
 }
 
@@ -453,7 +550,8 @@ function fallbackPremiumAnalysis(): PremiumAnalysisResult {
 export async function generatePremiumAnalysis(
   market: PremiumAnalysisInput,
   articles: PremiumNewsArticle[],
-  ta?: TechnicalAnalysis | null
+  ta?: TechnicalAnalysis | null,
+  fundamental?: FundamentalVerdict | null
 ): Promise<PremiumAnalysisResult> {
   if (!config.openai.apiKey) {
     return fallbackPremiumAnalysis();
@@ -470,7 +568,7 @@ export async function generatePremiumAnalysis(
       },
       body: JSON.stringify({
         model: config.openai.model,
-        messages: [{ role: "user", content: buildPremiumPrompt(market, articles, ta) }],
+        messages: [{ role: "user", content: buildPremiumPrompt(market, articles, ta, fundamental) }],
         response_format: {
           type: "json_schema",
           json_schema: {
