@@ -131,12 +131,12 @@ function StatPill({
   color?: string
 }) {
   return (
-    <div className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)]">
-      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+    <div className="flex flex-col items-center gap-0.5 px-1.5 sm:px-3 py-2 rounded-lg bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] min-w-0">
+      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60 truncate w-full text-center">
         {label}
       </span>
       <span
-        className="text-sm font-bold font-mono"
+        className="text-xs sm:text-sm font-bold font-mono truncate"
         style={{ color: color ?? "oklch(0.90 0.01 260)" }}
       >
         {value}
@@ -190,7 +190,7 @@ function QuantScoreRow({ cv, regime }: { cv: TAComputedVerdict; regime: string }
     cv.signalAgreement >= 70 ? GREEN : cv.signalAgreement >= 50 ? AMBER : RED
 
   return (
-    <div className="grid grid-cols-3 gap-2 my-3">
+    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 my-3">
       <StatPill
         label="Net Score"
         value={`${cv.netScore > 0 ? "+" : ""}${cv.netScore.toFixed(0)}`}
@@ -731,7 +731,7 @@ function TechLevelsPanel({ ta }: { ta: PremiumTechnicalAnalysis }) {
             {multiTfRsi.alignment.replace("_", " ")}
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           {[
             { label: "4H", v: multiTfRsi.tf4h },
             { label: "1H", v: multiTfRsi.tf1h },
@@ -960,22 +960,22 @@ function FundamentalPanel({ fa }: { fa: PremiumFundamentalAnalysis }) {
       </div>
 
       {/* Market stats row */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-lg p-2.5 bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] text-center">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1">Implied Prob</p>
-          <p className="text-sm font-mono font-bold" style={{ color: fa.impliedProbability >= 60 ? GREEN : fa.impliedProbability <= 40 ? RED : AMBER }}>
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+        <div className="rounded-lg p-1.5 sm:p-2.5 bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] text-center min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1 truncate">Implied Prob</p>
+          <p className="text-xs sm:text-sm font-mono font-bold" style={{ color: fa.impliedProbability >= 60 ? GREEN : fa.impliedProbability <= 40 ? RED : AMBER }}>
             {fa.impliedProbability}%
           </p>
         </div>
-        <div className="rounded-lg p-2.5 bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] text-center">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1">Efficiency</p>
-          <p className="text-[10px] font-semibold leading-tight" style={{ color: efficiencyColor }}>
+        <div className="rounded-lg p-1.5 sm:p-2.5 bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] text-center min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1 truncate">Efficiency</p>
+          <p className="text-[10px] font-semibold leading-tight truncate" style={{ color: efficiencyColor }}>
             {fa.priceEfficiency === "potentially_mispriced" ? "Mispriced?" : fa.priceEfficiency.replace("_", " ")}
           </p>
         </div>
-        <div className="rounded-lg p-2.5 bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] text-center">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1">Days Left</p>
-          <p className="text-sm font-mono font-bold text-foreground">
+        <div className="rounded-lg p-1.5 sm:p-2.5 bg-[oklch(0.13_0.013_255)] border border-[oklch(0.20_0.014_255)] text-center min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1 truncate">Days Left</p>
+          <p className="text-xs sm:text-sm font-mono font-bold text-foreground">
             {fa.daysToResolution !== null ? fa.daysToResolution : "—"}
           </p>
         </div>
@@ -1066,7 +1066,7 @@ function UnlockedState({ analysis }: { analysis: PremiumAnalysis }) {
 
       {/* Fundamental score row — non-crypto markets */}
       {fa && !ta && (
-        <div className="grid grid-cols-3 gap-2 my-3">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 my-3">
           <StatPill
             label="Net Score"
             value={`${fa.netScore > 0 ? "+" : ""}${fa.netScore.toFixed(0)}`}
