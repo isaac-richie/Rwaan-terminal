@@ -52,6 +52,7 @@ import { usePolymarketDepositWallet } from "@/hooks/use-polymarket-deposit-walle
 import { useTradeReadiness } from "@/hooks/use-trade-readiness";
 import { shortAddress, useTradingProfile } from "@/hooks/use-trading-profile";
 import { addAccountRefreshListener, scheduleAccountRefresh } from "@/lib/account-events";
+import { cachePortfolioPositionForDetail } from "@/lib/market-detail-cache";
 import { cn } from "@/lib/utils";
 
 const PRIVY_ENABLED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
@@ -126,8 +127,9 @@ function closedPositionStatus(pos: any) {
 
 function marketRouteId(pos: any) {
   return (
-    pos?.slug ?? pos?.marketSlug ?? pos?.market_slug ?? pos?.marketId ?? pos?.market_id ??
-    pos?.eventId ?? pos?.conditionId ?? pos?.condition_id ?? pos?.eventSlug ?? pos?.event_slug ?? pos?.id ?? null
+    pos?.asset ?? pos?.assetId ?? pos?.asset_id ?? pos?.tokenId ?? pos?.token_id ??
+    pos?.marketId ?? pos?.market_id ?? pos?.slug ?? pos?.marketSlug ?? pos?.market_slug ??
+    pos?.conditionId ?? pos?.condition_id ?? pos?.eventId ?? pos?.eventSlug ?? pos?.event_slug ?? pos?.id ?? null
   );
 }
 
@@ -595,6 +597,13 @@ function PortfolioContent() {
     }
   };
 
+  const openPositionMarket = (position: any, routeId: unknown, query?: URLSearchParams) => {
+    if (!routeId) return;
+    const identifier = String(routeId);
+    cachePortfolioPositionForDetail(position, identifier);
+    router.push(`/markets/${encodeURIComponent(identifier)}${query ? `?${query.toString()}` : ""}`);
+  };
+
   const handleRefreshAll = () => {
     portfolio.refresh();
     fundingStatus.refresh();
@@ -867,9 +876,7 @@ function PortfolioContent() {
                   const maxPayout = shares; // $1 per share
 
                   const handleSell = () => {
-                    if (marketHref) {
-                      router.push(`${marketHref}?${new URLSearchParams({ side: "sell", outcome: String(pos.outcomeIndex ?? outcome), shares: shares.toFixed(4) })}`);
-                    }
+                    openPositionMarket(pos, routeId, new URLSearchParams({ side: "sell", outcome, shares: shares.toFixed(4) }));
                   };
 
                   return (
@@ -971,7 +978,7 @@ function PortfolioContent() {
                         {/* Actions */}
                         <div className="mt-3 flex items-center gap-2">
                           <button
-                            onClick={() => marketHref && router.push(marketHref)}
+                            onClick={() => openPositionMarket(pos, routeId)}
                             disabled={!marketHref}
                             className="flex h-9 flex-1 items-center justify-center gap-1 rounded-xl border border-[oklch(0.24_0.016_255)] bg-transparent text-[11px] font-bold text-muted-foreground transition-colors hover:border-[oklch(0.32_0.016_255)] hover:text-foreground disabled:opacity-40 active:scale-[0.97]"
                           >

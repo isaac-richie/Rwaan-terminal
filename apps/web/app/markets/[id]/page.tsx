@@ -266,13 +266,17 @@ async function resolveGammaMarket(identifier: string) {
   if (!normalized) return null;
 
   const attempts: Array<() => Promise<any>> = [];
-  if (/^\d+$/.test(normalized)) {
-    attempts.push(() => fetchGammaMarketByQuery({ id: normalized }, (market) => String(market.id) === normalized));
-    attempts.push(
+  const numericIdentifier = /^\d+$/.test(normalized);
+  if (numericIdentifier) {
+    const tokenAttempts = [
       () => fetchGammaMarketByQuery({ clob_token_ids: normalized }, (market) => parseGammaTokenIds(market).includes(normalized)),
       () => fetchGammaMarketByQuery({ clobTokenIds: normalized }, (market) => parseGammaTokenIds(market).includes(normalized)),
-      () => fetchGammaMarketByQuery({ token_id: normalized }, (market) => parseGammaTokenIds(market).includes(normalized))
-    );
+      () => fetchGammaMarketByQuery({ token_id: normalized }, (market) => parseGammaTokenIds(market).includes(normalized)),
+    ];
+    const idAttempt = () => fetchGammaMarketByQuery({ id: normalized }, (market) => String(market.id) === normalized);
+
+    if (normalized.length > 18) attempts.push(...tokenAttempts, idAttempt);
+    else attempts.push(idAttempt, ...tokenAttempts);
   }
 
   const normalizedLower = normalized.toLowerCase();
@@ -324,7 +328,7 @@ function marketDetailFromCache(cached: CachedMarketDetail): MarketDetail {
     description: cached.description,
     category: cached.category || "Events",
     outcomes: cached.outcomes.length ? cached.outcomes : ["Yes", "No"],
-    prices: cached.prices,
+    prices: cached.prices.map((price) => (price > 1 ? price / 100 : price)),
     tokenIds: cached.tokenIds,
     image: cached.image || cached.icon,
     endsAt: cached.endsAt ? new Date(cached.endsAt).toLocaleDateString() : "",
