@@ -138,6 +138,7 @@ export function usePremiumAnalysis(marketId: string) {
         const tx = await signer.sendTransaction({
           to: paymentRequired.tokenContract,
           data: txData,
+          gasLimit: 60_000n, // ERC-20 transfer uses ~46k gas; cap to prevent inflated estimates
         })
 
         setStatus("confirming")
