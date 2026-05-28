@@ -223,9 +223,22 @@ async function fetchGammaMarketByQuery(query: Record<string, string>, matches?: 
   });
   if (!res.ok) throw new Error("Market lookup failed.");
   const data = await res.json();
-  const market = Array.isArray(data) ? data[0] : data;
+  const markets = Array.isArray(data) ? data : data ? [data] : [];
+  const market = matches ? markets.find(matches) : markets[0];
   if (!market?.id) return null;
-  return matches && !matches(market) ? null : market;
+  return market;
+}
+
+function parseGammaTokenIds(market: any): string[] {
+  const raw = market?.clobTokenIds ?? market?.clob_token_ids;
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map(String);
+  try {
+    const parsed = JSON.parse(String(raw));
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
 }
 
 async function fetchGammaEventPrimaryMarketByQuery(query: Record<string, string>) {
@@ -249,6 +262,11 @@ async function resolveGammaMarket(identifier: string) {
   const attempts: Array<() => Promise<any>> = [];
   if (/^\d+$/.test(normalized)) {
     attempts.push(() => fetchGammaMarketByQuery({ id: normalized }, (market) => String(market.id) === normalized));
+    attempts.push(
+      () => fetchGammaMarketByQuery({ clob_token_ids: normalized }, (market) => parseGammaTokenIds(market).includes(normalized)),
+      () => fetchGammaMarketByQuery({ clobTokenIds: normalized }, (market) => parseGammaTokenIds(market).includes(normalized)),
+      () => fetchGammaMarketByQuery({ token_id: normalized }, (market) => parseGammaTokenIds(market).includes(normalized))
+    );
   }
 
   const normalizedLower = normalized.toLowerCase();
