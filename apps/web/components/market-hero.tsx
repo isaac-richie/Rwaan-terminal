@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react"
 import { fetchMarkets, getCachedMarkets } from "@/lib/markets"
+import { cacheMarketForDetail } from "@/lib/market-detail-cache"
 import type { PolymarketMarket } from "@/lib/polymarket"
 import { cn } from "@/lib/utils"
 
@@ -146,7 +147,9 @@ export function MarketHero() {
   const marqueeMarkets = useMemo(() => [...trending, ...trending], [trending])
 
   const goToMarket = (market?: PolymarketMarket | null) => {
-    if (market?.id) router.push(`/markets/${market.id}`)
+    if (!market?.id) return
+    cacheMarketForDetail(market)
+    router.push(`/markets/${market.id}`)
   }
 
   if (loading && trending.length === 0) return <HeroSkeleton />

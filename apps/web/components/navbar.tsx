@@ -20,6 +20,7 @@ import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet"
 import { useTradeReadiness } from "@/hooks/use-trade-readiness"
 import { useTradingProfile } from "@/hooks/use-trading-profile"
 import { addAccountRefreshListener } from "@/lib/account-events"
+import { cacheMarketForDetail } from "@/lib/market-detail-cache"
 import { fetchMarkets } from "@/lib/markets"
 import type { PolymarketMarket } from "@/lib/polymarket"
 import { cn } from "@/lib/utils"
@@ -618,7 +619,11 @@ export function Navbar() {
         } else if (e.key === "Enter" && selectedIndex >= 0) {
           e.preventDefault()
           const market = searchResults[selectedIndex]
-          if (market) { setSearchOpen(false); router.push(`/markets/${market.id}`) }
+          if (market) {
+            cacheMarketForDetail(market)
+            setSearchOpen(false)
+            router.push(`/markets/${market.id}`)
+          }
         }
       }
     }
@@ -890,7 +895,11 @@ export function Navbar() {
                     return (
                       <button
                         key={market.id}
-                        onClick={() => { setSearchOpen(false); router.push(`/markets/${market.id}`) }}
+                        onClick={() => {
+                          cacheMarketForDetail(market)
+                          setSearchOpen(false)
+                          router.push(`/markets/${market.id}`)
+                        }}
                         onMouseEnter={() => setSelectedIndex(idx)}
                         className={cn(
                           "w-full text-left px-4 py-2.5 transition-colors group/r",

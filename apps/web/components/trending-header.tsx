@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowUpRight, Flame, TrendingUp } from "lucide-react"
 import { fetchMarkets } from "@/lib/markets"
+import { cacheMarketForDetail } from "@/lib/market-detail-cache"
 import type { PolymarketMarket } from "@/lib/polymarket"
 import { cn } from "@/lib/utils"
 
@@ -77,7 +78,10 @@ export function TrendingHeader() {
               return (
                 <button
                   key={market.id}
-                  onClick={() => router.push(`/markets/${market.id}`)}
+                  onClick={() => {
+                    cacheMarketForDetail(market)
+                    router.push(`/markets/${market.id}`)
+                  }}
                   className="shrink-0 w-[240px] surface-card surface-card-hover rounded-xl p-3 text-left transition-all group/hot btn-press"
                 >
                   <div className="flex items-start gap-2.5">

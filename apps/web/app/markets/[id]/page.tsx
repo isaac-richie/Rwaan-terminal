@@ -51,6 +51,7 @@ import { usePolymarketDepositWallet } from "@/hooks/use-polymarket-deposit-walle
 import { useTradeReadiness } from "@/hooks/use-trade-readiness";
 import { shortAddress, useTradingProfile } from "@/hooks/use-trading-profile";
 import { scheduleAccountRefresh } from "@/lib/account-events";
+import { readCachedMarketDetail, type CachedMarketDetail } from "@/lib/market-detail-cache";
 import { cn } from "@/lib/utils";
 import { CryptoAssetChart, detectCryptoAsset } from "@/components/charts/CryptoAssetChart";
 import { PremiumAnalysisCard } from "@/components/market/premium-analysis-card";
@@ -104,8 +105,13 @@ function formatCents(price?: number | null) {
 
 function formatCompactUsd(raw?: string | null): string {
   if (!raw) return "$--";
-  const cleaned = String(raw).replace(/[^0-9.]/g, "");
-  const num = Number(cleaned);
+  const text = String(raw).trim();
+  const normalized = text.replace(/[$,\s]/g, "").toUpperCase();
+  const suffix = normalized.match(/[KMB]$/)?.[0];
+  const valueText = suffix ? normalized.slice(0, -1) : normalized;
+  const parsed = Number(valueText.replace(/[^0-9.]/g, ""));
+  const multiplier = suffix === "B" ? 1_000_000_000 : suffix === "M" ? 1_000_000 : suffix === "K" ? 1_000 : 1;
+  const num = parsed * multiplier;
   if (!Number.isFinite(num) || num === 0) return "$--";
   if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`;
   if (num >= 1_000) return `$${(num / 1_000).toFixed(1)}K`;
@@ -291,6 +297,42 @@ async function resolveGammaMarket(identifier: string) {
   return null;
 }
 
+function marketDetailFromGamma(m: any): MarketDetail {
+  const outcomes = parseStringArray(m.outcomes);
+  const prices = parseNumberArray(m.outcomePrices ?? m.outcome_prices);
+  const tokenIds = parseStringArray(m.clobTokenIds ?? m.clob_token_ids);
+
+  return {
+    id: String(m.id),
+    title: String(m.question ?? "Untitled market"),
+    description: m.description,
+    category: m.category || "Events",
+    outcomes: outcomes.length ? outcomes : ["Yes", "No"],
+    prices,
+    tokenIds,
+    image: m.image || m.icon,
+    endsAt: m.endDate ? new Date(m.endDate).toLocaleDateString() : "",
+    volume24h: String(m.volume24hr ?? m.volume24h ?? m.volume_24h ?? m.volume_24hr ?? m.volume ?? ""),
+    liquidity: String(m.liquidity ?? m.liquidityClob ?? ""),
+  };
+}
+
+function marketDetailFromCache(cached: CachedMarketDetail): MarketDetail {
+  return {
+    id: cached.id,
+    title: cached.title,
+    description: cached.description,
+    category: cached.category || "Events",
+    outcomes: cached.outcomes.length ? cached.outcomes : ["Yes", "No"],
+    prices: cached.prices,
+    tokenIds: cached.tokenIds,
+    image: cached.image || cached.icon,
+    endsAt: cached.endsAt ? new Date(cached.endsAt).toLocaleDateString() : "",
+    volume24h: cached.volume24h ?? "",
+    liquidity: cached.liquidity ?? "",
+  };
+}
+
 const PUSD_DECIMALS = 6;
 
 function collateralAmount(raw?: string | null) {
@@ -450,36 +492,31 @@ export default function MarketDetailPage() {
         return;
       }
 
+      const cached = readCachedMarketDetail(String(marketId));
+      if (cached) {
+        setMarket(marketDetailFromCache(cached));
+        setMarketError(null);
+        setLoading(false);
+      }
+
       try {
-        setLoading(true);
+        if (!cached) setLoading(true);
         setMarketError(null);
         const m = await resolveGammaMarket(marketId);
         if (!m) {
-          setMarket(null);
-          setMarketError("Market not found.");
+          if (!cached) {
+            setMarket(null);
+            setMarketError("Market not found.");
+          }
           return;
         }
 
-        const outcomes = parseStringArray(m.outcomes);
-        const prices = parseNumberArray(m.outcomePrices ?? m.outcome_prices);
-        const tokenIds = parseStringArray(m.clobTokenIds ?? m.clob_token_ids);
-
-        setMarket({
-          id: m.id,
-          title: m.question,
-          description: m.description,
-          category: m.category || "Events",
-          outcomes: outcomes.length ? outcomes : ["Yes", "No"],
-          prices,
-          tokenIds,
-          image: m.image || m.icon,
-          endsAt: m.endDate ? new Date(m.endDate).toLocaleDateString() : "",
-          volume24h: String(m.volume24hr ?? m.volume24h ?? m.volume_24h ?? m.volume_24hr ?? m.volume ?? ""),
-          liquidity: String(m.liquidity ?? m.liquidityClob ?? ""),
-        });
+        setMarket(marketDetailFromGamma(m));
       } catch (err) {
-        setMarket(null);
-        setMarketError("Unable to load this market.");
+        if (!cached) {
+          setMarket(null);
+          setMarketError("Unable to load this market.");
+        }
       } finally {
         setLoading(false);
       }

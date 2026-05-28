@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Clock, TrendingUp, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { cacheMarketForDetail } from "@/lib/market-detail-cache"
 import type { PolymarketMarket } from "@/lib/polymarket"
 
 function formatEndDate(dateStr: string): string {
@@ -48,7 +49,10 @@ export function TradingCard({ market, index }: TradingCardProps) {
 
   const imgSrc = (market.image ?? market.icon) as string | undefined
 
-  const navigate = () => router.push(`/markets/${market.id}`)
+  const navigate = () => {
+    cacheMarketForDetail(market)
+    router.push(`/markets/${market.id}`)
+  }
 
   return (
     <article

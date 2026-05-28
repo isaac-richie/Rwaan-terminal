@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Flame } from "lucide-react"
 import { fetchMarkets } from "@/lib/markets"
+import { cacheMarketForDetail } from "@/lib/market-detail-cache"
 import { cn } from "@/lib/utils"
 import type { PolymarketMarket } from "@/lib/polymarket"
 
@@ -46,7 +47,10 @@ export function MobileTicker() {
               <button
                 key={`${market.id}-${idx}`}
                 type="button"
-                onClick={() => router.push(`/markets/${market.id}`)}
+                onClick={() => {
+                  cacheMarketForDetail(market)
+                  router.push(`/markets/${market.id}`)
+                }}
                 className="flex w-[220px] items-center gap-2 rounded-xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.13_0.013_255/0.9)] px-3 py-2 text-left active:scale-[0.98] transition-transform"
               >
                 {/* Icon */}
