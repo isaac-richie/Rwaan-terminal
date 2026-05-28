@@ -88,7 +88,7 @@ export function isPositionExpired(position: any, now = Date.now()) {
 
 export function isPortfolioPositionClosed(position: any, now = Date.now()) {
   if (!position) return false
-  if (position.settled || position.resolved || position.closed || position.redeemed) return true
+  if (position.settled || position.resolved || position.closed || position.redeemed || position.redeemable) return true
   if (position.active === false || position.marketActive === false || position.market_active === false) return true
   if (position.archived === true || position.marketArchived === true || position.market_archived === true) return true
   if (position.resolution || position.winner || position.winningOutcome || position.winning_outcome) return true

@@ -101,6 +101,7 @@ function positionOutcome(pos: any) {
 
 function positionStatus(pos: any) {
   if (isPortfolioPositionClosed(pos)) {
+    if (pos?.redeemable) return "Redeemable";
     if (pos?.settled || pos?.resolved || pos?.resolution) return "Settled";
     if (isPositionExpired(pos)) return "Expired";
     return "Closed";
@@ -112,6 +113,7 @@ function positionStatus(pos: any) {
 }
 
 function closedPositionStatus(pos: any) {
+  if (pos?.redeemable) return "Redeemable";
   if (pos?.settled || pos?.resolved) return "Settled";
   if (pos?.resolution) return "Resolved";
   if (isPositionExpired(pos)) {
