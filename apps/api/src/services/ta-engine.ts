@@ -145,6 +145,86 @@ export type ComputedVerdict = {
   verdictRationale: string;     // human-readable reasoning chain
 };
 
+// ─── V3 indicator types ─────────────────────────────────────────────────────
+
+export type VolumeProfileData = {
+  poc: number;           // Point of Control — price with highest volume
+  vah: number;           // Value Area High (70% volume)
+  val: number;           // Value Area Low (70% volume)
+  priceVsPoc: "above" | "below" | "at";
+  pocDistance: number;   // % from current price
+  interpretation: string;
+};
+
+export type IchimokuData = {
+  tenkan: number;        // 9-period midpoint (conversion line)
+  kijun: number;         // 26-period midpoint (base line)
+  senkouA: number;       // Senkou Span A (leading — (tenkan+kijun)/2 shifted 26)
+  senkouB: number;       // Senkou Span B (leading — 52-period midpoint shifted 26)
+  chikou: number;        // Chikou Span (close shifted back 26)
+  cloudColor: "green" | "red";
+  priceVsCloud: "above" | "in" | "below";
+  tkCross: "bullish" | "bearish" | "none";
+  cloudTwist: boolean;   // Senkou A crossed Senkou B recently — trend change
+  signal: "strong_bullish" | "bullish" | "neutral" | "bearish" | "strong_bearish";
+  interpretation: string;
+};
+
+export type ADXData = {
+  adx: number;           // 0-100 — trend strength regardless of direction
+  plusDI: number;         // +DI — bullish directional index
+  minusDI: number;       // -DI — bearish directional index
+  trendStrength: "strong" | "moderate" | "weak" | "no_trend";
+  diCross: "bullish" | "bearish" | "none"; // recent DI crossover
+  interpretation: string;
+};
+
+export type StochRSIData = {
+  k: number;             // %K (fast stochastic of RSI)
+  d: number;             // %D (3-period SMA of %K)
+  zone: "overbought" | "oversold" | "neutral";
+  crossover: "bullish" | "bearish" | "none";
+  interpretation: string;
+};
+
+export type CVDData = {
+  current: number;       // current cumulative volume delta
+  trend: "accumulation" | "distribution" | "neutral";
+  divergenceWithPrice: boolean;
+  divergenceType: "bullish" | "bearish" | null;
+  interpretation: string;
+};
+
+export type OrderBookData = {
+  bidDepth1pct: number;  // total bid volume within 1% of price
+  askDepth1pct: number;  // total ask volume within 1% of price
+  bidDepth2pct: number;
+  askDepth2pct: number;
+  imbalanceRatio1pct: number; // bid/ask ratio (>1 = buy wall, <1 = sell wall)
+  imbalanceRatio2pct: number;
+  largestBidWall: { price: number; size: number } | null;
+  largestAskWall: { price: number; size: number } | null;
+  signal: "buy_wall" | "sell_wall" | "balanced";
+  interpretation: string;
+};
+
+export type LiquidationData = {
+  longLiqClusters: Array<{ price: number; leverage: string; intensity: "high" | "medium" }>;
+  shortLiqClusters: Array<{ price: number; leverage: string; intensity: "high" | "medium" }>;
+  nearestLongLiq: number | null;  // nearest price where longs get liquidated (below)
+  nearestShortLiq: number | null; // nearest price where shorts get liquidated (above)
+  magnetDirection: "up" | "down" | "balanced";
+  interpretation: string;
+};
+
+export type AnchoredVWAPData = {
+  swingLowVwap: number | null;   // VWAP anchored to recent swing low
+  swingHighVwap: number | null;  // VWAP anchored to recent swing high
+  anchorType: "swing_low" | "swing_high"; // which anchor is more relevant
+  distance: number;              // % from relevant anchored VWAP
+  interpretation: string;
+};
+
 export type TechnicalAnalysis = {
   symbol: string;
   currentPrice: number;
@@ -201,6 +281,15 @@ export type TechnicalAnalysis = {
     shortTarget: number;
     shortRR: number;
   } | null;
+  // V3 indicators
+  volumeProfileData: VolumeProfileData | null;
+  ichimoku: IchimokuData | null;
+  adx: ADXData | null;
+  stochRsi: StochRSIData | null;
+  cvd: CVDData | null;
+  orderBook: OrderBookData | null;
+  liquidations: LiquidationData | null;
+  anchoredVwap: AnchoredVWAPData | null;
   // Summary for AI prompt injection
   summary: string;
 };
@@ -952,6 +1041,567 @@ function analyzeVolumeProfile(candles: Candle[]): "increasing" | "decreasing" | 
   return "flat";
 }
 
+// ─── Volume Profile (POC / VAH / VAL) ──────────────────────────────────────
+
+function computeVolumeProfile(candles: Candle[], currentPrice: number, numBins: number = 50): VolumeProfileData | null {
+  if (candles.length < 20) return null;
+
+  const allHighs = candles.map((c) => c.high);
+  const allLows = candles.map((c) => c.low);
+  const rangeHigh = Math.max(...allHighs);
+  const rangeLow = Math.min(...allLows);
+  const binSize = (rangeHigh - rangeLow) / numBins;
+  if (binSize <= 0) return null;
+
+  // Build histogram: distribute each candle's volume across the price bins it touches
+  const bins = new Array(numBins).fill(0);
+  const binPrices = new Array(numBins).fill(0).map((_, i) => rangeLow + binSize * (i + 0.5));
+
+  for (const c of candles) {
+    const lowBin = Math.max(0, Math.floor((c.low - rangeLow) / binSize));
+    const highBin = Math.min(numBins - 1, Math.floor((c.high - rangeLow) / binSize));
+    const spread = highBin - lowBin + 1;
+    const volPerBin = c.volume / spread;
+    for (let b = lowBin; b <= highBin; b++) bins[b] += volPerBin;
+  }
+
+  // POC = bin with max volume
+  let pocIdx = 0;
+  let maxVol = 0;
+  for (let i = 0; i < numBins; i++) {
+    if (bins[i] > maxVol) { maxVol = bins[i]; pocIdx = i; }
+  }
+  const poc = binPrices[pocIdx];
+
+  // Value Area: expand from POC until 70% of total volume is captured
+  const totalVol = bins.reduce((s, v) => s + v, 0);
+  const vaTarget = totalVol * 0.70;
+  let vaVol = bins[pocIdx];
+  let vaLow = pocIdx;
+  let vaHigh = pocIdx;
+
+  while (vaVol < vaTarget && (vaLow > 0 || vaHigh < numBins - 1)) {
+    const addBelow = vaLow > 0 ? bins[vaLow - 1] : 0;
+    const addAbove = vaHigh < numBins - 1 ? bins[vaHigh + 1] : 0;
+    if (addBelow >= addAbove && vaLow > 0) {
+      vaLow--;
+      vaVol += bins[vaLow];
+    } else if (vaHigh < numBins - 1) {
+      vaHigh++;
+      vaVol += bins[vaHigh];
+    } else {
+      break;
+    }
+  }
+
+  const vah = binPrices[vaHigh] + binSize / 2;
+  const val = binPrices[vaLow] - binSize / 2;
+  const pocDist = poc > 0 ? ((currentPrice - poc) / poc) * 100 : 0;
+  const priceVsPoc: VolumeProfileData["priceVsPoc"] =
+    pocDist > 0.3 ? "above" : pocDist < -0.3 ? "below" : "at";
+
+  let interpretation: string;
+  if (priceVsPoc === "at") {
+    interpretation = `Price at Point of Control ($${poc.toFixed(2)}) — fair value zone, expect mean reversion`;
+  } else if (currentPrice > vah) {
+    interpretation = `Price above Value Area High ($${vah.toFixed(2)}) — extended, may revert to POC $${poc.toFixed(2)}`;
+  } else if (currentPrice < val) {
+    interpretation = `Price below Value Area Low ($${val.toFixed(2)}) — oversold vs volume profile, potential snap to POC $${poc.toFixed(2)}`;
+  } else if (priceVsPoc === "above") {
+    interpretation = `Price in upper Value Area, above POC $${poc.toFixed(2)} — slight bullish positioning`;
+  } else {
+    interpretation = `Price in lower Value Area, below POC $${poc.toFixed(2)} — slight bearish positioning`;
+  }
+
+  return {
+    poc: Math.round(poc * 100) / 100,
+    vah: Math.round(vah * 100) / 100,
+    val: Math.round(val * 100) / 100,
+    priceVsPoc,
+    pocDistance: Math.round(pocDist * 100) / 100,
+    interpretation,
+  };
+}
+
+// ─── Ichimoku Cloud ────────────────────────────────────────────────────────
+
+function midpoint(candles: Candle[], period: number): number {
+  const slice = candles.slice(-period);
+  if (!slice.length) return 0;
+  const high = Math.max(...slice.map((c) => c.high));
+  const low = Math.min(...slice.map((c) => c.low));
+  return (high + low) / 2;
+}
+
+function computeIchimoku(candles: Candle[], currentPrice: number): IchimokuData | null {
+  if (candles.length < 52) return null;
+
+  const tenkan = midpoint(candles, 9);                   // Conversion line
+  const kijun = midpoint(candles, 26);                   // Base line
+  const senkouA = (tenkan + kijun) / 2;                  // Leading Span A (current, not shifted for display)
+  const senkouB = midpoint(candles, 52);                  // Leading Span B
+  const chikou = candles[candles.length - 1].close;       // Current close (would be plotted 26 bars back)
+
+  const cloudTop = Math.max(senkouA, senkouB);
+  const cloudBottom = Math.min(senkouA, senkouB);
+  const cloudColor: IchimokuData["cloudColor"] = senkouA >= senkouB ? "green" : "red";
+  const priceVsCloud: IchimokuData["priceVsCloud"] =
+    currentPrice > cloudTop ? "above" : currentPrice < cloudBottom ? "below" : "in";
+
+  // TK Cross: compare current vs 1 candle ago
+  const prevTenkan = midpoint(candles.slice(0, -1), 9);
+  const prevKijun = midpoint(candles.slice(0, -1), 26);
+  let tkCross: IchimokuData["tkCross"] = "none";
+  if (prevTenkan <= prevKijun && tenkan > kijun) tkCross = "bullish";
+  if (prevTenkan >= prevKijun && tenkan < kijun) tkCross = "bearish";
+
+  // Cloud twist: Senkou A crossed Senkou B in last 5 candles
+  let cloudTwist = false;
+  for (let i = Math.max(0, candles.length - 5); i < candles.length; i++) {
+    const slice = candles.slice(0, i + 1);
+    if (slice.length < 52) continue;
+    const prevA = (midpoint(slice.slice(0, -1), 9) + midpoint(slice.slice(0, -1), 26)) / 2;
+    const prevB = midpoint(slice.slice(0, -1), 52);
+    const curA = (midpoint(slice, 9) + midpoint(slice, 26)) / 2;
+    const curB = midpoint(slice, 52);
+    if ((prevA <= prevB && curA > curB) || (prevA >= prevB && curA < curB)) {
+      cloudTwist = true;
+      break;
+    }
+  }
+
+  // Overall signal
+  let signal: IchimokuData["signal"];
+  if (priceVsCloud === "above" && cloudColor === "green" && tkCross === "bullish") {
+    signal = "strong_bullish";
+  } else if (priceVsCloud === "above" && (cloudColor === "green" || tenkan > kijun)) {
+    signal = "bullish";
+  } else if (priceVsCloud === "below" && cloudColor === "red" && tkCross === "bearish") {
+    signal = "strong_bearish";
+  } else if (priceVsCloud === "below" && (cloudColor === "red" || tenkan < kijun)) {
+    signal = "bearish";
+  } else {
+    signal = "neutral";
+  }
+
+  const interpretation = [
+    `Price ${priceVsCloud} ${cloudColor} cloud`,
+    `Tenkan ${tenkan > kijun ? ">" : "<"} Kijun`,
+    tkCross !== "none" ? `TK ${tkCross} cross` : null,
+    cloudTwist ? "Cloud twist detected — trend change signal" : null,
+  ].filter(Boolean).join(" | ");
+
+  return {
+    tenkan: Math.round(tenkan * 100) / 100,
+    kijun: Math.round(kijun * 100) / 100,
+    senkouA: Math.round(senkouA * 100) / 100,
+    senkouB: Math.round(senkouB * 100) / 100,
+    chikou: Math.round(chikou * 100) / 100,
+    cloudColor,
+    priceVsCloud,
+    tkCross,
+    cloudTwist,
+    signal,
+    interpretation,
+  };
+}
+
+// ─── ADX (Average Directional Index) ───────────────────────────────────────
+
+function computeADX(candles: Candle[], period: number = 14): ADXData | null {
+  if (candles.length < period * 2 + 1) return null;
+
+  // Compute +DM, -DM, TR series
+  const plusDMs: number[] = [];
+  const minusDMs: number[] = [];
+  const trs: number[] = [];
+
+  for (let i = 1; i < candles.length; i++) {
+    const upMove = candles[i].high - candles[i - 1].high;
+    const downMove = candles[i - 1].low - candles[i].low;
+    plusDMs.push(upMove > downMove && upMove > 0 ? upMove : 0);
+    minusDMs.push(downMove > upMove && downMove > 0 ? downMove : 0);
+    trs.push(Math.max(
+      candles[i].high - candles[i].low,
+      Math.abs(candles[i].high - candles[i - 1].close),
+      Math.abs(candles[i].low - candles[i - 1].close),
+    ));
+  }
+
+  // Wilder smoothing: first value = sum of first `period` values, then smooth
+  function wilderSmooth(arr: number[]): number[] {
+    if (arr.length < period) return [];
+    const result: number[] = [];
+    let sum = 0;
+    for (let i = 0; i < period; i++) sum += arr[i];
+    result.push(sum);
+    for (let i = period; i < arr.length; i++) {
+      result.push(result[result.length - 1] - result[result.length - 1] / period + arr[i]);
+    }
+    return result;
+  }
+
+  const smoothPlusDM = wilderSmooth(plusDMs);
+  const smoothMinusDM = wilderSmooth(minusDMs);
+  const smoothTR = wilderSmooth(trs);
+
+  if (!smoothPlusDM.length || !smoothTR.length) return null;
+
+  // DI+ and DI- series
+  const plusDISeries = smoothPlusDM.map((v, i) => smoothTR[i] > 0 ? (v / smoothTR[i]) * 100 : 0);
+  const minusDISeries = smoothMinusDM.map((v, i) => smoothTR[i] > 0 ? (v / smoothTR[i]) * 100 : 0);
+
+  // DX series
+  const dxSeries = plusDISeries.map((pdi, i) => {
+    const sum = pdi + minusDISeries[i];
+    return sum > 0 ? (Math.abs(pdi - minusDISeries[i]) / sum) * 100 : 0;
+  });
+
+  // ADX = Wilder smoothed DX
+  if (dxSeries.length < period) return null;
+  let adx = dxSeries.slice(0, period).reduce((s, v) => s + v, 0) / period;
+  for (let i = period; i < dxSeries.length; i++) {
+    adx = (adx * (period - 1) + dxSeries[i]) / period;
+  }
+
+  const plusDI = plusDISeries[plusDISeries.length - 1];
+  const minusDI = minusDISeries[minusDISeries.length - 1];
+
+  const trendStrength: ADXData["trendStrength"] =
+    adx >= 40 ? "strong" : adx >= 25 ? "moderate" : adx >= 15 ? "weak" : "no_trend";
+
+  // DI crossover (last 3 bars)
+  let diCross: ADXData["diCross"] = "none";
+  if (plusDISeries.length >= 2 && minusDISeries.length >= 2) {
+    const prevPlus = plusDISeries[plusDISeries.length - 2];
+    const prevMinus = minusDISeries[minusDISeries.length - 2];
+    if (prevPlus <= prevMinus && plusDI > minusDI) diCross = "bullish";
+    if (prevPlus >= prevMinus && plusDI < minusDI) diCross = "bearish";
+  }
+
+  const interpretation = [
+    `ADX ${adx.toFixed(1)} — ${trendStrength.replace("_", " ")} trend`,
+    `+DI ${plusDI.toFixed(1)} / -DI ${minusDI.toFixed(1)}`,
+    diCross !== "none" ? `${diCross} DI crossover` : null,
+  ].filter(Boolean).join(" | ");
+
+  return {
+    adx: Math.round(adx * 10) / 10,
+    plusDI: Math.round(plusDI * 10) / 10,
+    minusDI: Math.round(minusDI * 10) / 10,
+    trendStrength,
+    diCross,
+    interpretation,
+  };
+}
+
+// ─── Stochastic RSI ────────────────────────────────────────────────────────
+
+function computeStochRSI(rsiSeries: number[], kPeriod: number = 14, dPeriod: number = 3): StochRSIData | null {
+  if (rsiSeries.length < kPeriod + dPeriod) return null;
+
+  // Stochastic of RSI: %K = (RSI - RSI_Low) / (RSI_High - RSI_Low)
+  const kValues: number[] = [];
+  for (let i = kPeriod - 1; i < rsiSeries.length; i++) {
+    const window = rsiSeries.slice(i - kPeriod + 1, i + 1);
+    const high = Math.max(...window);
+    const low = Math.min(...window);
+    const range = high - low;
+    kValues.push(range > 0 ? ((rsiSeries[i] - low) / range) * 100 : 50);
+  }
+
+  // %D = SMA of %K
+  const dValues: number[] = [];
+  for (let i = dPeriod - 1; i < kValues.length; i++) {
+    const sum = kValues.slice(i - dPeriod + 1, i + 1).reduce((s, v) => s + v, 0);
+    dValues.push(sum / dPeriod);
+  }
+
+  const k = kValues[kValues.length - 1];
+  const d = dValues[dValues.length - 1];
+
+  const zone: StochRSIData["zone"] = k >= 80 ? "overbought" : k <= 20 ? "oversold" : "neutral";
+
+  // Crossover: %K crosses %D
+  let crossover: StochRSIData["crossover"] = "none";
+  if (kValues.length >= 2 && dValues.length >= 2) {
+    const prevK = kValues[kValues.length - 2];
+    const prevD = dValues[dValues.length - 2];
+    if (prevK <= prevD && k > d) crossover = "bullish";
+    if (prevK >= prevD && k < d) crossover = "bearish";
+  }
+
+  const interpretation = [
+    `StochRSI %K ${k.toFixed(1)} / %D ${d.toFixed(1)}`,
+    zone !== "neutral" ? zone : null,
+    crossover !== "none" ? `${crossover} crossover` : null,
+  ].filter(Boolean).join(" — ");
+
+  return {
+    k: Math.round(k * 10) / 10,
+    d: Math.round(d * 10) / 10,
+    zone,
+    crossover,
+    interpretation,
+  };
+}
+
+// ─── CVD (Cumulative Volume Delta) ─────────────────────────────────────────
+// Approximated from candle data: split volume into buy/sell using
+// (close - open) / (high - low) ratio. This is the standard approximation
+// when tick-level data isn't available.
+
+function computeCVD(candles: Candle[], currentPrice: number): CVDData | null {
+  if (candles.length < 20) return null;
+
+  const deltaValues: number[] = [];
+  const cvdValues: number[] = [];
+  let cumDelta = 0;
+
+  for (const c of candles) {
+    const range = c.high - c.low;
+    // Buy ratio: how much of the candle body is bullish
+    const buyRatio = range > 0 ? (c.close - c.low) / range : 0.5;
+    const buyVol = c.volume * buyRatio;
+    const sellVol = c.volume * (1 - buyRatio);
+    const delta = buyVol - sellVol;
+    deltaValues.push(delta);
+    cumDelta += delta;
+    cvdValues.push(cumDelta);
+  }
+
+  // Trend: compare last 10 CVD values to prior 10
+  const recentCVD = cvdValues.slice(-10);
+  const priorCVD = cvdValues.slice(-20, -10);
+  const recentAvg = recentCVD.reduce((s, v) => s + v, 0) / recentCVD.length;
+  const priorAvg = priorCVD.reduce((s, v) => s + v, 0) / priorCVD.length;
+
+  const trend: CVDData["trend"] =
+    recentAvg > priorAvg * 1.1 ? "accumulation" :
+    recentAvg < priorAvg * 0.9 ? "distribution" : "neutral";
+
+  // Divergence: price direction vs CVD direction over last 20 candles
+  const priceChange = candles[candles.length - 1].close - candles[candles.length - 20].close;
+  const cvdChange = cvdValues[cvdValues.length - 1] - cvdValues[cvdValues.length - 20];
+  const divergenceWithPrice = (priceChange > 0 && cvdChange < 0) || (priceChange < 0 && cvdChange > 0);
+  const divergenceType: CVDData["divergenceType"] =
+    priceChange > 0 && cvdChange < 0 ? "bearish" :
+    priceChange < 0 && cvdChange > 0 ? "bullish" : null;
+
+  let interpretation: string;
+  if (divergenceWithPrice && divergenceType === "bullish") {
+    interpretation = `CVD bullish divergence — price falling but buy pressure building (smart money accumulating)`;
+  } else if (divergenceWithPrice && divergenceType === "bearish") {
+    interpretation = `CVD bearish divergence — price rising but sell pressure dominant (distribution)`;
+  } else if (trend === "accumulation") {
+    interpretation = `CVD trending up — net buying pressure, accumulation phase`;
+  } else if (trend === "distribution") {
+    interpretation = `CVD trending down — net selling pressure, distribution phase`;
+  } else {
+    interpretation = `CVD neutral — balanced buying and selling pressure`;
+  }
+
+  return {
+    current: Math.round(cumDelta),
+    trend,
+    divergenceWithPrice,
+    divergenceType,
+    interpretation,
+  };
+}
+
+// ─── Order Book Depth (Binance Spot) ───────────────────────────────────────
+
+async function fetchOrderBookDepth(symbol: string, currentPrice: number): Promise<OrderBookData | null> {
+  try {
+    const res = await fetch(
+      `https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=100`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as { bids: string[][]; asks: string[][] };
+
+    const bids = data.bids.map((b) => ({ price: Number(b[0]), qty: Number(b[1]) }));
+    const asks = data.asks.map((a) => ({ price: Number(a[0]), qty: Number(a[1]) }));
+
+    // Aggregate volume within 1% and 2% of current price
+    const within = (entries: typeof bids, pctRange: number) =>
+      entries
+        .filter((e) => Math.abs((e.price - currentPrice) / currentPrice) <= pctRange / 100)
+        .reduce((sum, e) => sum + e.qty * e.price, 0); // volume in USD
+
+    const bidDepth1pct = within(bids, 1);
+    const askDepth1pct = within(asks, 1);
+    const bidDepth2pct = within(bids, 2);
+    const askDepth2pct = within(asks, 2);
+
+    const imbalanceRatio1pct = askDepth1pct > 0 ? bidDepth1pct / askDepth1pct : 1;
+    const imbalanceRatio2pct = askDepth2pct > 0 ? bidDepth2pct / askDepth2pct : 1;
+
+    // Detect largest walls
+    const largestBid = bids.length ? bids.reduce((max, b) => b.qty > max.qty ? b : max, bids[0]) : null;
+    const largestAsk = asks.length ? asks.reduce((max, a) => a.qty > max.qty ? a : max, asks[0]) : null;
+
+    const signal: OrderBookData["signal"] =
+      imbalanceRatio1pct > 1.8 ? "buy_wall" :
+      imbalanceRatio1pct < 0.55 ? "sell_wall" : "balanced";
+
+    let interpretation: string;
+    if (signal === "buy_wall") {
+      interpretation = `Order book bid-heavy (${imbalanceRatio1pct.toFixed(2)}:1 within 1%) — strong buy support, shorts may be trapped`;
+    } else if (signal === "sell_wall") {
+      interpretation = `Order book ask-heavy (1:${(1 / imbalanceRatio1pct).toFixed(2)} within 1%) — overhead supply, longs face resistance`;
+    } else {
+      interpretation = `Order book balanced (${imbalanceRatio1pct.toFixed(2)}:1 within 1%) — no strong directional pressure from depth`;
+    }
+
+    return {
+      bidDepth1pct: Math.round(bidDepth1pct),
+      askDepth1pct: Math.round(askDepth1pct),
+      bidDepth2pct: Math.round(bidDepth2pct),
+      askDepth2pct: Math.round(askDepth2pct),
+      imbalanceRatio1pct: Math.round(imbalanceRatio1pct * 100) / 100,
+      imbalanceRatio2pct: Math.round(imbalanceRatio2pct * 100) / 100,
+      largestBidWall: largestBid ? { price: largestBid.price, size: Math.round(largestBid.qty * largestBid.price) } : null,
+      largestAskWall: largestAsk ? { price: largestAsk.price, size: Math.round(largestAsk.qty * largestAsk.price) } : null,
+      signal,
+      interpretation,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Liquidation Level Estimation ──────────────────────────────────────────
+// Estimates where cascading liquidations sit based on current price
+// and common leverage levels. Markets tend to hunt these clusters.
+
+function estimateLiquidationLevels(
+  currentPrice: number,
+  openInterest: OpenInterestData | null,
+  longShort: LongShortData | null,
+): LiquidationData {
+  // Common leverage tiers and their approximate maintenance margin %
+  const leverageTiers: Array<{ leverage: string; factor: number; intensity: "high" | "medium" }> = [
+    { leverage: "50x", factor: 0.02, intensity: "high" },   // 2% move = liquidation
+    { leverage: "25x", factor: 0.04, intensity: "high" },   // 4% move
+    { leverage: "20x", factor: 0.05, intensity: "high" },   // 5% move
+    { leverage: "10x", factor: 0.10, intensity: "medium" }, // 10% move
+    { leverage: "5x",  factor: 0.20, intensity: "medium" }, // 20% move
+  ];
+
+  // Long liquidations = below current price
+  const longLiqClusters = leverageTiers.map((t) => ({
+    price: Math.round(currentPrice * (1 - t.factor) * 100) / 100,
+    leverage: t.leverage,
+    intensity: t.intensity,
+  }));
+
+  // Short liquidations = above current price
+  const shortLiqClusters = leverageTiers.map((t) => ({
+    price: Math.round(currentPrice * (1 + t.factor) * 100) / 100,
+    leverage: t.leverage,
+    intensity: t.intensity,
+  }));
+
+  const nearestLongLiq = longLiqClusters[0]?.price ?? null;
+  const nearestShortLiq = shortLiqClusters[0]?.price ?? null;
+
+  // Which direction has more liquidation potential?
+  // If retail is crowded long → long liquidations are juicier targets (price goes down)
+  // If retail is crowded short → short liquidations are juicier (price goes up)
+  let magnetDirection: LiquidationData["magnetDirection"] = "balanced";
+  let interpretation: string;
+
+  if (longShort) {
+    if (longShort.retailBias === "long_heavy") {
+      magnetDirection = "down";
+      interpretation = `Retail ${longShort.globalLongPct.toFixed(0)}% long — long liquidation clusters below ($${nearestLongLiq?.toFixed(0)}) are magnet targets`;
+    } else if (longShort.retailBias === "short_heavy") {
+      magnetDirection = "up";
+      interpretation = `Retail ${longShort.globalShortPct.toFixed(0)}% short — short liquidation clusters above ($${nearestShortLiq?.toFixed(0)}) are magnet targets`;
+    } else {
+      interpretation = `Balanced positioning — liquidation clusters symmetric. Nearest: long liq $${nearestLongLiq?.toFixed(0)} / short liq $${nearestShortLiq?.toFixed(0)}`;
+    }
+  } else {
+    interpretation = `Liquidation estimates: long cascade below $${nearestLongLiq?.toFixed(0)} (50x), short cascade above $${nearestShortLiq?.toFixed(0)} (50x)`;
+  }
+
+  return {
+    longLiqClusters,
+    shortLiqClusters,
+    nearestLongLiq,
+    nearestShortLiq,
+    magnetDirection,
+    interpretation,
+  };
+}
+
+// ─── Anchored VWAP ─────────────────────────────────────────────────────────
+// Anchors VWAP to the most recent significant swing point instead of a
+// rolling window. This gives institutional-quality mean reversion levels.
+
+function computeAnchoredVWAP(
+  candles: Candle[],
+  swingPoints: SwingPoint[],
+  currentPrice: number,
+  structure: MarketStructure,
+): AnchoredVWAPData | null {
+  if (!swingPoints.length || candles.length < 10) return null;
+
+  function vwapFromIndex(startIdx: number): number {
+    let cumTypicalVol = 0;
+    let cumVol = 0;
+    for (let i = startIdx; i < candles.length; i++) {
+      const typical = (candles[i].high + candles[i].low + candles[i].close) / 3;
+      cumTypicalVol += typical * candles[i].volume;
+      cumVol += candles[i].volume;
+    }
+    return cumVol > 0 ? cumTypicalVol / cumVol : currentPrice;
+  }
+
+  // Find most recent swing low and swing high
+  const recentLows = swingPoints.filter((s) => s.type === "low").slice(-3);
+  const recentHighs = swingPoints.filter((s) => s.type === "high").slice(-3);
+
+  const lastSwingLow = recentLows.length ? recentLows[recentLows.length - 1] : null;
+  const lastSwingHigh = recentHighs.length ? recentHighs[recentHighs.length - 1] : null;
+
+  const swingLowVwap = lastSwingLow ? Math.round(vwapFromIndex(lastSwingLow.index) * 100) / 100 : null;
+  const swingHighVwap = lastSwingHigh ? Math.round(vwapFromIndex(lastSwingHigh.index) * 100) / 100 : null;
+
+  // In uptrend, anchor to swing low (support VWAP); in downtrend, anchor to swing high
+  const anchorType: AnchoredVWAPData["anchorType"] =
+    structure === "downtrend" ? "swing_high" : "swing_low";
+  const relevantVwap = anchorType === "swing_low" ? swingLowVwap : swingHighVwap;
+  const distance = relevantVwap && relevantVwap > 0
+    ? Math.round(((currentPrice - relevantVwap) / relevantVwap) * 10000) / 100
+    : 0;
+
+  let interpretation: string;
+  if (relevantVwap) {
+    if (Math.abs(distance) < 0.5) {
+      interpretation = `Price at anchored VWAP ($${relevantVwap.toFixed(2)}) from ${anchorType.replace("_", " ")} — institutional mean reversion magnet`;
+    } else if (distance > 2) {
+      interpretation = `Price +${distance.toFixed(2)}% above anchored VWAP ($${relevantVwap.toFixed(2)}) — extended, watch for pullback to VWAP`;
+    } else if (distance < -2) {
+      interpretation = `Price ${distance.toFixed(2)}% below anchored VWAP ($${relevantVwap.toFixed(2)}) — oversold vs institutional reference`;
+    } else {
+      interpretation = `Price ${distance > 0 ? "+" : ""}${distance.toFixed(2)}% from anchored VWAP ($${relevantVwap.toFixed(2)})`;
+    }
+  } else {
+    interpretation = "Anchored VWAP unavailable — insufficient swing data";
+  }
+
+  return {
+    swingLowVwap,
+    swingHighVwap,
+    anchorType,
+    distance,
+    interpretation,
+  };
+}
+
 // ─── Regime detection ───────────────────────────────────────────────────────
 
 function detectRegime(candles: Candle[], atr: number, structure: MarketStructure): Regime {
@@ -1247,12 +1897,23 @@ function computeVerdict(params: {
   takerRatio: TakerRatioData | null;
   currentPrice: number;
   riskReward: ReturnType<typeof computeRiskReward>;
+  // V3
+  volumeProfileData: VolumeProfileData | null;
+  ichimoku: IchimokuData | null;
+  adx: ADXData | null;
+  stochRsi: StochRSIData | null;
+  cvd: CVDData | null;
+  orderBook: OrderBookData | null;
+  liquidations: LiquidationData | null;
+  anchoredVwap: AnchoredVWAPData | null;
 }): ComputedVerdict {
   const {
     htfStructure, trendStrength, ema, macd, bollinger, rsi, rsiDiv,
     multiTfRsiAlignment, obv, volProfile, vwapDist, nearSupport,
     nearResistance, regime, funding, fearGreed, openInterest, longShort,
     takerRatio, currentPrice: price, riskReward,
+    volumeProfileData, ichimoku, adx, stochRsi, cvd, orderBook,
+    liquidations, anchoredVwap,
   } = params;
 
   const votes: SignalVote[] = [];
@@ -1530,6 +2191,126 @@ function computeVerdict(params: {
     }
   }
 
+  // ── 17. Ichimoku Cloud (weight: 0.07) ──
+  if (ichimoku) {
+    const w = 0.07;
+    if (ichimoku.signal === "strong_bullish") {
+      votes.push({ name: "Ichimoku", direction: "bullish", weight: w, conviction: 0.9, reason: `Price above green cloud + bullish TK cross — ${ichimoku.interpretation}` });
+    } else if (ichimoku.signal === "bullish") {
+      votes.push({ name: "Ichimoku", direction: "bullish", weight: w, conviction: 0.65, reason: ichimoku.interpretation });
+    } else if (ichimoku.signal === "strong_bearish") {
+      votes.push({ name: "Ichimoku", direction: "bearish", weight: w, conviction: 0.9, reason: `Price below red cloud + bearish TK cross — ${ichimoku.interpretation}` });
+    } else if (ichimoku.signal === "bearish") {
+      votes.push({ name: "Ichimoku", direction: "bearish", weight: w, conviction: 0.65, reason: ichimoku.interpretation });
+    } else {
+      votes.push({ name: "Ichimoku", direction: "neutral", weight: w, conviction: 0.3, reason: `Price in cloud — no directional edge` });
+    }
+    if (ichimoku.cloudTwist) {
+      // Cloud twist is a leading reversal signal — add bonus conviction to last vote
+      votes[votes.length - 1].conviction = Math.min(1, votes[votes.length - 1].conviction + 0.15);
+    }
+  }
+
+  // ── 18. ADX (weight: 0.05) ──
+  if (adx) {
+    const w = 0.05;
+    if (adx.diCross === "bullish" && adx.adx >= 20) {
+      votes.push({ name: "ADX", direction: "bullish", weight: w, conviction: 0.75, reason: `Bullish DI crossover with ADX ${adx.adx.toFixed(0)} — trend initiating` });
+    } else if (adx.diCross === "bearish" && adx.adx >= 20) {
+      votes.push({ name: "ADX", direction: "bearish", weight: w, conviction: 0.75, reason: `Bearish DI crossover with ADX ${adx.adx.toFixed(0)} — trend initiating` });
+    } else if (adx.trendStrength === "strong") {
+      const dir = adx.plusDI > adx.minusDI ? "bullish" as const : "bearish" as const;
+      votes.push({ name: "ADX", direction: dir, weight: w, conviction: 0.7, reason: `ADX ${adx.adx.toFixed(0)} — strong ${dir} trend (+DI ${adx.plusDI.toFixed(0)} / -DI ${adx.minusDI.toFixed(0)})` });
+    } else if (adx.trendStrength === "moderate") {
+      const dir = adx.plusDI > adx.minusDI ? "bullish" as const : "bearish" as const;
+      votes.push({ name: "ADX", direction: dir, weight: w, conviction: 0.5, reason: `ADX ${adx.adx.toFixed(0)} — moderate trend` });
+    } else {
+      votes.push({ name: "ADX", direction: "neutral", weight: w, conviction: 0.2, reason: `ADX ${adx.adx.toFixed(0)} — no significant trend` });
+    }
+  }
+
+  // ── 19. Stochastic RSI (weight: 0.04) ──
+  if (stochRsi) {
+    const w = 0.04;
+    if (stochRsi.zone === "oversold" && stochRsi.crossover === "bullish") {
+      votes.push({ name: "StochRSI", direction: "bullish", weight: w, conviction: 0.85, reason: `StochRSI bullish cross from oversold (%K ${stochRsi.k.toFixed(0)}) — high-probability bounce` });
+    } else if (stochRsi.zone === "overbought" && stochRsi.crossover === "bearish") {
+      votes.push({ name: "StochRSI", direction: "bearish", weight: w, conviction: 0.85, reason: `StochRSI bearish cross from overbought (%K ${stochRsi.k.toFixed(0)}) — pullback likely` });
+    } else if (stochRsi.zone === "oversold") {
+      votes.push({ name: "StochRSI", direction: "bullish", weight: w, conviction: 0.55, reason: `StochRSI oversold (%K ${stochRsi.k.toFixed(0)}) — bounce setup` });
+    } else if (stochRsi.zone === "overbought") {
+      votes.push({ name: "StochRSI", direction: "bearish", weight: w, conviction: 0.55, reason: `StochRSI overbought (%K ${stochRsi.k.toFixed(0)}) — exhaustion risk` });
+    } else {
+      votes.push({ name: "StochRSI", direction: "neutral", weight: w, conviction: 0.2, reason: `StochRSI neutral (%K ${stochRsi.k.toFixed(0)})` });
+    }
+  }
+
+  // ── 20. CVD (weight: 0.06) ──
+  if (cvd) {
+    const w = 0.06;
+    if (cvd.divergenceWithPrice && cvd.divergenceType === "bullish") {
+      votes.push({ name: "CVD", direction: "bullish", weight: w + 0.02, conviction: 0.85, reason: cvd.interpretation });
+    } else if (cvd.divergenceWithPrice && cvd.divergenceType === "bearish") {
+      votes.push({ name: "CVD", direction: "bearish", weight: w + 0.02, conviction: 0.85, reason: cvd.interpretation });
+    } else if (cvd.trend === "accumulation") {
+      votes.push({ name: "CVD", direction: "bullish", weight: w, conviction: 0.6, reason: cvd.interpretation });
+    } else if (cvd.trend === "distribution") {
+      votes.push({ name: "CVD", direction: "bearish", weight: w, conviction: 0.6, reason: cvd.interpretation });
+    } else {
+      votes.push({ name: "CVD", direction: "neutral", weight: w, conviction: 0.2, reason: cvd.interpretation });
+    }
+  }
+
+  // ── 21. Volume Profile POC (weight: 0.05) ──
+  if (volumeProfileData) {
+    const w = 0.05;
+    if (volumeProfileData.priceVsPoc === "above" && volumeProfileData.pocDistance > 1) {
+      votes.push({ name: "Volume POC", direction: "bullish", weight: w, conviction: 0.55, reason: `Price above POC ($${volumeProfileData.poc.toFixed(2)}) — holding above fair value` });
+    } else if (volumeProfileData.priceVsPoc === "below" && volumeProfileData.pocDistance < -1) {
+      votes.push({ name: "Volume POC", direction: "bearish", weight: w, conviction: 0.55, reason: `Price below POC ($${volumeProfileData.poc.toFixed(2)}) — trading below fair value` });
+    } else {
+      votes.push({ name: "Volume POC", direction: "neutral", weight: w, conviction: 0.4, reason: `Price at POC ($${volumeProfileData.poc.toFixed(2)}) — mean reversion zone` });
+    }
+  }
+
+  // ── 22. Order Book (weight: 0.05) ──
+  if (orderBook) {
+    const w = 0.05;
+    if (orderBook.signal === "buy_wall") {
+      votes.push({ name: "Order Book", direction: "bullish", weight: w, conviction: 0.7, reason: orderBook.interpretation });
+    } else if (orderBook.signal === "sell_wall") {
+      votes.push({ name: "Order Book", direction: "bearish", weight: w, conviction: 0.7, reason: orderBook.interpretation });
+    } else {
+      votes.push({ name: "Order Book", direction: "neutral", weight: w, conviction: 0.2, reason: orderBook.interpretation });
+    }
+  }
+
+  // ── 23. Liquidation Magnet (weight: 0.04) ──
+  if (liquidations) {
+    const w = 0.04;
+    if (liquidations.magnetDirection === "down") {
+      votes.push({ name: "Liq Magnet", direction: "bearish", weight: w, conviction: 0.6, reason: liquidations.interpretation });
+    } else if (liquidations.magnetDirection === "up") {
+      votes.push({ name: "Liq Magnet", direction: "bullish", weight: w, conviction: 0.6, reason: liquidations.interpretation });
+    } else {
+      votes.push({ name: "Liq Magnet", direction: "neutral", weight: w, conviction: 0.2, reason: liquidations.interpretation });
+    }
+  }
+
+  // ── 24. Anchored VWAP (weight: 0.04) ──
+  if (anchoredVwap) {
+    const w = 0.04;
+    if (anchoredVwap.distance > 2) {
+      votes.push({ name: "Anchored VWAP", direction: "bearish", weight: w, conviction: 0.5, reason: `Extended above anchored VWAP — mean reversion risk` });
+    } else if (anchoredVwap.distance < -2) {
+      votes.push({ name: "Anchored VWAP", direction: "bullish", weight: w, conviction: 0.5, reason: `Below anchored VWAP — snap-back potential` });
+    } else if (anchoredVwap.distance > 0) {
+      votes.push({ name: "Anchored VWAP", direction: "bullish", weight: w, conviction: 0.4, reason: `Above anchored VWAP — holding institutional level` });
+    } else {
+      votes.push({ name: "Anchored VWAP", direction: "bearish", weight: w, conviction: 0.4, reason: `Below anchored VWAP — under institutional selling` });
+    }
+  }
+
   // ─── Tally weighted scores ───
   let bullishScore = 0;
   let bearishScore = 0;
@@ -1710,6 +2491,37 @@ function buildSummary(ta: Omit<TechnicalAnalysis, "summary">): string {
     lines.push(`  Taker Ratio: ${(tr.buyRatio * 100).toFixed(1)}% buy / ${(tr.sellRatio * 100).toFixed(1)}% sell — ${tr.interpretation}`);
   }
 
+  // V3 indicators
+  if (ta.ichimoku) {
+    const ichi = ta.ichimoku;
+    lines.push(`  Ichimoku: ${ichi.interpretation}`);
+    lines.push(`    Tenkan: ${fmtPrice(ichi.tenkan)} | Kijun: ${fmtPrice(ichi.kijun)} | Cloud: ${ichi.cloudColor} (${ichi.priceVsCloud})`);
+  }
+  if (ta.adx) {
+    lines.push(`  ADX: ${ta.adx.interpretation}`);
+  }
+  if (ta.stochRsi) {
+    lines.push(`  StochRSI: ${ta.stochRsi.interpretation}`);
+  }
+  if (ta.cvd) {
+    lines.push(`  CVD: ${ta.cvd.interpretation}`);
+  }
+  if (ta.volumeProfileData) {
+    const vp = ta.volumeProfileData;
+    lines.push(`  Volume Profile: POC ${fmtPrice(vp.poc)} | VAH ${fmtPrice(vp.vah)} | VAL ${fmtPrice(vp.val)} — ${vp.interpretation}`);
+  }
+  if (ta.orderBook) {
+    const ob = ta.orderBook;
+    lines.push(`  Order Book: Bid depth $${(ob.bidDepth1pct / 1000).toFixed(0)}K / Ask depth $${(ob.askDepth1pct / 1000).toFixed(0)}K within 1% — ${ob.interpretation}`);
+  }
+  if (ta.anchoredVwap) {
+    lines.push(`  Anchored VWAP: ${ta.anchoredVwap.interpretation}`);
+  }
+  if (ta.liquidations) {
+    const liq = ta.liquidations;
+    lines.push(`  Liquidation Map: Long cascade below ${liq.nearestLongLiq ? fmtPrice(liq.nearestLongLiq) : "N/A"} | Short cascade above ${liq.nearestShortLiq ? fmtPrice(liq.nearestShortLiq) : "N/A"} — ${liq.interpretation}`);
+  }
+
   // Key levels
   lines.push(``, `KEY LEVELS:`);
   const topLevels = levels.slice(0, 8);
@@ -1868,10 +2680,11 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
     const price = (candles15m.length ? candles15m[candles15m.length - 1] : candles1h[candles1h.length - 1]).close;
 
     // Fetch market microstructure data now that we have price (OI needs price for USD conversion)
-    const [oiData, lsData, takerData] = await Promise.all([
+    const [oiData, lsData, takerData, orderBookData] = await Promise.all([
       fetchOpenInterest(binanceSymbol, price).catch(() => null),
       fetchLongShortRatio(binanceSymbol).catch(() => null),
       fetchTakerRatio(binanceSymbol).catch(() => null),
+      fetchOrderBookDepth(binanceSymbol, price).catch(() => null),
     ]);
 
     // ─── HTF structure from 4H ───
@@ -1963,6 +2776,15 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
       multiTfRsiAlignment: multiTfRsi.alignment,
     });
 
+    // ─── V3 indicators ───
+    const volumeProfileData = computeVolumeProfile(candles1h, price);
+    const ichimoku = computeIchimoku(candles1h, price);
+    const adxData = computeADX(candles1h);
+    const stochRsiData = computeStochRSI(rsiSeries1h);
+    const cvdData = computeCVD(candles1h, price);
+    const liquidationData = estimateLiquidationLevels(price, oiData, lsData);
+    const anchoredVwapData = computeAnchoredVWAP(candles1h, oneHSwings, price, structure);
+
     // ─── Risk/reward ───
     const riskReward = computeRiskReward(price, levels);
 
@@ -1989,6 +2811,15 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
       takerRatio: takerData,
       currentPrice: price,
       riskReward,
+      // V3 signals
+      volumeProfileData,
+      ichimoku,
+      adx: adxData,
+      stochRsi: stochRsiData,
+      cvd: cvdData,
+      orderBook: orderBookData,
+      liquidations: liquidationData,
+      anchoredVwap: anchoredVwapData,
     });
 
     const ta: Omit<TechnicalAnalysis, "summary"> = {
@@ -2019,6 +2850,15 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
       confluenceFactors: factors,
       verdict,
       riskReward,
+      // V3
+      volumeProfileData,
+      ichimoku,
+      adx: adxData,
+      stochRsi: stochRsiData,
+      cvd: cvdData,
+      orderBook: orderBookData,
+      liquidations: liquidationData,
+      anchoredVwap: anchoredVwapData,
     };
 
     const result: TechnicalAnalysis = { ...ta, summary: buildSummary(ta) };
