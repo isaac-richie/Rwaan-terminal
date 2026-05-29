@@ -306,6 +306,14 @@ export type PremiumAnalysis = {
   technicalAnalysis?: PremiumTechnicalAnalysis;
   // Populated for non-crypto markets only
   fundamentalAnalysis?: PremiumFundamentalAnalysis;
+  // Model-vs-market probability breakdown (crypto price markets only). `edge` is the
+  // divergence between our model and the market price — the mispricing signal.
+  probabilityModel?: {
+    modelProbability: number;
+    marketProbability: number | null;
+    blendedProbability: number;
+    edge: number | null;
+  };
 };
 
 export type PaymentRequirement = {

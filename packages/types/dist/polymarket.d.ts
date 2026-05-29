@@ -260,6 +260,12 @@ export type PremiumAnalysis = {
     signalHash: string;
     technicalAnalysis?: PremiumTechnicalAnalysis;
     fundamentalAnalysis?: PremiumFundamentalAnalysis;
+    probabilityModel?: {
+        modelProbability: number;
+        marketProbability: number | null;
+        blendedProbability: number;
+        edge: number | null;
+    };
 };
 export type PaymentRequirement = {
     chainId: number;

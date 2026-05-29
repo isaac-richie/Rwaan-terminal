@@ -171,14 +171,63 @@ function StatPill({
 
 // ─── Verdict Banner ───────────────────────────────────────────────────────────
 
+function ModelVsMarketStrip({ pm }: { pm: NonNullable<PremiumAnalysis["probabilityModel"]> }) {
+  if (pm.marketProbability === null || pm.edge === null) return null
+  const modelPct = Math.round(pm.blendedProbability * 100)
+  const marketPct = Math.round(pm.marketProbability * 100)
+  const edgePts = Math.round(pm.edge * 100)
+  const strong = Math.abs(edgePts) >= 12
+  const dir = edgePts > 0 ? "underpricing" : "overpricing"
+  const edgeColor = strong ? AMBER : "var(--muted-foreground)"
+
+  return (
+    <div className="mt-3 rounded-lg border border-white/5 bg-black/15 p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Model vs Market</p>
+        {strong && (
+          <span
+            className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+            style={{ background: `${AMBER.replace(")", " / 0.14)")}`, color: AMBER }}
+          >
+            ⚠ {Math.abs(edgePts)}pt edge
+          </span>
+        )}
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Model</p>
+          <p className="mt-0.5 font-mono text-xs font-bold text-foreground">{modelPct}%</p>
+        </div>
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Market</p>
+          <p className="mt-0.5 font-mono text-xs font-bold text-foreground">{marketPct}%</p>
+        </div>
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/55">Edge</p>
+          <p className="mt-0.5 font-mono text-xs font-bold" style={{ color: edgeColor }}>
+            {edgePts > 0 ? "+" : ""}{edgePts}pt
+          </p>
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] leading-4 text-muted-foreground/70">
+        {strong
+          ? `Our model puts YES ${Math.abs(edgePts)}pts ${edgePts > 0 ? "above" : "below"} the market — a potential ${dir} of YES.`
+          : "Model and market agree — fairly priced, no clear edge."}
+      </p>
+    </div>
+  )
+}
+
 function VerdictBanner({
   verdict,
   ta,
   fa,
+  probabilityModel,
 }: {
   verdict: PremiumAnalysis["verdict"]
   ta?: PremiumTechnicalAnalysis
   fa?: PremiumFundamentalAnalysis
+  probabilityModel?: PremiumAnalysis["probabilityModel"]
 }) {
   const isYes = verdict.direction === "YES"
   const color = isYes ? GREEN : RED
@@ -231,6 +280,8 @@ function VerdictBanner({
           style={{ width: `${verdict.confidence}%`, background: color }}
         />
       </div>
+
+      {probabilityModel && <ModelVsMarketStrip pm={probabilityModel} />}
 
       {cv ? (
         <div className="space-y-2.5">
@@ -1189,7 +1240,7 @@ function UnlockedState({ analysis }: { analysis: PremiumAnalysis }) {
       </div>
 
       {/* Verdict banner */}
-      <VerdictBanner verdict={analysis.verdict} ta={ta} fa={fa} />
+      <VerdictBanner verdict={analysis.verdict} ta={ta} fa={fa} probabilityModel={analysis.probabilityModel} />
 
       {/* Quant score row — crypto markets */}
       {ta?.computedVerdict && (
