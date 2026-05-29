@@ -8,12 +8,42 @@ const MARKET_CACHE_TTL_SECONDS = 60;
 const EVENT_CACHE_TTL_SECONDS = 120;
 const FEED_STALE_TTL_SECONDS = 15 * 60;
 const FEED_PREWARM_INTERVAL_MS = 60_000;
-// Prewarm all tag IDs used by the "all" feed so category switches are instant
-const PREWARM_TAG_IDS = ["21", "235", "101611", "1312", "2", "596", "1", "102974", "102969"];
+
+// Union of every tag ID the web client requests across all categories.
+// Keep in sync with `categoryFeedTagIds` + `FAST_ALL_TAG_IDS` in
+// apps/web/lib/polymarket.ts — these are the tags a category switch fans out to.
+const PREWARM_TAG_IDS = [
+  // crypto
+  "21", "235", "101611", "1312",
+  // news
+  "2", "144",
+  // entertainment
+  "596", "100", "53",
+  // sports
+  "1",
+  // africa (AFCON + soccer + world cup + Egypt PL)
+  "102974", "102969", "100350", "102350", "102232", "104397",
+  // geopolitics
+  "100265", "1396", "101970", "366",
+];
+
+// CRITICAL: these params must byte-for-byte match what the web client sends for a
+// category switch, because `buildCacheKey` hashes the full param set (limit included).
+// The client uses limit=48 (display 12 × 4) at the default "trending" sort
+// (order=volume_24hr, ascending=false). A mismatch here = the prewarm cache never hits.
+const CATEGORY_EVENT_LIMIT = "48";
 const FEED_PREWARM_QUERIES: Array<Record<string, string>> = PREWARM_TAG_IDS.map((tagId) => ({
-  active: "true", closed: "false", compact: "true", limit: "96", offset: "0",
+  active: "true", closed: "false", compact: "true", limit: CATEGORY_EVENT_LIMIT, offset: "0",
   order: "volume_24hr", ascending: "false", tag_id: tagId, related_tags: "true",
 }));
+
+// The "all" feed loads through the Gamma markets index, not the events batch.
+// Client uses limit=24 (display 12 × 2) at the default trending sort.
+const ALL_FEED_MARKETS_QUERY: Record<string, string> = {
+  active: "true", closed: "false", limit: "24", offset: "0",
+  order: "volume_24hr", ascending: "false",
+};
+
 const inFlightRefreshes = new Map<string, Promise<unknown>>();
 
 type UnknownRecord = Record<string, unknown>;
@@ -172,17 +202,26 @@ function prewarmGammaFeeds(app: FastifyInstance) {
   if (process.env.NODE_ENV === "test" || process.env.RAWLI_DISABLE_GAMMA_PREWARM === "true") return;
 
   const refresh = () => {
-    void Promise.allSettled(
-      FEED_PREWARM_QUERIES.map((query) => {
-        const cacheKey = buildCacheKey("gamma:events", query);
-        return refreshCacheOnce(
-          cacheKey,
-          async () => compactGammaEvents(await getGamma("/events", withoutInternalQuery(query))),
-          EVENT_CACHE_TTL_SECONDS,
-          FEED_STALE_TTL_SECONDS,
-        );
-      }),
-    ).then((results) => {
+    // Per-tag event feeds (every category switch hits one of these cache keys)
+    const eventRefreshes = FEED_PREWARM_QUERIES.map((query) => {
+      const cacheKey = buildCacheKey("gamma:events", query);
+      return refreshCacheOnce(
+        cacheKey,
+        async () => compactGammaEvents(await getGamma("/events", withoutInternalQuery(query))),
+        EVENT_CACHE_TTL_SECONDS,
+        FEED_STALE_TTL_SECONDS,
+      );
+    });
+
+    // The default "all" feed loads through the Gamma markets index.
+    const allFeedRefresh = refreshCacheOnce(
+      buildCacheKey("gamma:markets", ALL_FEED_MARKETS_QUERY),
+      () => getGamma("/markets", ALL_FEED_MARKETS_QUERY),
+      MARKET_CACHE_TTL_SECONDS,
+      FEED_STALE_TTL_SECONDS,
+    );
+
+    void Promise.allSettled([...eventRefreshes, allFeedRefresh]).then((results) => {
       const failed = results.filter((result) => result.status === "rejected").length;
       if (failed > 0) app.log.warn({ failed }, "gamma feed prewarm had failed requests");
     });

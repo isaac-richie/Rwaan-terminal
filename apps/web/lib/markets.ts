@@ -169,14 +169,15 @@ let prefetchScheduled = false
 export function scheduleCategoryPrefetch() {
   if (prefetchScheduled || typeof window === "undefined") return
   prefetchScheduled = true
-  // Wait 2s after initial load so we don't compete with the user's first view
+  // Wait 1.2s after initial load so we don't compete with the user's first view.
+  // Covers every category in the bar so the first click on any of them is instant.
   setTimeout(() => {
-    const cats = ["Crypto", "Sports", "Entertainment", "News", "Africa"]
+    const cats = ["Crypto", "Sports", "Entertainment", "News", "Africa", "Geopolitics"]
     for (const cat of cats) {
       // Only prefetch if not already cached
       if (!getCachedMarkets(cat, 12, "trending", 0)) {
         void fetchMarkets(cat, 12, "trending", 0).catch(() => {})
       }
     }
-  }, 2000)
+  }, 1200)
 }
