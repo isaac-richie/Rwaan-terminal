@@ -12,6 +12,7 @@ import {
   deriveMarketAwareVerdict,
 } from "../services/ta-engine.js";
 import { computeFundamentalVerdict } from "../services/fundamental-engine.js";
+import { logPrediction, scoreResolvedPredictions, getAccuracy } from "../services/predictionLog.js";
 
 const marketSchema = z.object({
   id: z.string().min(1),
@@ -233,6 +234,38 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         }),
       };
 
+      // ── Log the prediction for calibration/backtesting (best-effort) ──
+      {
+        const engine = taResult ? "ta" : fundamentalResult ? "fundamental" : "llm";
+        const dir: "YES" | "NO" = raw.verdict.direction;
+        const conf = raw.verdict.confidence;
+        const pYesFromVerdict = dir === "YES" ? conf / 100 : 1 - conf / 100;
+        let blendedProb = pYesFromVerdict;
+        let modelProb: number | null = null;
+        let marketProb: number | null = marketImpliedYesProb;
+        if (probabilityModel) {
+          blendedProb = probabilityModel.blendedProbability;
+          modelProb = probabilityModel.modelProbability;
+          marketProb = probabilityModel.marketProbability;
+        } else if (fundamentalResult) {
+          const ip = fundamentalResult.impliedProbability;
+          if (typeof ip === "number" && Number.isFinite(ip)) marketProb = ip > 1 ? ip / 100 : ip;
+        }
+        void logPrediction({
+          signalHash,
+          marketId: market.id,
+          question: market.question,
+          category: market.category ?? null,
+          engine,
+          direction: dir,
+          modelProb,
+          marketProb,
+          blendedProb,
+          confidence: conf,
+          resolvesAt: market.endDate ?? null,
+        });
+      }
+
       return {
         ok: true,
         marketId: market.id,
@@ -240,4 +273,12 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       };
     }
   );
+
+  // Calibration scoreboard — how accurate have past verdicts been once resolved.
+  // Opportunistically scores any newly-resolved markets (throttled) before reporting.
+  app.get("/analysis/accuracy", async () => {
+    await scoreResolvedPredictions().catch(() => undefined);
+    const stats = await getAccuracy();
+    return { ok: true, ...stats };
+  });
 }

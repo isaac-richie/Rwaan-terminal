@@ -103,6 +103,28 @@ const sqliteSchema = `
 
   CREATE INDEX IF NOT EXISTS idx_referrals_referrer
     ON referrals(referrer);
+
+  CREATE TABLE IF NOT EXISTS prediction_log (
+    signal_hash       TEXT PRIMARY KEY,
+    market_id         TEXT NOT NULL,
+    question          TEXT NOT NULL,
+    category          TEXT,
+    engine            TEXT NOT NULL,           -- 'ta' | 'fundamental' | 'llm'
+    direction         TEXT NOT NULL,           -- 'YES' | 'NO'
+    model_prob        REAL,                    -- standalone model P(YES)
+    market_prob       REAL,                    -- market-implied P(YES) at prediction time
+    blended_prob      REAL NOT NULL,           -- final P(YES) we acted on
+    confidence        INTEGER NOT NULL,
+    resolves_at       TEXT,                    -- market end date (ISO)
+    created_at        TEXT NOT NULL,
+    resolved_outcome  INTEGER,                 -- 1 = YES resolved true, 0 = NO, null = pending
+    resolved_at       TEXT,
+    brier             REAL,                    -- (blended_prob - resolved_outcome)^2
+    correct           INTEGER                  -- 1 if direction matched resolution
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_prediction_log_pending
+    ON prediction_log(resolved_outcome, resolves_at);
 `;
 
 const postgresSchema = `
@@ -167,6 +189,28 @@ const postgresSchema = `
 
   CREATE INDEX IF NOT EXISTS idx_referrals_referrer
     ON referrals(referrer);
+
+  CREATE TABLE IF NOT EXISTS prediction_log (
+    signal_hash       TEXT PRIMARY KEY,
+    market_id         TEXT NOT NULL,
+    question          TEXT NOT NULL,
+    category          TEXT,
+    engine            TEXT NOT NULL,
+    direction         TEXT NOT NULL,
+    model_prob        DOUBLE PRECISION,
+    market_prob       DOUBLE PRECISION,
+    blended_prob      DOUBLE PRECISION NOT NULL,
+    confidence        INTEGER NOT NULL,
+    resolves_at       TEXT,
+    created_at        TEXT NOT NULL,
+    resolved_outcome  INTEGER,
+    resolved_at       TEXT,
+    brier             DOUBLE PRECISION,
+    correct           INTEGER
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_prediction_log_pending
+    ON prediction_log(resolved_outcome, resolves_at);
 `;
 
 // ---------------------------------------------------------------------------
@@ -1076,4 +1120,233 @@ export async function getReferrerForReferee(referee: string): Promise<string | n
     .prepare("SELECT referrer FROM referrals WHERE referee = ? AND rewarded = 0 LIMIT 1")
     .get(key) as { referrer: string } | undefined;
   return row?.referrer ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Prediction log (verdict calibration / backtest)
+// ---------------------------------------------------------------------------
+
+export type PredictionLogInput = {
+  signalHash: string;
+  marketId: string;
+  question: string;
+  category?: string | null;
+  engine: string;            // 'ta' | 'fundamental' | 'llm'
+  direction: "YES" | "NO";
+  modelProb?: number | null;
+  marketProb?: number | null;
+  blendedProb: number;
+  confidence: number;
+  resolvesAt?: string | null;
+};
+
+export type PendingPredictionRow = {
+  signal_hash: string;
+  market_id: string;
+  question: string;
+  direction: string;
+  blended_prob: number;
+  resolves_at: string | null;
+  created_at: string;
+};
+
+export type AccuracyStats = {
+  resolved: number;
+  pending: number;
+  accuracy: number | null;     // share of correct directional calls
+  brierScore: number | null;   // mean (p - outcome)^2, lower is better (0.25 = coin flip)
+  logLoss: number | null;      // mean -[y·ln p + (1-y)·ln(1-p)]
+  marketBrier: number | null;  // market's own Brier over the same resolved set (baseline)
+  byEngine: Record<string, { resolved: number; accuracy: number | null; brierScore: number | null }>;
+};
+
+/** Record a prediction at generation time. Idempotent on signal_hash. */
+export async function recordPrediction(input: PredictionLogInput): Promise<void> {
+  const createdAt = new Date().toISOString();
+  const vals = [
+    input.signalHash,
+    input.marketId,
+    input.question.slice(0, 500),
+    input.category ?? null,
+    input.engine,
+    input.direction,
+    input.modelProb ?? null,
+    input.marketProb ?? null,
+    input.blendedProb,
+    Math.round(input.confidence),
+    input.resolvesAt ?? null,
+    createdAt,
+  ];
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    await pool.query(
+      `
+        INSERT INTO prediction_log
+          (signal_hash, market_id, question, category, engine, direction,
+           model_prob, market_prob, blended_prob, confidence, resolves_at, created_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        ON CONFLICT (signal_hash) DO NOTHING
+      `,
+      vals,
+    );
+    return;
+  }
+
+  const db = await getDb();
+  db.prepare(
+    `
+      INSERT OR IGNORE INTO prediction_log
+        (signal_hash, market_id, question, category, engine, direction,
+         model_prob, market_prob, blended_prob, confidence, resolves_at, created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    `,
+  ).run(...vals);
+}
+
+/** Predictions whose resolve date has passed and that have not yet been scored. */
+export async function getPendingPredictions(nowIso: string, limit = 100): Promise<PendingPredictionRow[]> {
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    const { rows } = await pool.query<PendingPredictionRow>(
+      `
+        SELECT signal_hash, market_id, question, direction, blended_prob, resolves_at, created_at
+        FROM prediction_log
+        WHERE resolved_outcome IS NULL
+          AND resolves_at IS NOT NULL
+          AND resolves_at <= $1
+        ORDER BY resolves_at ASC
+        LIMIT $2
+      `,
+      [nowIso, limit],
+    );
+    return rows;
+  }
+
+  const db = await getDb();
+  return db
+    .prepare(
+      `
+        SELECT signal_hash, market_id, question, direction, blended_prob, resolves_at, created_at
+        FROM prediction_log
+        WHERE resolved_outcome IS NULL
+          AND resolves_at IS NOT NULL
+          AND resolves_at <= ?
+        ORDER BY resolves_at ASC
+        LIMIT ?
+      `,
+    )
+    .all(nowIso, limit) as PendingPredictionRow[];
+}
+
+/** Score a prediction once its market has resolved. */
+export async function resolvePrediction(
+  signalHash: string,
+  resolvedYes: 0 | 1,
+  blendedProb: number,
+  direction: "YES" | "NO",
+): Promise<void> {
+  const brier = (blendedProb - resolvedYes) ** 2;
+  const correct = (direction === "YES" ? 1 : 0) === resolvedYes ? 1 : 0;
+  const resolvedAt = new Date().toISOString();
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    await pool.query(
+      `UPDATE prediction_log
+       SET resolved_outcome = $1, resolved_at = $2, brier = $3, correct = $4
+       WHERE signal_hash = $5`,
+      [resolvedYes, resolvedAt, brier, correct, signalHash],
+    );
+    return;
+  }
+
+  const db = await getDb();
+  db.prepare(
+    `UPDATE prediction_log
+     SET resolved_outcome = ?, resolved_at = ?, brier = ?, correct = ?
+     WHERE signal_hash = ?`,
+  ).run(resolvedYes, resolvedAt, brier, correct, signalHash);
+}
+
+type ScoredRow = {
+  engine: string;
+  blended_prob: number;
+  market_prob: number | null;
+  resolved_outcome: number;
+  brier: number;
+  correct: number;
+};
+
+export async function getAccuracyStats(): Promise<AccuracyStats> {
+  let scored: ScoredRow[];
+  let pending = 0;
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    const [scoredRes, pendingRes] = await Promise.all([
+      pool.query<ScoredRow>(
+        `SELECT engine, blended_prob, market_prob, resolved_outcome, brier, correct
+         FROM prediction_log WHERE resolved_outcome IS NOT NULL`,
+      ),
+      pool.query<{ count: string }>(
+        `SELECT COUNT(*) AS count FROM prediction_log WHERE resolved_outcome IS NULL`,
+      ),
+    ]);
+    scored = scoredRes.rows;
+    pending = Number(pendingRes.rows[0]?.count ?? 0);
+  } else {
+    const db = await getDb();
+    scored = db
+      .prepare(
+        `SELECT engine, blended_prob, market_prob, resolved_outcome, brier, correct
+         FROM prediction_log WHERE resolved_outcome IS NOT NULL`,
+      )
+      .all() as ScoredRow[];
+    pending = (db.prepare(`SELECT COUNT(*) AS count FROM prediction_log WHERE resolved_outcome IS NULL`).get() as { count: number }).count;
+  }
+
+  if (scored.length === 0) {
+    return { resolved: 0, pending, accuracy: null, brierScore: null, logLoss: null, marketBrier: null, byEngine: {} };
+  }
+
+  const clamp = (p: number) => Math.min(1 - 1e-6, Math.max(1e-6, p));
+  let correctSum = 0;
+  let brierSum = 0;
+  let logLossSum = 0;
+  let marketBrierSum = 0;
+  let marketCount = 0;
+  const byEngine: Record<string, { resolved: number; correct: number; brier: number }> = {};
+
+  for (const r of scored) {
+    const p = clamp(Number(r.blended_prob));
+    const y = Number(r.resolved_outcome);
+    correctSum += Number(r.correct) || 0;
+    brierSum += Number(r.brier);
+    logLossSum += -(y * Math.log(p) + (1 - y) * Math.log(1 - p));
+    if (r.market_prob !== null && Number.isFinite(Number(r.market_prob))) {
+      marketBrierSum += (Number(r.market_prob) - y) ** 2;
+      marketCount += 1;
+    }
+    const e = (byEngine[r.engine] ??= { resolved: 0, correct: 0, brier: 0 });
+    e.resolved += 1;
+    e.correct += Number(r.correct) || 0;
+    e.brier += Number(r.brier);
+  }
+
+  const n = scored.length;
+  return {
+    resolved: n,
+    pending,
+    accuracy: correctSum / n,
+    brierScore: brierSum / n,
+    logLoss: logLossSum / n,
+    marketBrier: marketCount > 0 ? marketBrierSum / marketCount : null,
+    byEngine: Object.fromEntries(
+      Object.entries(byEngine).map(([k, v]) => [
+        k,
+        { resolved: v.resolved, accuracy: v.correct / v.resolved, brierScore: v.brier / v.resolved },
+      ]),
+    ),
+  };
 }
