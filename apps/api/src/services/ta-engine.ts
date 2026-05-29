@@ -2806,6 +2806,21 @@ function normCdf(x: number): number {
 }
 
 /**
+ * P(log-return >= threshold) for a fat-tailed terminal distribution with mean `m`
+ * and standard deviation `sigmaT`. Crypto returns have heavy kurtosis a single
+ * Gaussian under-prices on far strikes, so we use a two-component Gaussian
+ * variance-mixture (85% core + 15% wide, variance-matched to sigmaT²). This lifts
+ * the probability mass in the tails the way real BTC/ETH returns behave.
+ */
+function terminalProbAtLeast(threshold: number, m: number, sigmaT: number): number {
+  // Mixture: 0.85·N(m, σ₁²) + 0.15·N(m, (2.5σ₁)²), with total variance = sigmaT².
+  // 0.85 + 0.15·6.25 = 1.7875 → σ₁ = sigmaT / √1.7875.
+  const sBase = sigmaT / Math.sqrt(1.7875);
+  const tailAtLeast = (s: number) => normCdf((m - threshold) / s); // P(X >= threshold), X~N(m,s²)
+  return 0.85 * tailAtLeast(sBase) + 0.15 * tailAtLeast(2.5 * sBase);
+}
+
+/**
  * Calibrated P(YES) for a crypto price question, modelling price as a random walk
  * (geometric Brownian motion) over the remaining horizon, with a small directional
  * drift contributed by the technical read. These threshold questions ARE effectively
@@ -2838,19 +2853,22 @@ function estimateYesProbability(params: {
   if (signalAgreement < 50) sigmaT *= 1.15;
   sigmaT = Math.max(0.01, sigmaT);
 
-  // TA drift as a fraction of horizon σ (bounded): max read tilts ~0.6σ.
-  const drift = (Math.max(-100, Math.min(100, netScore)) / 100) * 0.6 * sigmaT;
+  // Mean of the terminal log-return = TA drift tilt (bounded to ~0.6σ) plus the
+  // martingale convexity term (−½σ²): with no view the fair baseline is E[S_T]=S₀,
+  // which puts the median log-return below zero. Negligible intraday, material at 30-90d.
+  const driftTilt = (Math.max(-100, Math.min(100, netScore)) / 100) * 0.6 * sigmaT;
+  const m = driftTilt - 0.5 * sigmaT * sigmaT;
 
   // Directional question with no explicit target → P(end higher/lower than now).
   if (!target || price <= 0) {
-    const pUp = normCdf(drift / sigmaT); // P(S_T >= S)
+    const pUp = terminalProbAtLeast(0, m, sigmaT); // P(logReturn >= 0)
     const pYes = yesMeansUp ? pUp : 1 - pUp;
     return { pYes: Math.min(0.95, Math.max(0.05, pYes)), sigmaT, gapPct: null };
   }
 
   const logK = Math.log(target / price); // >0 if target above current
-  // Endpoint probability the terminal price satisfies the threshold.
-  const pAbove = normCdf((drift - logK) / sigmaT); // P(S_T >= target)
+  // Endpoint probability the terminal price satisfies the threshold (fat-tailed).
+  const pAbove = terminalProbAtLeast(logK, m, sigmaT); // P(S_T >= target)
   let pYes = yesMeansUp ? pAbove : 1 - pAbove;
 
   // "reach/hit/touch" = barrier-touch any time before T, not just at expiry.
