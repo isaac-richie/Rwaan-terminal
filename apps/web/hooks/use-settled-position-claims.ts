@@ -209,6 +209,10 @@ function claimErrorMessage(err: any) {
   if (normalized.includes("user rejected") || normalized.includes("rejected by wallet") || err?.code === 4001) {
     return "Claim rejected in wallet."
   }
+  // Route/endpoint missing on the server (stale deploy) — was previously a cryptic "Not Found".
+  if (normalized.includes("claim_endpoint_unavailable") || normalized === "not found" || normalized.includes("route post")) {
+    return "Settlement claiming is temporarily unavailable. Your winnings are safe — please try again shortly."
+  }
   if (normalized.includes("unknown connector error") || normalized.includes("connector")) {
     return "Wallet connector could not complete the claim. Reopen your wallet, approve Polygon, then try again."
   }
@@ -319,7 +323,12 @@ export function useSettledPositionClaims(options: ClaimOptions) {
             negRisk: group.negRisk,
           }),
         })
-        const prepared = await prepareRes.json()
+        const prepared = await prepareRes.json().catch(() => ({}))
+        // A 404 here means the API doesn't expose the claim route (e.g. a stale
+        // deploy that predates it) — surface a clear message, not a raw "Not Found".
+        if (prepareRes.status === 404) {
+          throw new Error("claim_endpoint_unavailable")
+        }
         if (!prepareRes.ok || prepared?.ok === false) {
           throw new Error(prepared?.error ?? "Unable to prepare deposit wallet claim.")
         }
@@ -345,7 +354,10 @@ export function useSettledPositionClaims(options: ClaimOptions) {
             signature,
           }),
         })
-        const submitted = await submitRes.json()
+        const submitted = await submitRes.json().catch(() => ({}))
+        if (submitRes.status === 404) {
+          throw new Error("claim_endpoint_unavailable")
+        }
         if (!submitRes.ok || submitted?.ok === false) {
           throw new Error(submitted?.error ?? "Deposit wallet claim submit failed.")
         }
