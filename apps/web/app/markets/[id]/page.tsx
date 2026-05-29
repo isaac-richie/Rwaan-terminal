@@ -423,6 +423,58 @@ function positionTokenGate(balanceAllowance: { balance: string; allowance: strin
   return { ready: true, needsApproval: false, needsFunding: false, message: "Position balance and sell allowance cover this order." };
 }
 
+// Ordered execution stages for the trade flow. Each completed stage unlocks the next.
+const TRADE_STEPS = ["Preview", "Approve", "Sign", "Submit"] as const;
+
+function TradeStepTracker({ stageIndex }: { stageIndex: number }) {
+  return (
+    <div className="grid grid-cols-4 gap-1">
+      {TRADE_STEPS.map((label, i) => {
+        const done = i < stageIndex;
+        const active = i === stageIndex;
+        return (
+          <div key={label} className="flex flex-col items-center gap-1">
+            <div className="flex w-full items-center">
+              <div
+                className={cn(
+                  "h-0.5 flex-1 rounded-full transition-colors",
+                  i === 0 ? "opacity-0" : done || active ? "bg-[oklch(0.78_0.16_82/0.5)]" : "bg-[oklch(0.20_0.015_255)]"
+                )}
+              />
+              <span
+                className={cn(
+                  "mx-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold transition-all",
+                  done
+                    ? "bg-[oklch(0.68_0.18_155/0.2)] text-[oklch(0.68_0.18_155)]"
+                    : active
+                    ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] shadow-[0_0_10px_oklch(0.78_0.16_82/0.4)]"
+                    : "bg-[oklch(0.16_0.014_255)] text-muted-foreground/70"
+                )}
+              >
+                {done ? "✓" : i + 1}
+              </span>
+              <div
+                className={cn(
+                  "h-0.5 flex-1 rounded-full transition-colors",
+                  i === TRADE_STEPS.length - 1 ? "opacity-0" : done ? "bg-[oklch(0.78_0.16_82/0.5)]" : "bg-[oklch(0.20_0.015_255)]"
+                )}
+              />
+            </div>
+            <span
+              className={cn(
+                "text-[9px] font-bold uppercase tracking-wide",
+                active ? "text-foreground" : done ? "text-[oklch(0.68_0.18_155)]" : "text-muted-foreground/50"
+              )}
+            >
+              {label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const DESC_TRUNCATE_LEN = 280;
 
 function DescriptionCard({ description }: { description: string }) {
@@ -746,6 +798,28 @@ export default function MarketDetailPage() {
     signingOrder ||
     clobSession.status === "preparing" ||
     clobSession.submitStatus === "submitting";
+  // Current position in the linear execution flow: Preview(0) → Approve(1) → Sign(2) → Submit(3) → done(4).
+  // Drives the step tracker and gates which action button is unlocked.
+  const tradeStageIndex = useMemo(() => {
+    if (!tradePreview) return 0; // Preview
+    const needsApproval =
+      clobSession.status !== "ready" ||
+      (requiresCollateral && !tradeCollateralGate.ready) ||
+      (requiresPositionApproval && !tradePositionGate.ready);
+    if (needsApproval) return 1; // Approve / activate session
+    if (!clobSession.signedOrderPreview) return 2; // Sign
+    if (clobSession.orderSubmission?.success) return 4; // Done
+    return 3; // Submit
+  }, [
+    tradePreview,
+    clobSession.status,
+    clobSession.signedOrderPreview,
+    clobSession.orderSubmission?.success,
+    requiresCollateral,
+    requiresPositionApproval,
+    tradeCollateralGate.ready,
+    tradePositionGate.ready,
+  ]);
   const cancelTargetOrder = useMemo(
     () => clobSession.openOrders.find((order) => order.id === cancelOrderId) ?? null,
     [clobSession.openOrders, cancelOrderId]
@@ -1298,8 +1372,9 @@ export default function MarketDetailPage() {
                 </div>
               </div>
 
-              {/* Onboarding stepper — only visible when not fully ready */}
-              {(!authenticated || clobSession.status !== "ready") && (
+              {/* Onboarding stepper — cold-start checklist. Hidden once a preview exists,
+                  because the linear action flow below then owns activation/approval. */}
+              {!tradePreview && (!authenticated || clobSession.status !== "ready") && (
                 <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.7)] p-3">
                   <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Getting started</div>
                   <div className="space-y-2">
@@ -1599,7 +1674,62 @@ export default function MarketDetailPage() {
                 )}
               </div>
 
-              {/* Return preview */}
+              {/* ── Step tracker — visible once wallet + trading profile are ready ── */}
+              {connectedWalletAddress && tradingProfile.profile && (
+                <div className="rounded-2xl border border-[oklch(0.20_0.014_255)] bg-[oklch(0.12_0.012_260/0.6)] px-3 py-3">
+                  <TradeStepTracker stageIndex={tradeStageIndex} />
+                </div>
+              )}
+
+              {/* ── Step 1 entry CTA: Connect / Resolve / Preview ──
+                  Only shown before a preview exists. Once previewed, the progressive
+                  step blocks below (approve → sign → submit) take over linearly. */}
+              {!tradePreview && (
+                !connectedWalletAddress ? (
+                  <Button
+                    className="w-full h-12 rounded-xl gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold text-sm shadow-[0_0_20px_oklch(0.78_0.16_82/0.25)] active:scale-[0.98] transition-transform"
+                    onClick={handleConnectWallet}
+                    disabled={!ready}
+                  >
+                    <Wallet className="w-4 h-4" />
+                    {ready ? "Connect Wallet to Trade" : "Loading..."}
+                  </Button>
+                ) : !tradingProfile.profile ? (
+                  <Button className="w-full h-12 rounded-xl gap-2" disabled>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Resolving Trading Wallet
+                  </Button>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Button
+                      className={cn(
+                        "w-full h-12 sm:h-13 rounded-xl sm:rounded-2xl gap-2 font-bold text-sm active:scale-[0.98] transition-all duration-200",
+                        tradeSide === "buy"
+                          ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.01_255)] hover:bg-[oklch(0.83_0.16_82)] shadow-[0_4px_20px_oklch(0.78_0.16_82/0.35)]"
+                          : "bg-[oklch(0.58_0.2_25)] text-white hover:bg-[oklch(0.63_0.2_25)] shadow-[0_4px_20px_oklch(0.58_0.2_25/0.25)]"
+                      )}
+                      onClick={handlePreviewTrade}
+                      disabled={tradeActionBusy || !activeTokenId || amountNumber <= 0 || readiness.readiness?.canPreview === false || sellOrderbookUnavailable}
+                    >
+                      {previewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : tradeSide === "buy" ? <TrendingUp className="w-4 h-4" /> : <ArrowDownUp className="w-4 h-4" />}
+                      {sellOrderbookUnavailable
+                        ? "Market settling"
+                        : amountNumber <= 0
+                        ? `Enter an amount to ${tradeSide}`
+                        : `Preview ${tradeSide === "buy" ? "Buy" : "Sell"} ${activeOutcomeName}`}
+                    </Button>
+                    {readiness.readiness?.canPreview === false && readiness.readiness?.executionLockedReason && (
+                      <p className="flex items-start gap-1.5 px-1 text-[10px] leading-snug text-[oklch(0.74_0.14_25)]">
+                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                        {readiness.readiness.executionLockedReason}
+                      </p>
+                    )}
+                  </div>
+                )
+              )}
+
+              {/* Return preview — only after a preview has been generated */}
+              {tradePreview && (
               <div className="rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_255)] p-4 space-y-3 text-xs">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
@@ -1741,6 +1871,7 @@ export default function MarketDetailPage() {
                   </>
                 )}
               </div>
+              )}
 
               {(tradePreview || previewError) && (
                 <div className="rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260)] p-4 space-y-2.5 text-xs">
@@ -1837,13 +1968,13 @@ export default function MarketDetailPage() {
 
               {/* ── Progressive trade steps — only show the CURRENT step ── */}
               {tradePreview && (() => {
-                // Step 1: Session not ready → "Prepare trading session"
+                // Step 2 (activate): Session not ready → "Prepare trading session"
                 if (clobSession.status !== "ready") {
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        <span className="grid h-5 w-5 place-items-center rounded-full bg-[oklch(0.78_0.16_82/0.15)] text-[oklch(0.78_0.16_82)] text-[9px]">1</span>
-                        Prepare trading session
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-[oklch(0.78_0.16_82/0.15)] text-[oklch(0.78_0.16_82)] text-[9px]">2</span>
+                        Activate trading session
                       </div>
                       <div className="rounded-lg border border-[oklch(0.78_0.16_82/0.2)] bg-[oklch(0.78_0.16_82/0.07)] p-2.5 text-[11px] leading-snug text-[oklch(0.78_0.16_82)]">
                         <p>Prepare your trading session once, then sign this order.</p>
@@ -2066,8 +2197,8 @@ export default function MarketDetailPage() {
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        <span className="grid h-5 w-5 place-items-center rounded-full bg-[oklch(0.68_0.18_155/0.18)] text-[oklch(0.68_0.18_155)] text-[9px]">✓</span>
-                        Approved — sign your order
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-[oklch(0.68_0.18_155/0.18)] text-[oklch(0.68_0.18_155)] text-[9px]">3</span>
+                        Sign your order
                       </div>
                       <Button
                         type="button"
@@ -2089,8 +2220,9 @@ export default function MarketDetailPage() {
               {clobSession.signedOrderPreview && (
                 <div className="rounded-2xl border border-[oklch(0.68_0.18_155/0.32)] bg-[oklch(0.68_0.18_155/0.08)] p-4 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">
-                      Signed order preview
+                    <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">
+                      <span className="grid h-5 w-5 place-items-center rounded-full bg-[oklch(0.68_0.18_155/0.18)] text-[9px]">4</span>
+                      Review &amp; submit
                     </span>
                     <span className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">
                       Not submitted
@@ -2447,7 +2579,14 @@ export default function MarketDetailPage() {
                 </AlertDialogContent>
               </AlertDialog>
 
-              {connectedWalletAddress && (clobSession.status !== "ready" || clobSession.error || depositWalletStatus.error) && (
+              {/* Trading access — surfaced only for deposit-wallet deployment or errors.
+                  Generic session activation is owned by the onboarding stepper (pre-preview)
+                  and the linear step flow (post-preview), so it isn't duplicated here. */}
+              {connectedWalletAddress && (
+                clobSession.error ||
+                depositWalletStatus.error ||
+                (tradingProfile.profile?.tradingWalletKind === "deposit" && depositWalletStatus.status?.deployed !== true)
+              ) && (
                 <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] p-3 text-xs space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -2621,42 +2760,6 @@ export default function MarketDetailPage() {
               {walletNotice && (
                 <p className="text-[11px] text-center text-muted-foreground">{walletNotice}</p>
               )}
-
-              {/* Main action button */}
-              {!connectedWalletAddress ? (
-                <Button
-                  className="w-full h-12 rounded-xl gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold text-sm shadow-[0_0_20px_oklch(0.78_0.16_82/0.25)] active:scale-[0.98] transition-transform"
-                  onClick={handleConnectWallet}
-                  disabled={!ready}
-                >
-                  <Wallet className="w-4 h-4" />
-                  {ready ? "Connect Wallet to Trade" : "Loading..."}
-                </Button>
-              ) : !tradingProfile.profile ? (
-                <Button
-                  className="w-full h-12 rounded-xl gap-2"
-                  disabled
-                >
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Resolving Trading Wallet
-                </Button>
-              ) : (
-                <div className="space-y-2">
-                  <Button
-                    className={cn(
-                      "w-full h-12 sm:h-13 rounded-xl sm:rounded-2xl gap-2 font-bold text-sm active:scale-[0.98] transition-all duration-200",
-                      tradeSide === "buy"
-                        ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.01_255)] hover:bg-[oklch(0.83_0.16_82)] shadow-[0_4px_20px_oklch(0.78_0.16_82/0.35)]"
-                        : "bg-[oklch(0.58_0.2_25)] text-white hover:bg-[oklch(0.63_0.2_25)] shadow-[0_4px_20px_oklch(0.58_0.2_25/0.25)]"
-                    )}
-                    onClick={handlePreviewTrade}
-                    disabled={tradeActionBusy || !activeTokenId || amountNumber <= 0 || readiness.readiness?.canPreview === false || sellOrderbookUnavailable}
-                  >
-                    {previewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : tradeSide === "buy" ? <TrendingUp className="w-4 h-4" /> : <ArrowDownUp className="w-4 h-4" />}
-                    {sellOrderbookUnavailable ? "Market settling" : `Preview ${tradeSide === "buy" ? "Buy" : "Sell"} ${activeOutcomeName}`}
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -2670,11 +2773,13 @@ export default function MarketDetailPage() {
             <span className="text-[oklch(0.24_0.014_255)]">/</span>
             <span className="text-xs font-bold text-[oklch(0.65_0.20_25)] tabular-nums">No {noPrice.toFixed(0)}¢</span>
           </div>
-          {/* Quick trade buttons */}
+          {/* Quick trade buttons — resolve Yes/No to real outcome indices */}
           <div className="flex gap-2 shrink-0">
             <button
               onClick={() => {
                 setTradeSide("buy");
+                const idx = market.outcomes.findIndex((o) => o.trim().toLowerCase().includes("yes"));
+                setSelectedOutcomeIdx(idx >= 0 ? idx : 0);
                 document.getElementById("trade-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
               className="h-10 px-5 rounded-xl btn-yes btn-press flex items-center justify-center"
@@ -2684,7 +2789,8 @@ export default function MarketDetailPage() {
             <button
               onClick={() => {
                 setTradeSide("buy");
-                setSelectedOutcomeIdx(1);
+                const idx = market.outcomes.findIndex((o) => o.trim().toLowerCase().includes("no"));
+                setSelectedOutcomeIdx(idx >= 0 ? idx : Math.min(1, market.outcomes.length - 1));
                 document.getElementById("trade-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
               className="h-10 px-5 rounded-xl btn-no btn-press flex items-center justify-center"
