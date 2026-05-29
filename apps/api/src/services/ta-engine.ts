@@ -2639,6 +2639,209 @@ export function detectCryptoSymbol(text: string): string | null {
   return matches[0].sym;
 }
 
+// ─── Market-question awareness ───────────────────────────────────────────────
+// The raw TA verdict answers "is the asset bullish or bearish?" — but a prediction
+// market asks a specific question ("will X be ABOVE $Y by Z?"). A bullish asset does
+// NOT imply a YES resolution when the market asks about a DROP. These helpers map the
+// asset-level directional read onto the actual market question.
+
+const UP_KEYWORDS = [
+  "above", "over", "exceed", "surpass", "greater than", "more than", "at least",
+  "higher than", "higher", "break above", "breakout above", "new high",
+  "all-time high", "all time high", "new ath", "rally to", "climb to", "rise to",
+  "rise above", "pump to", "moon", ">=", "≥",
+  // directional (no-target) phrasings
+  "go up", "going up", "trade higher", "close higher", "end higher", "be up",
+  "trend up", "gain", "rally", "rise", "increase", "pump", "surge", "spike",
+];
+const DOWN_KEYWORDS = [
+  "below", "under", "beneath", "dip to", "dip below", "dip", "drop to", "drop below",
+  "drop", "fall to", "fall below", "fall", "crash", "decline", "less than",
+  "lower than", "lower", "break below", "breakdown", "down to", "sink to",
+  "<=", "≤",
+  // directional (no-target) phrasings
+  "go down", "going down", "trade lower", "close lower", "end lower", "be down",
+  "trend down", "lose value", "decrease", "dump", "tank", "plunge", "sell off",
+  "sell-off", "selloff",
+];
+const REACH_KEYWORDS = ["reach", "hit", "touch", "tag", "get to", "trade at", "cross", "flip"];
+
+export type CryptoPriceQuestion = {
+  isPriceQuestion: boolean;
+  yesMeansUp: boolean | null; // null = ambiguous from text alone (resolve vs current price)
+  target: number | null;
+  comparator: "above" | "below" | "reach" | null;
+};
+
+function parseTargetPrice(question: string): number | null {
+  const q = question.replace(/,/g, "");
+  // Prefer an explicit $-prefixed figure; otherwise require a k/m suffix so we don't
+  // accidentally match years ("2025") or ordinals.
+  const dollar = q.match(/\$\s?(\d+(?:\.\d+)?)\s*([kKmM])?/);
+  const bare = dollar ? null : q.match(/\b(\d+(?:\.\d+)?)\s*([kKmM])\b/);
+  const m = dollar ?? bare;
+  if (!m) return null;
+  let val = parseFloat(m[1]);
+  const suffix = (m[2] ?? "").toLowerCase();
+  if (suffix === "k") val *= 1_000;
+  else if (suffix === "m") val *= 1_000_000;
+  return Number.isFinite(val) && val > 0 ? val : null;
+}
+
+// Subjects that mention a crypto asset + directional word but are NOT about the
+// asset's spot price. Price technicals are irrelevant here → route to the news engine.
+const NON_PRICE_SUBJECTS = [
+  "gas fee", "gas fees", "tvl", "total value locked", "revenue", "volume",
+  "dominance", "supply", "staking", "stake", "hashrate", "hash rate", "etf",
+  "approve", "approval", "list", "listing", "delist", "hack", "exploit", "launch",
+  "upgrade", "fork", "halving", "unlock", "airdrop", "governance", "lawsuit", "sec ",
+];
+
+export function classifyCryptoPriceQuestion(question: string): CryptoPriceQuestion {
+  const q = question.toLowerCase();
+  const target = parseTargetPrice(question);
+  const hasUp = UP_KEYWORDS.some((k) => q.includes(k));
+  const hasDown = DOWN_KEYWORDS.some((k) => q.includes(k));
+  const hasReach = REACH_KEYWORDS.some((k) => q.includes(k));
+  const hasNonPriceSubject = NON_PRICE_SUBJECTS.some((k) => q.includes(k));
+
+  // A price question references a $ target and/or directional threshold language,
+  // and is not really about a non-price metric (fees, TVL, ETF approval, etc.).
+  const isPriceQuestion = !hasNonPriceSubject && (Boolean(target) || hasUp || hasDown || hasReach);
+
+  let yesMeansUp: boolean | null = null;
+  let comparator: "above" | "below" | "reach" | null = null;
+  if (hasDown && !hasUp) {
+    yesMeansUp = false;
+    comparator = "below";
+  } else if (hasUp && !hasDown) {
+    yesMeansUp = true;
+    comparator = "above";
+  } else if (hasReach) {
+    comparator = "reach"; // resolve up/down vs current price later
+  }
+
+  return { isPriceQuestion, yesMeansUp, target, comparator };
+}
+
+function daysUntil(endDate?: string): number | null {
+  if (!endDate) return null;
+  const t = new Date(endDate).getTime();
+  if (!Number.isFinite(t)) return null;
+  const d = (t - Date.now()) / 86_400_000;
+  return d > 0 ? d : null;
+}
+
+export type MarketAwareVerdict = {
+  verdict: ComputedVerdict; // .direction now answers the MARKET question (not just asset bias)
+  taRelevant: boolean;      // false → question isn't about price; TA must not drive the verdict
+  polarity: CryptoPriceQuestion;
+  mappingNote: string;
+};
+
+/**
+ * Translate the asset-level TA verdict into an answer to the actual market question.
+ *
+ * Handles three things the raw engine ignores:
+ *  1. Polarity — "below/dip/drop" questions invert the YES/NO meaning of a bullish read.
+ *  2. Threshold reachability — a far-away strike relative to expected move over the
+ *     remaining time makes YES less likely regardless of short-term drift.
+ *  3. Relevance — non-price crypto questions (ETF approvals, hacks, listings) should not
+ *     be answered by price technicals at all.
+ */
+export function deriveMarketAwareVerdict(
+  ta: TechnicalAnalysis,
+  question: string,
+  endDate?: string
+): MarketAwareVerdict {
+  const pq = classifyCryptoPriceQuestion(question);
+  const base = ta.verdict;
+  const price = ta.currentPrice;
+
+  // Not a price question → technicals are contextual colour only.
+  if (!pq.isPriceQuestion) {
+    return {
+      verdict: base,
+      taRelevant: false,
+      polarity: pq,
+      mappingNote:
+        "This is not a direct price-threshold question, so live technicals are contextual only and should not determine the YES/NO verdict.",
+    };
+  }
+
+  // Resolve ambiguous polarity (e.g. "reach $X") using target vs current price.
+  let yesMeansUp = pq.yesMeansUp;
+  if (yesMeansUp === null && pq.target && price > 0) {
+    if (pq.target > price * 1.003) yesMeansUp = true;
+    else if (pq.target < price * 0.997) yesMeansUp = false;
+  }
+  const ambiguousPolarity = yesMeansUp === null;
+  if (yesMeansUp === null) yesMeansUp = true; // safe default; confidence is capped below
+
+  const netScore = base.netScore; // -100..100, + = bullish asset
+  const assetBias: "bullish" | "bearish" | "neutral" =
+    netScore > 8 ? "bullish" : netScore < -8 ? "bearish" : "neutral";
+
+  let score = 0; // positive favours YES
+  let distanceNote = "";
+
+  // ── Threshold reachability (only when a concrete $ target exists) ──
+  if (pq.target && price > 0) {
+    const days = daysUntil(endDate) ?? 7; // default ~1-week horizon when unknown
+    // ATR(1h) % scaled to the horizon via random-walk sqrt-time as a rough expected move.
+    const expectedMovePct = Math.max(1, (ta.volatilityPct || 1) * Math.sqrt(24 * Math.max(days, 0.25)));
+    const gapPct = yesMeansUp
+      ? ((pq.target - price) / price) * 100 // YES needs price to RISE this much
+      : ((price - pq.target) / price) * 100; // YES needs price to FALL this much
+
+    if (gapPct <= 0) {
+      // Current price is already on the YES side — YES only needs to hold.
+      score += 30;
+      distanceNote = `Price is already ${yesMeansUp ? "above" : "below"} the $${pq.target.toLocaleString()} threshold; YES only needs to hold.`;
+    } else {
+      const touchLenient = pq.comparator === "reach" ? 0.7 : 1; // touching is easier than closing past
+      const ratio = (gapPct / expectedMovePct) * touchLenient;
+      if (ratio <= 0.5) score += 18;
+      else if (ratio <= 1) score += 4;
+      else if (ratio <= 2) score -= 22;
+      else score -= 42;
+      distanceNote = `Target is ${gapPct.toFixed(1)}% away vs ~${expectedMovePct.toFixed(1)}% expected move over ${days.toFixed(1)}d (${ratio.toFixed(2)}× expected).`;
+    }
+  }
+
+  // ── Drift component: does the asset's technical bias push toward YES? ──
+  const biasTowardYes = yesMeansUp ? netScore : -netScore; // flip for "down" questions
+  score += Math.max(-100, Math.min(100, biasTowardYes)) * 0.4;
+
+  const direction: "YES" | "NO" = score >= 0 ? "YES" : "NO";
+
+  // ── Confidence ──
+  let confidence = Math.abs(score) * 0.9 + 18;
+  if (ambiguousPolarity) confidence = Math.min(confidence, 45); // we guessed the polarity
+  if (assetBias === "neutral" && !pq.target) confidence = Math.min(confidence, 50);
+  // Blend with the engine's own conviction so a strong technical read still reads strong.
+  confidence = Math.round(confidence * 0.6 + base.confidence * 0.4);
+  confidence = Math.max(12, Math.min(92, confidence));
+
+  const polarityText = ambiguousPolarity
+    ? "Question polarity is ambiguous"
+    : yesMeansUp
+    ? "Market YES requires price to rise to / stay above the target"
+    : "Market YES requires price to fall to / stay below the target";
+  const mappingNote =
+    `${polarityText}. Asset technicals read ${assetBias} (net ${netScore > 0 ? "+" : ""}${netScore.toFixed(0)}).` +
+    (distanceNote ? ` ${distanceNote}` : "");
+
+  const verdict: ComputedVerdict = {
+    ...base,
+    direction,
+    confidence,
+    verdictRationale: `Market-aware verdict: ${direction} (${confidence}%). ${mappingNote}\n\nUnderlying asset read:\n${base.verdictRationale}`,
+  };
+
+  return { verdict, taRelevant: true, polarity: { ...pq, yesMeansUp }, mappingNote };
+}
+
 export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnalysis | null> {
   const upperAsset = asset.toUpperCase();
 

@@ -370,7 +370,8 @@ function buildPremiumPrompt(
   market: PremiumAnalysisInput,
   articles: PremiumNewsArticle[],
   ta?: TechnicalAnalysis | null,
-  fundamental?: FundamentalVerdict | null
+  fundamental?: FundamentalVerdict | null,
+  marketMappingNote?: string | null
 ): string {
   const consensusStr = market.outcomes?.length
     ? market.outcomes.map(o => `${o.name}: ${o.price}%`).join(" / ")
@@ -441,6 +442,17 @@ function buildPremiumPrompt(
         `CRITICAL — CRYPTO MARKET WITH FULL QUANTITATIVE TA SUITE:`,
         `This is a crypto asset market. A deterministic quant engine has already computed a verdict`,
         `from 16 weighted signal votes across multi-timeframe technical analysis.`,
+        ...(marketMappingNote
+          ? [
+              ``,
+              `MARKET-QUESTION MAPPING (critical — read carefully):`,
+              marketMappingNote,
+              `The verdict direction "${ta.verdict.direction}" ALREADY reflects this mapping. The raw`,
+              `technicals describe the ASSET (bullish/bearish); the verdict answers the MARKET QUESTION.`,
+              `If the asset is bullish but YES requires a price DROP, the correct verdict is NO — explain`,
+              `the YES/NO strictly in terms of the market's resolution condition, never just asset direction.`,
+            ]
+          : []),
         ``,
         `The quant engine analyzed 16 weighted signal votes:`,
         `- 4H/1H/15m market structure, EMA ribbon (9/21/50/200): ${ta.ema.ribbonState.replace("_", " ")}`,
@@ -678,7 +690,8 @@ export async function generatePremiumAnalysis(
   market: PremiumAnalysisInput,
   articles: PremiumNewsArticle[],
   ta?: TechnicalAnalysis | null,
-  fundamental?: FundamentalVerdict | null
+  fundamental?: FundamentalVerdict | null,
+  marketMappingNote?: string | null
 ): Promise<PremiumAnalysisResult> {
   if (!config.openai.apiKey) {
     return fallbackPremiumAnalysis(ta, fundamental);
@@ -695,7 +708,7 @@ export async function generatePremiumAnalysis(
       },
       body: JSON.stringify({
         model: config.openai.model,
-        messages: [{ role: "user", content: buildPremiumPrompt(market, articles, ta, fundamental) }],
+        messages: [{ role: "user", content: buildPremiumPrompt(market, articles, ta, fundamental, marketMappingNote) }],
         response_format: {
           type: "json_schema",
           json_schema: {

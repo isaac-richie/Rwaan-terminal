@@ -5,7 +5,12 @@ import { generateMarketAnalysis, generatePremiumAnalysis } from "../services/ope
 import { paymentGate } from "../middleware/paymentGate.js";
 import { fetchPremiumNews } from "../services/news.js";
 import { buildPaymentRequirement } from "../services/payment.js";
-import { detectCryptoSymbol, runTechnicalAnalysis } from "../services/ta-engine.js";
+import {
+  detectCryptoSymbol,
+  runTechnicalAnalysis,
+  classifyCryptoPriceQuestion,
+  deriveMarketAwareVerdict,
+} from "../services/ta-engine.js";
 import { computeFundamentalVerdict } from "../services/fundamental-engine.js";
 
 const marketSchema = z.object({
@@ -71,28 +76,53 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
 
       const { market } = payload.data;
 
-      // Detect crypto asset from market question for TA enrichment
+      // Detect crypto asset + decide whether the question is actually about price.
+      // TA only drives the verdict for crypto PRICE questions ("will X be above $Y?").
+      // Non-price crypto questions (ETF approvals, hacks, listings) go to the
+      // fundamental/news engine instead — price technicals are irrelevant there.
       const cryptoSymbol = detectCryptoSymbol(market.question);
+      const priceClassification = cryptoSymbol ? classifyCryptoPriceQuestion(market.question) : null;
+      const useTA = Boolean(cryptoSymbol && priceClassification?.isPriceQuestion);
 
-      // Fetch news + TA/fundamental signals in parallel
-      // - TA engine: crypto markets only
-      // - Fundamental engine: non-crypto markets (runs after news fetch, needs articles)
-      const [newsArticles, taResult] = await Promise.all([
+      // Fetch news + (conditionally) TA signals in parallel
+      const [newsArticles, rawTaResult] = await Promise.all([
         fetchPremiumNews(market.question, market.category),
-        cryptoSymbol
-          ? runTechnicalAnalysis(cryptoSymbol).catch((err) => {
+        useTA
+          ? runTechnicalAnalysis(cryptoSymbol!).catch((err) => {
               console.warn(`[smartmarket] TA engine failed for ${cryptoSymbol}:`, err);
               return null;
             })
           : Promise.resolve(null),
       ]);
 
-      // Compute fundamental verdict for non-crypto markets using the fetched articles
-      const fundamentalResult = !cryptoSymbol
+      // Map the asset-level TA read onto the actual market question so a bullish
+      // asset doesn't wrongly resolve a "will it drop below $X" market as YES.
+      let taResult = rawTaResult;
+      let taMappingNote: string | null = null;
+      if (rawTaResult) {
+        const mapped = deriveMarketAwareVerdict(rawTaResult, market.question, market.endDate);
+        if (mapped.taRelevant) {
+          taResult = { ...rawTaResult, verdict: mapped.verdict };
+          taMappingNote = mapped.mappingNote;
+        } else {
+          // Crypto symbol present but the question isn't about price — drop TA so the
+          // fundamental engine answers it instead.
+          taResult = null;
+        }
+      }
+
+      // Fundamental verdict for everything the TA engine doesn't drive
+      const fundamentalResult = !taResult
         ? computeFundamentalVerdict(market, newsArticles)
         : null;
 
-      const raw = await generatePremiumAnalysis(market, newsArticles, taResult, fundamentalResult);
+      const raw = await generatePremiumAnalysis(
+        market,
+        newsArticles,
+        taResult,
+        fundamentalResult,
+        taMappingNote
+      );
 
       const generatedAt = new Date().toISOString();
       const signalHash = createHash("sha256")
