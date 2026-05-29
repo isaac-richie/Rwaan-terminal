@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -49,6 +49,11 @@ import {
 } from "@/hooks/use-polymarket-portfolio";
 import { useClobSession, type OpenOrderSnapshot } from "@/hooks/use-clob-session";
 import { usePolymarketDepositWallet } from "@/hooks/use-polymarket-deposit-wallet";
+import {
+  groupClaimablePositions,
+  type ClaimablePositionGroup,
+  useSettledPositionClaims,
+} from "@/hooks/use-settled-position-claims";
 import { useTradeReadiness } from "@/hooks/use-trade-readiness";
 import { shortAddress, useTradingProfile } from "@/hooks/use-trading-profile";
 import { addAccountRefreshListener, scheduleAccountRefresh } from "@/lib/account-events";
@@ -283,23 +288,26 @@ function EmptyState({ title, description, action }: {
   );
 }
 
-function BalanceBar({ liquid, inPositions, locked, total }: {
-  liquid: number; inPositions: number; locked: number; total: number;
+function BalanceBar({ liquid, inPositions, claimable, locked, total }: {
+  liquid: number; inPositions: number; claimable: number; locked: number; total: number;
 }) {
   if (total <= 0) return null;
   const liquidPct = Math.max(0, (liquid / total) * 100);
   const posPct = Math.max(0, (inPositions / total) * 100);
+  const claimPct = Math.max(0, (claimable / total) * 100);
   const lockPct = Math.max(0, (locked / total) * 100);
   return (
     <div className="mt-4">
       <div className="flex h-2 overflow-hidden rounded-full bg-[oklch(0.14_0.012_260)]">
         <div className="h-full rounded-l-full bg-[oklch(0.68_0.18_155/0.75)]" style={{ width: `${liquidPct}%` }} />
         <div className="h-full bg-[oklch(0.78_0.16_82/0.70)]" style={{ width: `${posPct}%` }} />
+        <div className="h-full bg-[oklch(0.70_0.11_210/0.70)]" style={{ width: `${claimPct}%` }} />
         <div className="h-full rounded-r-full bg-[oklch(0.55_0.10_260/0.50)]" style={{ width: `${lockPct}%` }} />
       </div>
       <div className="mt-2.5 flex items-center gap-4 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.68_0.18_155/0.75)]" />Liquid</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.78_0.16_82/0.70)]" />In positions</span>
+        <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.70_0.11_210/0.70)]" />Claimable</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.55_0.10_260/0.50)]" />Locked orders</span>
       </div>
     </div>
@@ -307,13 +315,13 @@ function BalanceBar({ liquid, inPositions, locked, total }: {
 }
 
 function BalanceLedgerCard({
-  pUsdBalance, pUsdAllowance, spendablePusd, liquidPusd, inPositions,
+  pUsdBalance, pUsdAllowance, spendablePusd, liquidPusd, inPositions, claimableValue,
   lockedOrdersValue, lockedBuyCollateral, lockedSellValue, lockedSellShares,
   openOrdersCount, accountValue, collateralLoading, collateralError,
   clobReady, openOrdersLoading, onPrepareSession, onRefreshOrders, tradingWalletAddress,
 }: {
   pUsdBalance: number | null; pUsdAllowance: number | null; spendablePusd: number | null;
-  liquidPusd: number | null; inPositions: number; lockedOrdersValue: number;
+  liquidPusd: number | null; inPositions: number; claimableValue: number; lockedOrdersValue: number;
   lockedBuyCollateral: number; lockedSellValue: number; lockedSellShares: number;
   openOrdersCount: number; accountValue: number; collateralLoading: boolean;
   collateralError: string | null; clobReady: boolean; openOrdersLoading: boolean;
@@ -351,18 +359,21 @@ function BalanceLedgerCard({
         </Button>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[
           { label: "pUSD balance", value: collateralLoading ? "Syncing…" : formatPusd(pUsdBalance), sub: "Polygon wallet" },
           { label: "Available", value: collateralLoading ? "Syncing…" : formatPusd(liquidPusd), sub: "After resting orders" },
           { label: "In positions", value: formatPortfolioMoney(inPositions), sub: "Open share value" },
+          { label: "Claimable", value: formatPortfolioMoney(claimableValue), sub: claimableValue > 0 ? "Settled winnings" : "None pending", blue: true },
           { label: "Locked", value: formatPortfolioMoney(lockedOrdersValue), sub: openOrdersCount ? `${openOrdersCount} order${openOrdersCount !== 1 ? "s" : ""}` : clobReady ? "None resting" : "Needs CLOB", gold: true },
         ].map((item) => (
           <div
             key={item.label}
             className={cn(
               "rounded-2xl border p-4",
-              (item as any).gold
+              (item as any).blue
+                ? "border-[oklch(0.70_0.11_210/0.24)] bg-[oklch(0.70_0.11_210/0.07)]"
+                : (item as any).gold
                 ? "border-[oklch(0.78_0.16_82/0.18)] bg-[oklch(0.78_0.16_82/0.05)]"
                 : "border-[oklch(0.20_0.014_255)] bg-[oklch(0.12_0.012_260/0.65)]"
             )}
@@ -377,8 +388,9 @@ function BalanceLedgerCard({
       <BalanceBar
         liquid={liquidPusd ?? 0}
         inPositions={inPositions}
+        claimable={claimableValue}
         locked={lockedOrdersValue}
-        total={(liquidPusd ?? 0) + inPositions + lockedOrdersValue}
+        total={(liquidPusd ?? 0) + inPositions + claimableValue + lockedOrdersValue}
       />
 
       {/* Status indicator — compact, no technical plumbing */}
@@ -392,6 +404,111 @@ function BalanceLedgerCard({
         )}
       >
         {statusMessage}
+      </div>
+    </div>
+  );
+}
+
+function claimActionLabel(status: string, active: boolean) {
+  if (!active) return "Claim";
+  if (status === "preparing") return "Preparing";
+  if (status === "signing") return "Sign claim";
+  if (status === "approving") return "Approving";
+  if (status === "claiming") return "Claiming";
+  if (status === "confirming") return "Confirming";
+  if (status === "claimed") return "Claimed";
+  return "Claim";
+}
+
+function ClaimableSettlementsCard({
+  groups,
+  total,
+  status,
+  claimingKey,
+  busy,
+  relayedMode,
+  onClaim,
+  onClaimAll,
+}: {
+  groups: ClaimablePositionGroup[];
+  total: number;
+  status: string;
+  claimingKey: string | null;
+  busy: boolean;
+  relayedMode: boolean;
+  onClaim: (group: ClaimablePositionGroup) => void;
+  onClaimAll: () => void;
+}) {
+  if (!groups.length) return null;
+
+  return (
+    <div className="surface-card rounded-2xl border border-[oklch(0.70_0.11_210/0.25)] bg-[oklch(0.70_0.11_210/0.05)] p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[oklch(0.70_0.11_210/0.28)] bg-[oklch(0.70_0.11_210/0.10)]">
+            <CircleDollarSign className="h-5 w-5 text-[oklch(0.76_0.13_210)]" />
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.76_0.13_210)]">Claimable settlements</div>
+            <div className="mt-1 text-xl font-bold tracking-tight text-foreground sm:text-2xl">{formatPortfolioMoney(total)}</div>
+            <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
+              Settled winning shares are still position tokens until claimed. Claiming converts them into pUSD.
+              {relayedMode ? " This account will use Rawli's deposit-wallet relayer." : ""}
+            </p>
+          </div>
+        </div>
+
+        {groups.length > 1 && (
+          <Button
+            type="button"
+            onClick={onClaimAll}
+            disabled={busy}
+            className="h-11 rounded-xl bg-[oklch(0.78_0.16_82)] px-4 text-sm font-bold text-[oklch(0.10_0.012_260)] hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-50 sm:h-9 sm:text-xs"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5" /> : <CheckCircle2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />}
+            Claim all
+          </Button>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-2">
+        {groups.map((group) => {
+          const active = claimingKey === group.key;
+          return (
+            <div
+              key={group.key}
+              className="flex flex-col gap-3 rounded-xl border border-[oklch(0.20_0.014_255)] bg-[oklch(0.10_0.012_260/0.65)] p-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-foreground">{group.title}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  <span>{group.outcome}</span>
+                  <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
+                  <span>{formatPortfolioNumber(group.size)} sh</span>
+                  {group.negRisk && (
+                    <>
+                      <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
+                      <span>Neg risk</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 sm:justify-end">
+                <div className="font-mono text-base font-bold text-[oklch(0.76_0.13_210)]">{formatPortfolioMoney(group.value)}</div>
+                <Button
+                  type="button"
+                  onClick={() => onClaim(group)}
+                  disabled={busy}
+                  className="h-10 min-w-[104px] rounded-xl bg-[oklch(0.78_0.16_82)] px-4 text-sm font-bold text-[oklch(0.10_0.012_260)] hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-50 sm:h-9 sm:text-xs"
+                >
+                  {active && busy ? <Loader2 className="h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5" /> : <CheckCircle2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />}
+                  {claimActionLabel(status, active)}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -457,6 +574,29 @@ function PortfolioContent() {
   const closedPositions = data?.closedPositions ?? [];
   const trades = data?.trades ?? [];
   const allErrors = error ?? tradingProfile.error ?? portfolio.error ?? fundingStatus.error ?? clobSession.error;
+  const claimableGroups = useMemo(() => groupClaimablePositions(closedPositions), [closedPositions]);
+  const claimableValue = useMemo(
+    () => claimableGroups.reduce((total, group) => total + group.value, 0),
+    [claimableGroups]
+  );
+
+  const refreshAfterClaim = useCallback(async () => {
+    await Promise.allSettled([
+      portfolio.refresh(),
+      fundingStatus.refresh(),
+      readiness.refresh(),
+      clobSession.refreshBalanceAllowance(),
+    ]);
+    scheduleAccountRefresh({ reason: "settled_position_claimed", address: tradingWalletAddress });
+  }, [clobSession, fundingStatus, portfolio, readiness, tradingWalletAddress]);
+
+  const settledClaims = useSettledPositionClaims({
+    wallet: connectedWallet,
+    ownerAddress: walletAddress,
+    tradingWalletAddress,
+    tradingWalletKind: tradingProfile.profile?.tradingWalletKind ?? null,
+    onClaimed: refreshAfterClaim,
+  });
 
   const stats = useMemo(() => {
     const openValue = openPositions.reduce((t: number, p: any) => t + getPositionValue(p), 0);
@@ -481,7 +621,7 @@ function PortfolioContent() {
   const spendablePusd = pUsdBalance === null || pUsdAllowance === null ? null : Math.min(pUsdBalance, pUsdAllowance);
   const openOrderSummary = useMemo(() => summarizeOpenOrders(clobSession.openOrders), [clobSession.openOrders]);
   const liquidPusd = spendablePusd === null ? null : Math.max(0, spendablePusd - openOrderSummary.buyCollateral);
-  const accountValue = (pUsdBalance ?? 0) + stats.openValue;
+  const accountValue = (pUsdBalance ?? 0) + stats.openValue + claimableValue;
 
   const accountRefreshRef = useRef({
     portfolioRefresh: portfolio.refresh, fundingRefresh: fundingStatus.refresh,
@@ -620,6 +760,33 @@ function PortfolioContent() {
     void portfolio.refresh();
   };
 
+  useEffect(() => {
+    if (!settledClaims.error) return;
+    toast.error("Claim failed", { description: settledClaims.error });
+  }, [settledClaims.error]);
+
+  const handleClaimGroup = async (group: ClaimablePositionGroup) => {
+    const result = await settledClaims.claim(group);
+    if (!result) return;
+    toast.success("Claim submitted", {
+      description: result.relayed
+        ? "Rawli relayed the deposit-wallet redemption. Balance will refresh after confirmation."
+        : result.txHash
+        ? `Redeem tx ${shortHash(result.txHash)} confirmed.`
+        : "Settled winnings are being converted to pUSD.",
+    });
+  };
+
+  const handleClaimAll = async () => {
+    for (const group of claimableGroups) {
+      const result = await settledClaims.claim(group);
+      if (!result) return;
+    }
+    toast.success("Claims submitted", {
+      description: "Claimable settled positions were sent for redemption.",
+    });
+  };
+
   return (
     <div className="terminal-grid-bg ambient-glow flex min-h-screen flex-col bg-background">
       <Navbar />
@@ -684,6 +851,12 @@ function PortfolioContent() {
               )}>
                 {data ? portfolio.summary.realized : "$0.00"}
               </span>
+              {claimableValue > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.70_0.11_210/0.28)] bg-[oklch(0.70_0.11_210/0.08)] px-2.5 py-1 text-[10px] font-semibold text-[oklch(0.76_0.13_210)]">
+                  <CircleDollarSign className="h-2.5 w-2.5" />
+                  Claimable {formatPortfolioMoney(claimableValue)}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -720,6 +893,12 @@ function PortfolioContent() {
               )}>
                 Realized {data ? portfolio.summary.realized : "—"}
               </span>
+              {claimableValue > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.70_0.11_210/0.28)] bg-[oklch(0.70_0.11_210/0.08)] px-2.5 py-1 text-[10px] font-semibold text-[oklch(0.76_0.13_210)]">
+                  <CircleDollarSign className="h-2.5 w-2.5" />
+                  Claimable {formatPortfolioMoney(claimableValue)}
+                </span>
+              )}
               {portfolio.loading ? (
                 <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" /> Syncing
@@ -794,11 +973,12 @@ function PortfolioContent() {
         )}
 
         {/* ── Top stats strip ─────────────────────────────── */}
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
             { label: "Trade route", value: tradingWalletAddress ? "Ready" : "Pending", icon: ShieldCheck, tone: tradingWalletAddress ? "positive" : "gold" as const },
             { label: "Open positions", value: data ? String(openPositions.length) : "—", icon: Layers3, tone: "gold" as const },
             { label: "Closed positions", value: data ? String(closedPositions.length) : "—", icon: CheckCircle2, tone: stats.realizedPositive ? "positive" as const : "negative" as const },
+            { label: "Claimable", value: data ? formatPortfolioMoney(claimableValue) : "—", icon: CircleDollarSign, tone: claimableValue > 0 ? "positive" as const : "gold" as const },
             { label: "Avg P/L", value: data ? formatPercent(stats.avgPnlPercent) : "—", icon: stats.avgPnlPercent >= 0 ? TrendingUp : TrendingDown, tone: stats.avgPnlPercent >= 0 ? "positive" as const : "negative" as const },
           ].map(({ label, value, icon: Icon, tone }) => (
             <div key={label} className="surface-card rounded-2xl p-3 sm:p-4">
@@ -819,7 +999,7 @@ function PortfolioContent() {
         <div className="mt-4">
           <BalanceLedgerCard
             pUsdBalance={pUsdBalance} pUsdAllowance={pUsdAllowance} spendablePusd={spendablePusd}
-            liquidPusd={liquidPusd} inPositions={stats.openValue} lockedOrdersValue={openOrderSummary.totalValue}
+            liquidPusd={liquidPusd} inPositions={stats.openValue} claimableValue={claimableValue} lockedOrdersValue={openOrderSummary.totalValue}
             lockedBuyCollateral={openOrderSummary.buyCollateral} lockedSellValue={openOrderSummary.sellValue}
             lockedSellShares={openOrderSummary.sellShares} openOrdersCount={clobSession.openOrders.length}
             accountValue={accountValue} collateralLoading={readiness.loading} collateralError={readiness.error}
@@ -830,6 +1010,21 @@ function PortfolioContent() {
             tradingWalletAddress={tradingWalletAddress}
           />
         </div>
+
+        {claimableGroups.length > 0 && (
+          <div className="mt-4">
+            <ClaimableSettlementsCard
+              groups={claimableGroups}
+              total={claimableValue}
+              status={settledClaims.status}
+              claimingKey={settledClaims.claimingKey}
+              busy={settledClaims.busy}
+              relayedMode={settledClaims.relayedMode}
+              onClaim={handleClaimGroup}
+              onClaimAll={handleClaimAll}
+            />
+          </div>
+        )}
 
         {/* ── Tabs ────────────────────────────────────────── */}
         <div className="mt-5 sm:mt-8 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1148,21 +1343,40 @@ function PortfolioContent() {
                   <div className="mt-1 text-base font-semibold text-foreground">{closedPositions.length} resolved</div>
                 </div>
                 <div className="overflow-x-auto">
-                  <div className="min-w-[640px]">
-                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 border-b border-[oklch(0.16_0.014_255)] px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      <span>Market</span><span>Size</span><span>Value</span><span className="text-right">Status</span>
+                  <div className="min-w-[760px]">
+                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 border-b border-[oklch(0.16_0.014_255)] px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      <span>Market</span><span>Size</span><span>Value</span><span>Status</span><span className="text-right">Action</span>
                     </div>
-                    {closedPositions.map((pos: any, idx: number) => (
-                      <div
-                        key={`closed-${idx}`}
-                        className="grid grid-cols-[1fr_auto_auto_auto] gap-4 border-b border-[oklch(0.13_0.012_260)] px-5 py-3.5 last:border-0 transition-colors hover:bg-[oklch(0.12_0.012_260/0.5)]"
-                      >
-                        <span className="truncate text-[13px] font-medium text-foreground">{positionLabel(pos)}</span>
-                        <span className="font-mono text-[12px] text-muted-foreground tabular-nums">{formatPortfolioNumber(pos?.size ?? pos?.position_size)}</span>
-                        <span className="font-mono text-[12px] text-muted-foreground tabular-nums">{formatPortfolioMoney(getPositionValue(pos))}</span>
-                        <span className="text-right text-[11px] font-semibold text-muted-foreground">{closedPositionStatus(pos)}</span>
-                      </div>
-                    ))}
+                    {closedPositions.map((pos: any, idx: number) => {
+                      const claimGroup = groupClaimablePositions([pos])[0];
+                      const claimingThis = claimGroup ? settledClaims.claimingKey === claimGroup.key : false;
+                      return (
+                        <div
+                          key={`closed-${idx}`}
+                          className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 border-b border-[oklch(0.13_0.012_260)] px-5 py-3.5 last:border-0 transition-colors hover:bg-[oklch(0.12_0.012_260/0.5)]"
+                        >
+                          <span className="truncate text-[13px] font-medium text-foreground">{positionLabel(pos)}</span>
+                          <span className="font-mono text-[12px] text-muted-foreground tabular-nums">{formatPortfolioNumber(pos?.size ?? pos?.position_size)}</span>
+                          <span className="font-mono text-[12px] text-muted-foreground tabular-nums">{formatPortfolioMoney(getPositionValue(pos))}</span>
+                          <span className="text-[11px] font-semibold text-muted-foreground">{closedPositionStatus(pos)}</span>
+                          <span className="flex justify-end">
+                            {claimGroup ? (
+                              <button
+                                type="button"
+                                onClick={() => handleClaimGroup(claimGroup)}
+                                disabled={settledClaims.busy}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[oklch(0.78_0.16_82)] px-3 text-[11px] font-bold text-[oklch(0.10_0.012_260)] disabled:opacity-50"
+                              >
+                                {claimingThis && settledClaims.busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                                {claimActionLabel(settledClaims.status, claimingThis)}
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">—</span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

@@ -4,12 +4,15 @@ import {
   deployDepositWallet,
   getDepositWalletStatus,
   prepareDepositWalletApproval,
+  prepareDepositWalletClaim,
   prepareDepositWalletWithdraw,
   submitDepositWalletApproval,
+  submitDepositWalletClaim,
   submitDepositWalletWithdraw
 } from "../services/depositWallet.js";
 
 const evmAddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/);
+const bytes32Schema = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
 
 const statusQuerySchema = z.object({
   owner: evmAddressSchema,
@@ -54,6 +57,24 @@ const withdrawSubmitSchema = z.object({
   nonce: z.string().regex(/^\d+$/),
   deadline: z.string().regex(/^\d+$/),
   calls: z.array(depositWalletCallSchema).min(1).max(1),
+  signature: z.string().regex(/^0x[a-fA-F0-9]+$/),
+});
+
+const claimPrepareSchema = z.object({
+  owner: evmAddressSchema,
+  depositWallet: evmAddressSchema,
+  conditionId: bytes32Schema,
+  negRisk: z.boolean().optional(),
+});
+
+const claimSubmitSchema = z.object({
+  owner: evmAddressSchema,
+  depositWallet: evmAddressSchema,
+  conditionId: bytes32Schema,
+  negRisk: z.boolean().optional(),
+  nonce: z.string().regex(/^\d+$/),
+  deadline: z.string().regex(/^\d+$/),
+  calls: z.array(depositWalletCallSchema).min(2).max(2),
   signature: z.string().regex(/^0x[a-fA-F0-9]+$/),
 });
 
@@ -190,6 +211,60 @@ export async function depositWalletRoutes(app: FastifyInstance): Promise<void> {
       ]);
       reply.status(clientErrors.has(err?.message) ? 400 : err?.message === "builder_relayer_not_configured" ? 503 : 502);
       return { ok: false, error: err?.message ?? "deposit_wallet_withdraw_submit_failed" };
+    }
+  });
+
+  app.post("/deposit-wallet/claim/prepare", async (req, reply) => {
+    const parsed = claimPrepareSchema.safeParse(req.body ?? null);
+    if (!parsed.success) {
+      reply.status(400);
+      return { ok: false, error: "invalid_deposit_wallet_claim_prepare_payload", issues: parsed.error.issues };
+    }
+
+    try {
+      return await prepareDepositWalletClaim(
+        parsed.data.owner,
+        parsed.data.depositWallet,
+        parsed.data.conditionId,
+        parsed.data.negRisk
+      );
+    } catch (err: any) {
+      req.log.error({ err }, "Deposit wallet claim prepare failed");
+      const clientErrors = new Set([
+        "deposit_wallet_owner_mismatch",
+        "deposit_wallet_not_deployed",
+        "invalid_condition_id",
+      ]);
+      reply.status(clientErrors.has(err?.message) ? 400 : 502);
+      return { ok: false, error: err?.message ?? "deposit_wallet_claim_prepare_failed" };
+    }
+  });
+
+  app.post("/deposit-wallet/claim/submit", async (req, reply) => {
+    const parsed = claimSubmitSchema.safeParse(req.body ?? null);
+    if (!parsed.success) {
+      reply.status(400);
+      return { ok: false, error: "invalid_deposit_wallet_claim_submit_payload", issues: parsed.error.issues };
+    }
+
+    try {
+      return await submitDepositWalletClaim(parsed.data);
+    } catch (err: any) {
+      req.log.error({ err }, "Deposit wallet claim submit failed");
+      const clientErrors = new Set([
+        "deposit_wallet_owner_mismatch",
+        "deposit_wallet_not_deployed",
+        "deposit_wallet_deadline_too_soon",
+        "deposit_wallet_signature_owner_mismatch",
+        "stale_deposit_wallet_batch",
+        "expired_deposit_wallet_batch",
+        "invalid_deposit_wallet_deadline",
+        "deposit_wallet_batch_mismatch",
+        "invalid_signature",
+        "invalid_condition_id",
+      ]);
+      reply.status(clientErrors.has(err?.message) ? 400 : err?.message === "builder_relayer_not_configured" ? 503 : 502);
+      return { ok: false, error: err?.message ?? "deposit_wallet_claim_submit_failed" };
     }
   });
 }
