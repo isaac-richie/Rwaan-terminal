@@ -256,7 +256,8 @@ export type TechnicalAnalysis = {
   volumeProfile: "increasing" | "decreasing" | "flat";
   // VWAP + ATR
   vwapDistance: number;
-  volatilityPct: number;
+  volatilityPct: number;       // ATR(1h)/price * 100 — short-term range proxy
+  realizedVolDailyPct: number; // statistical daily σ (% ) from OHLC log-returns (Garman-Klass + EWMA)
   // External data
   funding: FundingData | null;
   fearGreed: FearGreedData | null;
@@ -1026,6 +1027,58 @@ function computeATR(candles: Candle[], period: number = 14): number {
     sum += tr;
   }
   return sum / period;
+}
+
+/**
+ * Industry-standard realized daily volatility from OHLC log-returns.
+ *
+ * Primary estimator is close-to-close return variance — the unbiased, textbook
+ * realized-variance measure that maps directly to the GBM the probability model
+ * assumes. We weight it with an EWMA (RiskMetrics λ=0.94) so the recent regime
+ * dominates, blended with the equal-weight sample mean for stability. A bias-
+ * corrected Garman–Klass component (uses the intrabar range for efficiency) is
+ * mixed in lightly. Returns daily σ as a fraction (e.g. 0.035 = 3.5%/day).
+ *
+ * This replaces ATR — a smoothed range proxy — with a real statistical estimate
+ * of how far price actually travels, which is what the probability model needs.
+ */
+export function computeRealizedDailyVol(candles: Candle[], barsPerDay: number): number | null {
+  if (candles.length < 24) return null;
+  const LAMBDA = 0.94; // RiskMetrics EWMA decay
+  // Garman–Klass underestimates ~30% on discretely-sampled candles (observed H/L is
+  // tighter than the true continuous range); correct it back to a comparable scale.
+  const GK_BIAS_CORRECTION = 1 / 0.49; // variance scale (≈ (1/0.7)^2)
+
+  const ccVar: number[] = []; // close-to-close per-bar variance (unbiased)
+  const gkVar: number[] = []; // bias-corrected Garman–Klass per-bar variance
+  for (let i = 1; i < candles.length; i++) {
+    const c = candles[i];
+    const prev = candles[i - 1];
+    if (!(c.open > 0 && c.high > 0 && c.low > 0 && c.close > 0 && prev.close > 0) || c.high < c.low) continue;
+    const rcc = Math.log(c.close / prev.close);
+    ccVar.push(rcc * rcc);
+    const lnHL = Math.log(c.high / c.low);
+    const lnCO = Math.log(c.close / c.open);
+    const gk = 0.5 * lnHL * lnHL - (2 * Math.LN2 - 1) * lnCO * lnCO;
+    gkVar.push(Number.isFinite(gk) && gk >= 0 ? gk * GK_BIAS_CORRECTION : rcc * rcc);
+  }
+  if (ccVar.length < 12) return null;
+
+  const ewma = (series: number[]) => {
+    let v = series[0];
+    for (let i = 1; i < series.length; i++) v = LAMBDA * v + (1 - LAMBDA) * series[i];
+    return v;
+  };
+  const mean = (series: number[]) => series.reduce((a, b) => a + b, 0) / series.length;
+
+  // Per-estimator: lean on recent (EWMA) regime, anchor 30% to the longer sample mean.
+  const ccPerBar = 0.7 * ewma(ccVar) + 0.3 * mean(ccVar);
+  const gkPerBar = 0.7 * ewma(gkVar) + 0.3 * mean(gkVar);
+  // Blend: close-to-close is unbiased and primary; GK adds efficiency.
+  const perBarVariance = 0.6 * ccPerBar + 0.4 * gkPerBar;
+
+  const dailyVol = Math.sqrt(Math.max(perBarVariance * barsPerDay, 1e-10));
+  return Number.isFinite(dailyVol) && dailyVol > 0 ? dailyVol : null;
 }
 
 // ─── Volume profile ─────────────────────────────────────────────────────────
@@ -2764,17 +2817,21 @@ function estimateYesProbability(params: {
   target: number | null;
   yesMeansUp: boolean;
   comparator: "above" | "below" | "reach" | null;
-  netScore: number;       // -100..100 technical bias
-  volatilityPct: number;  // ATR(1h)/price * 100
+  netScore: number;          // -100..100 technical bias
+  dailyVolPct: number;       // statistical daily σ in % (Garman-Klass + EWMA)
+  volatilityPct: number;     // ATR(1h)/price * 100 — fallback only
   days: number;
   regime: Regime;
-  signalAgreement: number; // 0-100
+  signalAgreement: number;   // 0-100
 }): { pYes: number; sigmaT: number; gapPct: number | null } {
-  const { price, target, yesMeansUp, comparator, netScore, volatilityPct, days, regime, signalAgreement } = params;
+  const { price, target, yesMeansUp, comparator, netScore, dailyVolPct, volatilityPct, days, regime, signalAgreement } = params;
 
-  // Daily σ from ATR(1h): scale to a day (√24) and convert ATR→stdev (~÷1.2).
-  const sigmaDaily = Math.max(0.005, ((volatilityPct || 1) / 100) * Math.sqrt(24) / 1.2);
-  let sigmaT = sigmaDaily * Math.sqrt(Math.max(days, 0.25));
+  // Prefer statistical daily σ; fall back to the ATR-derived proxy only if missing.
+  const sigmaDaily =
+    dailyVolPct > 0
+      ? dailyVolPct / 100
+      : Math.max(0.005, ((volatilityPct || 1) / 100) * Math.sqrt(24) / 1.2);
+  let sigmaT = Math.max(0.005, sigmaDaily) * Math.sqrt(Math.max(days, 0.25));
   // Widen the distribution when the read is unreliable (volatile regime / low agreement)
   // so we don't over-state conviction.
   if (regime === "volatile") sigmaT *= 1.25;
@@ -2890,6 +2947,7 @@ export function deriveMarketAwareVerdict(
     yesMeansUp,
     comparator: pq.comparator,
     netScore,
+    dailyVolPct: ta.realizedVolDailyPct,
     volatilityPct: ta.volatilityPct,
     days,
     regime: ta.regime,
@@ -3060,6 +3118,13 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
     const vwapDistance = vwap > 0 ? ((price - vwap) / vwap) * 100 : 0;
     const atr = computeATR(candles1h, 14);
     const volatilityPct = price > 0 ? (atr / price) * 100 : 0;
+    // Statistical daily volatility (Garman-Klass + EWMA). Prefer 4h candles (more
+    // samples, less microstructure noise); fall back to 1h, then to the ATR proxy.
+    const realizedDailyVol =
+      computeRealizedDailyVol(candles4h, 6) ??
+      computeRealizedDailyVol(candles1h, 24) ??
+      (volatilityPct > 0 ? (volatilityPct / 100) * Math.sqrt(24) / 1.2 : 0.03);
+    const realizedVolDailyPct = realizedDailyVol * 100;
     const volumeProfile = analyzeVolumeProfile(candles1h);
 
     // ─── Regime ───
@@ -3147,6 +3212,7 @@ export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnal
       rsi14,
       rsiDivergence,
       multiTfRsi,
+      realizedVolDailyPct,
       obv,
       volumeProfile,
       vwapDistance: Math.round(vwapDistance * 100) / 100,
