@@ -2737,7 +2737,72 @@ export type MarketAwareVerdict = {
   taRelevant: boolean;      // false → question isn't about price; TA must not drive the verdict
   polarity: CryptoPriceQuestion;
   mappingNote: string;
+  probability: number;      // calibrated P(YES), 0-1
 };
+
+// Standard normal CDF (Abramowitz & Stegun 7.1.26) — no external deps.
+function normCdf(x: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989422804014327 * Math.exp((-x * x) / 2);
+  const p =
+    d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return x >= 0 ? 1 - p : p;
+}
+
+/**
+ * Calibrated P(YES) for a crypto price question, modelling price as a random walk
+ * (geometric Brownian motion) over the remaining horizon, with a small directional
+ * drift contributed by the technical read. These threshold questions ARE effectively
+ * options, so a volatility-based terminal/barrier distribution is the right base rate;
+ * the TA signal only tilts it.
+ */
+function estimateYesProbability(params: {
+  price: number;
+  target: number | null;
+  yesMeansUp: boolean;
+  comparator: "above" | "below" | "reach" | null;
+  netScore: number;       // -100..100 technical bias
+  volatilityPct: number;  // ATR(1h)/price * 100
+  days: number;
+  regime: Regime;
+  signalAgreement: number; // 0-100
+}): { pYes: number; sigmaT: number; gapPct: number | null } {
+  const { price, target, yesMeansUp, comparator, netScore, volatilityPct, days, regime, signalAgreement } = params;
+
+  // Daily σ from ATR(1h): scale to a day (√24) and convert ATR→stdev (~÷1.2).
+  const sigmaDaily = Math.max(0.005, ((volatilityPct || 1) / 100) * Math.sqrt(24) / 1.2);
+  let sigmaT = sigmaDaily * Math.sqrt(Math.max(days, 0.25));
+  // Widen the distribution when the read is unreliable (volatile regime / low agreement)
+  // so we don't over-state conviction.
+  if (regime === "volatile") sigmaT *= 1.25;
+  if (signalAgreement < 50) sigmaT *= 1.15;
+  sigmaT = Math.max(0.01, sigmaT);
+
+  // TA drift as a fraction of horizon σ (bounded): max read tilts ~0.6σ.
+  const drift = (Math.max(-100, Math.min(100, netScore)) / 100) * 0.6 * sigmaT;
+
+  // Directional question with no explicit target → P(end higher/lower than now).
+  if (!target || price <= 0) {
+    const pUp = normCdf(drift / sigmaT); // P(S_T >= S)
+    const pYes = yesMeansUp ? pUp : 1 - pUp;
+    return { pYes: Math.min(0.95, Math.max(0.05, pYes)), sigmaT, gapPct: null };
+  }
+
+  const logK = Math.log(target / price); // >0 if target above current
+  // Endpoint probability the terminal price satisfies the threshold.
+  const pAbove = normCdf((drift - logK) / sigmaT); // P(S_T >= target)
+  let pYes = yesMeansUp ? pAbove : 1 - pAbove;
+
+  // "reach/hit/touch" = barrier-touch any time before T, not just at expiry.
+  // Reflection principle: touch prob ≈ 2× endpoint prob (capped), when not yet crossed.
+  if (comparator === "reach") {
+    const alreadyThere = (yesMeansUp && price >= target) || (!yesMeansUp && price <= target);
+    pYes = alreadyThere ? 0.985 : Math.min(0.985, pYes * 2);
+  }
+
+  const gapPct = yesMeansUp ? ((target - price) / price) * 100 : ((price - target) / price) * 100;
+  return { pYes: Math.min(0.97, Math.max(0.03, pYes)), sigmaT, gapPct };
+}
 
 /**
  * Translate the asset-level TA verdict into an answer to the actual market question.
@@ -2766,6 +2831,7 @@ export function deriveMarketAwareVerdict(
       polarity: pq,
       mappingNote:
         "This is not a direct price-threshold question, so live technicals are contextual only and should not determine the YES/NO verdict.",
+      probability: 0.5,
     };
   }
 
@@ -2782,64 +2848,50 @@ export function deriveMarketAwareVerdict(
   const assetBias: "bullish" | "bearish" | "neutral" =
     netScore > 8 ? "bullish" : netScore < -8 ? "bearish" : "neutral";
 
-  let score = 0; // positive favours YES
-  let distanceNote = "";
+  const days = daysUntil(endDate) ?? 7; // default ~1-week horizon when unknown
 
-  // ── Threshold reachability (only when a concrete $ target exists) ──
-  if (pq.target && price > 0) {
-    const days = daysUntil(endDate) ?? 7; // default ~1-week horizon when unknown
-    // ATR(1h) % scaled to the horizon via random-walk sqrt-time as a rough expected move.
-    const expectedMovePct = Math.max(1, (ta.volatilityPct || 1) * Math.sqrt(24 * Math.max(days, 0.25)));
-    const gapPct = yesMeansUp
-      ? ((pq.target - price) / price) * 100 // YES needs price to RISE this much
-      : ((price - pq.target) / price) * 100; // YES needs price to FALL this much
+  // ── Calibrated P(YES) from a volatility-based terminal/barrier model + TA drift ──
+  const { pYes, sigmaT, gapPct } = estimateYesProbability({
+    price,
+    target: pq.target,
+    yesMeansUp,
+    comparator: pq.comparator,
+    netScore,
+    volatilityPct: ta.volatilityPct,
+    days,
+    regime: ta.regime,
+    signalAgreement: base.signalAgreement,
+  });
 
-    if (gapPct <= 0) {
-      // Current price is already on the YES side — YES only needs to hold.
-      score += 30;
-      distanceNote = `Price is already ${yesMeansUp ? "above" : "below"} the $${pq.target.toLocaleString()} threshold; YES only needs to hold.`;
-    } else {
-      const touchLenient = pq.comparator === "reach" ? 0.7 : 1; // touching is easier than closing past
-      const ratio = (gapPct / expectedMovePct) * touchLenient;
-      if (ratio <= 0.5) score += 18;
-      else if (ratio <= 1) score += 4;
-      else if (ratio <= 2) score -= 22;
-      else score -= 42;
-      distanceNote = `Target is ${gapPct.toFixed(1)}% away vs ~${expectedMovePct.toFixed(1)}% expected move over ${days.toFixed(1)}d (${ratio.toFixed(2)}× expected).`;
-    }
-  }
+  // When we had to guess polarity, pull the estimate toward 50/50.
+  const adjustedPYes = ambiguousPolarity ? 0.5 + (pYes - 0.5) * 0.5 : pYes;
 
-  // ── Drift component: does the asset's technical bias push toward YES? ──
-  const biasTowardYes = yesMeansUp ? netScore : -netScore; // flip for "down" questions
-  score += Math.max(-100, Math.min(100, biasTowardYes)) * 0.4;
-
-  const direction: "YES" | "NO" = score >= 0 ? "YES" : "NO";
-
-  // ── Confidence ──
-  let confidence = Math.abs(score) * 0.9 + 18;
-  if (ambiguousPolarity) confidence = Math.min(confidence, 45); // we guessed the polarity
-  if (assetBias === "neutral" && !pq.target) confidence = Math.min(confidence, 50);
-  // Blend with the engine's own conviction so a strong technical read still reads strong.
-  confidence = Math.round(confidence * 0.6 + base.confidence * 0.4);
-  confidence = Math.max(12, Math.min(92, confidence));
+  const direction: "YES" | "NO" = adjustedPYes >= 0.5 ? "YES" : "NO";
+  // Confidence = probability of the side we're calling (calibrated, not vanity).
+  const winningProb = Math.max(adjustedPYes, 1 - adjustedPYes);
+  const confidence = Math.max(50, Math.min(95, Math.round(winningProb * 100)));
 
   const polarityText = ambiguousPolarity
     ? "Question polarity is ambiguous"
     : yesMeansUp
     ? "Market YES requires price to rise to / stay above the target"
     : "Market YES requires price to fall to / stay below the target";
+  const distanceNote =
+    gapPct !== null && pq.target
+      ? ` Target ${pq.target.toLocaleString()} is ${gapPct >= 0 ? gapPct.toFixed(1) + "% away" : Math.abs(gapPct).toFixed(1) + "% already in-the-money"}; horizon σ ≈ ${(sigmaT * 100).toFixed(1)}% over ${days.toFixed(1)}d.`
+      : "";
   const mappingNote =
-    `${polarityText}. Asset technicals read ${assetBias} (net ${netScore > 0 ? "+" : ""}${netScore.toFixed(0)}).` +
-    (distanceNote ? ` ${distanceNote}` : "");
+    `${polarityText}. Asset technicals read ${assetBias} (net ${netScore > 0 ? "+" : ""}${netScore.toFixed(0)}). ` +
+    `Modelled P(YES) ≈ ${(adjustedPYes * 100).toFixed(0)}%.${distanceNote}`;
 
   const verdict: ComputedVerdict = {
     ...base,
     direction,
     confidence,
-    verdictRationale: `Market-aware verdict: ${direction} (${confidence}%). ${mappingNote}\n\nUnderlying asset read:\n${base.verdictRationale}`,
+    verdictRationale: `Market-aware verdict: ${direction} (${confidence}% ≈ P(${direction})). ${mappingNote}\n\nUnderlying asset read:\n${base.verdictRationale}`,
   };
 
-  return { verdict, taRelevant: true, polarity: { ...pq, yesMeansUp }, mappingNote };
+  return { verdict, taRelevant: true, polarity: { ...pq, yesMeansUp }, mappingNote, probability: adjustedPYes };
 }
 
 export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnalysis | null> {
