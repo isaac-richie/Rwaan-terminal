@@ -31,6 +31,20 @@ const requestSchema = z.object({
   market: marketSchema
 });
 
+/**
+ * Market-implied P(YES) from the consensus outcome price. Handles both percentage
+ * (0-100) and fractional (0-1) encodings. Returns null for non-binary / unpriced markets.
+ */
+function marketImpliedYesProbability(market: z.infer<typeof marketSchema>): number | null {
+  const outcomes = market.outcomes;
+  if (!outcomes || outcomes.length === 0) return null;
+  const yes = outcomes.find((o) => o.name?.toLowerCase().includes("yes"));
+  const chosen = yes ?? (outcomes.length === 2 ? outcomes[0] : null);
+  if (!chosen || !Number.isFinite(chosen.price)) return null;
+  const frac = chosen.price > 1 ? chosen.price / 100 : chosen.price;
+  return frac > 0 && frac < 1 ? Math.min(0.99, Math.max(0.01, frac)) : null;
+}
+
 export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   app.get("/analysis/quote", async () => {
     return {
@@ -95,15 +109,31 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
           : Promise.resolve(null),
       ]);
 
+      // Market-implied P(YES) from the consensus outcome price — used as the prior
+      // our model blends against (the market is the hardest baseline to beat).
+      const marketImpliedYesProb = marketImpliedYesProbability(market);
+
       // Map the asset-level TA read onto the actual market question so a bullish
       // asset doesn't wrongly resolve a "will it drop below $X" market as YES.
       let taResult = rawTaResult;
       let taMappingNote: string | null = null;
+      let probabilityModel: {
+        modelProbability: number;
+        marketProbability: number | null;
+        blendedProbability: number;
+        edge: number | null;
+      } | null = null;
       if (rawTaResult) {
-        const mapped = deriveMarketAwareVerdict(rawTaResult, market.question, market.endDate);
+        const mapped = deriveMarketAwareVerdict(rawTaResult, market.question, market.endDate, marketImpliedYesProb);
         if (mapped.taRelevant) {
           taResult = { ...rawTaResult, verdict: mapped.verdict };
           taMappingNote = mapped.mappingNote;
+          probabilityModel = {
+            modelProbability: mapped.modelProbability,
+            marketProbability: mapped.marketProbability,
+            blendedProbability: mapped.probability,
+            edge: mapped.edge,
+          };
         } else {
           // Crypto symbol present but the question isn't about price — drop TA so the
           // fundamental engine answers it instead.
@@ -139,6 +169,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         })),
         generatedAt,
         signalHash,
+        // Model vs market probability breakdown (crypto price markets only)
+        ...(probabilityModel && { probabilityModel }),
         // Include full TA metadata when available (crypto markets only)
         ...(taResult && {
           technicalAnalysis: {

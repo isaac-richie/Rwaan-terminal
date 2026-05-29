@@ -2737,7 +2737,10 @@ export type MarketAwareVerdict = {
   taRelevant: boolean;      // false → question isn't about price; TA must not drive the verdict
   polarity: CryptoPriceQuestion;
   mappingNote: string;
-  probability: number;      // calibrated P(YES), 0-1
+  probability: number;          // final blended P(YES), 0-1
+  modelProbability: number;     // our model's standalone P(YES) before blending
+  marketProbability: number | null; // market-implied P(YES) used as prior, if available
+  edge: number | null;          // modelProbability - marketProbability (mispricing signal)
 };
 
 // Standard normal CDF (Abramowitz & Stegun 7.1.26) — no external deps.
@@ -2804,6 +2807,28 @@ function estimateYesProbability(params: {
   return { pYes: Math.min(0.97, Math.max(0.03, pYes)), sigmaT, gapPct };
 }
 
+const clampProb = (p: number) => Math.min(1 - 1e-4, Math.max(1e-4, p));
+const logit = (p: number) => Math.log(clampProb(p) / (1 - clampProb(p)));
+const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+
+/**
+ * Blend our model's P(YES) with the market-implied probability (the outcome price).
+ * The market aggregates real capital and is usually the hardest baseline to beat, so it
+ * acts as the prior; our live-data model tilts it. Blending happens in log-odds space
+ * (the natural scale for probabilities). The divergence (edge) between the two is itself
+ * the alpha signal — a large, confident gap flags a potential mispricing.
+ */
+function blendWithMarket(
+  modelPYes: number,
+  marketPYes: number | null,
+  modelWeight: number
+): { blended: number; edge: number | null } {
+  if (marketPYes === null) return { blended: modelPYes, edge: null };
+  const w = Math.min(0.6, Math.max(0.2, modelWeight));
+  const blended = sigmoid((1 - w) * logit(marketPYes) + w * logit(modelPYes));
+  return { blended, edge: modelPYes - marketPYes };
+}
+
 /**
  * Translate the asset-level TA verdict into an answer to the actual market question.
  *
@@ -2817,11 +2842,16 @@ function estimateYesProbability(params: {
 export function deriveMarketAwareVerdict(
   ta: TechnicalAnalysis,
   question: string,
-  endDate?: string
+  endDate?: string,
+  marketImpliedYesProb?: number | null
 ): MarketAwareVerdict {
   const pq = classifyCryptoPriceQuestion(question);
   const base = ta.verdict;
   const price = ta.currentPrice;
+  const marketPYes =
+    typeof marketImpliedYesProb === "number" && Number.isFinite(marketImpliedYesProb)
+      ? Math.min(0.99, Math.max(0.01, marketImpliedYesProb))
+      : null;
 
   // Not a price question → technicals are contextual colour only.
   if (!pq.isPriceQuestion) {
@@ -2831,7 +2861,10 @@ export function deriveMarketAwareVerdict(
       polarity: pq,
       mappingNote:
         "This is not a direct price-threshold question, so live technicals are contextual only and should not determine the YES/NO verdict.",
-      probability: 0.5,
+      probability: marketPYes ?? 0.5,
+      modelProbability: 0.5,
+      marketProbability: marketPYes,
+      edge: null,
     };
   }
 
@@ -2864,11 +2897,18 @@ export function deriveMarketAwareVerdict(
   });
 
   // When we had to guess polarity, pull the estimate toward 50/50.
-  const adjustedPYes = ambiguousPolarity ? 0.5 + (pYes - 0.5) * 0.5 : pYes;
+  const modelPYes = ambiguousPolarity ? 0.5 + (pYes - 0.5) * 0.5 : pYes;
 
-  const direction: "YES" | "NO" = adjustedPYes >= 0.5 ? "YES" : "NO";
+  // ── Blend with the market-implied probability (the strongest available prior) ──
+  // Our live-data model earns more weight when it has a concrete strike to price and
+  // the technical read is in agreement; otherwise the market consensus dominates.
+  const modelWeight = (pq.target ? 0.45 : 0.35) + (base.signalAgreement >= 70 ? 0.05 : 0) - (ambiguousPolarity ? 0.1 : 0);
+  const { blended, edge } = blendWithMarket(modelPYes, marketPYes, modelWeight);
+  const finalPYes = blended;
+
+  const direction: "YES" | "NO" = finalPYes >= 0.5 ? "YES" : "NO";
   // Confidence = probability of the side we're calling (calibrated, not vanity).
-  const winningProb = Math.max(adjustedPYes, 1 - adjustedPYes);
+  const winningProb = Math.max(finalPYes, 1 - finalPYes);
   const confidence = Math.max(50, Math.min(95, Math.round(winningProb * 100)));
 
   const polarityText = ambiguousPolarity
@@ -2880,9 +2920,16 @@ export function deriveMarketAwareVerdict(
     gapPct !== null && pq.target
       ? ` Target ${pq.target.toLocaleString()} is ${gapPct >= 0 ? gapPct.toFixed(1) + "% away" : Math.abs(gapPct).toFixed(1) + "% already in-the-money"}; horizon σ ≈ ${(sigmaT * 100).toFixed(1)}% over ${days.toFixed(1)}d.`
       : "";
+  const marketNote =
+    marketPYes !== null
+      ? ` Market implies ${(marketPYes * 100).toFixed(0)}%, our model ${(modelPYes * 100).toFixed(0)}% → blended ${(finalPYes * 100).toFixed(0)}%.` +
+        (edge !== null && Math.abs(edge) >= 0.12
+          ? ` ⚠ ${Math.abs(edge * 100).toFixed(0)}pt divergence from market — potential ${edge > 0 ? "under" : "over"}pricing of YES.`
+          : "")
+      : ` Modelled P(YES) ≈ ${(modelPYes * 100).toFixed(0)}% (no market price to blend).`;
   const mappingNote =
-    `${polarityText}. Asset technicals read ${assetBias} (net ${netScore > 0 ? "+" : ""}${netScore.toFixed(0)}). ` +
-    `Modelled P(YES) ≈ ${(adjustedPYes * 100).toFixed(0)}%.${distanceNote}`;
+    `${polarityText}. Asset technicals read ${assetBias} (net ${netScore > 0 ? "+" : ""}${netScore.toFixed(0)}).` +
+    `${distanceNote}${marketNote}`;
 
   const verdict: ComputedVerdict = {
     ...base,
@@ -2891,7 +2938,16 @@ export function deriveMarketAwareVerdict(
     verdictRationale: `Market-aware verdict: ${direction} (${confidence}% ≈ P(${direction})). ${mappingNote}\n\nUnderlying asset read:\n${base.verdictRationale}`,
   };
 
-  return { verdict, taRelevant: true, polarity: { ...pq, yesMeansUp }, mappingNote, probability: adjustedPYes };
+  return {
+    verdict,
+    taRelevant: true,
+    polarity: { ...pq, yesMeansUp },
+    mappingNote,
+    probability: finalPYes,
+    modelProbability: modelPYes,
+    marketProbability: marketPYes,
+    edge,
+  };
 }
 
 export async function runTechnicalAnalysis(asset: string): Promise<TechnicalAnalysis | null> {
