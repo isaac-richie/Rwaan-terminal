@@ -180,8 +180,14 @@ function ModelVsMarketStrip({ pm }: { pm: NonNullable<PremiumAnalysis["probabili
   const marketPct = Math.round(pm.marketProbability * 100)
   const edgePts = Math.round(pm.edge * 100)
   const strong = Math.abs(edgePts) >= 12
+  const smallEdge = Math.abs(edgePts) >= 5
   const dir = edgePts > 0 ? "underpricing" : "overpricing"
   const edgeColor = strong ? AMBER : "var(--muted-foreground)"
+  const edgeSummary = strong
+    ? `Our model puts YES ${Math.abs(edgePts)}pts ${edgePts > 0 ? "above" : "below"} the market — a potential ${dir} of YES.`
+    : smallEdge
+      ? `Small ${Math.abs(edgePts)}pt pricing edge, but not enough for a standalone trade.`
+      : "Model and market are broadly aligned, so edge is limited."
 
   return (
     <div className="mt-3 rounded-lg border border-white/5 bg-black/15 p-2.5">
@@ -213,9 +219,7 @@ function ModelVsMarketStrip({ pm }: { pm: NonNullable<PremiumAnalysis["probabili
         </div>
       </div>
       <p className="mt-2 text-[11px] leading-4 text-muted-foreground/70">
-        {strong
-          ? `Our model puts YES ${Math.abs(edgePts)}pts ${edgePts > 0 ? "above" : "below"} the market — a potential ${dir} of YES.`
-          : "Model and market agree — fairly priced, no clear edge."}
+        {edgeSummary}
       </p>
     </div>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"
 
@@ -10,6 +10,11 @@ export type PortfolioResponse = {
   closedPositions?: any[]
   value?: any
   trades?: any[]
+  partial?: boolean
+  warnings?: Array<{
+    source: "positions" | "closedPositions" | "value" | "trades"
+    error: string
+  }>
 }
 
 function firstValueRecord(value: any) {
@@ -227,9 +232,11 @@ export function usePolymarketPortfolio(address?: string | null, pollingMs?: numb
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const dataRef = useRef<PortfolioResponse | null>(null)
 
   const refresh = async () => {
     if (!address) {
+      dataRef.current = null
       setData(null)
       setError(null)
       return
@@ -237,16 +244,43 @@ export function usePolymarketPortfolio(address?: string | null, pollingMs?: numb
 
     setLoading(true)
     setError(null)
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), 12_000)
     try {
-      const res = await fetch(`${API_BASE}/portfolio/${address}`)
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload?.error ?? "Failed to load portfolio")
-      setData(normalizePortfolioResponse(payload as PortfolioResponse))
+      const res = await fetch(`${API_BASE}/portfolio/${address}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      })
+      const rawPayload = await res.text()
+      const payload = rawPayload
+        ? (() => {
+            try {
+              return JSON.parse(rawPayload)
+            } catch {
+              return { error: rawPayload }
+            }
+          })()
+        : {}
+      if (!res.ok) throw new Error(payload?.error ?? payload?.message ?? `Portfolio API returned ${res.status}`)
+      const normalized = normalizePortfolioResponse(payload as PortfolioResponse)
+      dataRef.current = normalized
+      setData(normalized)
       setLastUpdated(new Date())
+      if (normalized.partial) {
+        setError("Some portfolio details are still syncing. Showing the latest available data.")
+      }
     } catch (err: any) {
-      setData(null)
-      setError(err?.message ?? "Portfolio load failed")
+      const hadData = Boolean(dataRef.current)
+      if (!hadData) setData(null)
+      setError(
+        hadData
+          ? "Portfolio connection dipped. Showing the last synced data while Rawli retries."
+          : err?.name === "AbortError"
+            ? "Portfolio load timed out. Pull to refresh or try again in a moment."
+            : err?.message ?? "Portfolio load failed"
+      )
     } finally {
+      window.clearTimeout(timeoutId)
       setLoading(false)
     }
   }

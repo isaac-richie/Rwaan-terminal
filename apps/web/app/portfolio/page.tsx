@@ -573,7 +573,8 @@ function PortfolioContent() {
   const openPositions = data?.positions ?? [];
   const closedPositions = data?.closedPositions ?? [];
   const trades = data?.trades ?? [];
-  const allErrors = error ?? tradingProfile.error ?? portfolio.error ?? fundingStatus.error ?? clobSession.error;
+  const portfolioWarning = portfolio.error && portfolio.data ? portfolio.error : null;
+  const allErrors = error ?? tradingProfile.error ?? (portfolio.data ? null : portfolio.error) ?? fundingStatus.error ?? clobSession.error;
   const claimableGroups = useMemo(() => groupClaimablePositions(closedPositions), [closedPositions]);
   const claimableValue = useMemo(
     () => claimableGroups.reduce((total, group) => total + group.value, 0),
@@ -945,6 +946,13 @@ function PortfolioContent() {
           <div className="mt-5 flex items-start gap-3 rounded-xl border border-[oklch(0.58_0.2_25/0.30)] bg-[oklch(0.58_0.2_25/0.07)] px-4 py-3 text-[12px] text-[oklch(0.68_0.2_25)]">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{allErrors}</span>
+          </div>
+        )}
+
+        {portfolioWarning && !allErrors && (
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-[oklch(0.74_0.16_85/0.30)] bg-[oklch(0.74_0.16_85/0.07)] px-4 py-3 text-[12px] text-[oklch(0.78_0.16_85)]">
+            <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{portfolioWarning}</span>
           </div>
         )}
 

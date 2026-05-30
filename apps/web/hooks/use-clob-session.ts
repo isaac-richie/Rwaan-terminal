@@ -315,8 +315,7 @@ function isApiKeyCreds(value: unknown): value is ApiKeyCreds {
 
 function apiKeyError(value: unknown) {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {}
-  const error = raw.error ?? raw.message
-  return typeof error === "string" ? error : null
+  return extractErrorText(raw.error) ?? extractErrorText(raw.message)
 }
 
 async function createOrDeriveApiKey(client: ClobClient): Promise<ApiKeyCreds> {
@@ -358,9 +357,58 @@ function toSignedOrderPreview(order: SignedOrder, side: "BUY" | "SELL" = "BUY", 
   }
 }
 
+function extractErrorText(value: unknown, depth = 0): string | null {
+  if (value === undefined || value === null || depth > 4) return null
+  if (typeof value === "string") return value.trim() || null
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  if (value instanceof Error) return extractErrorText(value.message, depth + 1)
+  if (Array.isArray(value)) {
+    const parts = value.map((item) => extractErrorText(item, depth + 1)).filter(Boolean)
+    return parts.length ? parts.join(" · ") : null
+  }
+  if (typeof value !== "object") return null
+
+  const raw = value as Record<string, unknown>
+  const directKeys = [
+    "errorMsg",
+    "error_msg",
+    "error",
+    "message",
+    "reason",
+    "details",
+    "detail",
+    "description",
+    "statusText",
+  ]
+
+  for (const key of directKeys) {
+    const text = extractErrorText(raw[key], depth + 1)
+    if (text) return text
+  }
+
+  const nestedKeys = ["data", "body", "response", "result"]
+  for (const key of nestedKeys) {
+    const text = extractErrorText(raw[key], depth + 1)
+    if (text) return text
+  }
+
+  try {
+    const json = JSON.stringify(raw)
+    return json && json !== "{}" ? json : null
+  } catch {
+    return null
+  }
+}
+
 function normalizeOrderSubmission(raw: unknown): OrderSubmission {
   const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {}
   const success = value.success === true
+  const errorMsg =
+    extractErrorText(value.errorMsg) ??
+    extractErrorText(value.error_msg) ??
+    extractErrorText(value.error) ??
+    extractErrorText(value.message) ??
+    extractErrorText(value.reason)
   // Exclude raw HTTP status codes (e.g. "400") from the display status field —
   // they look confusing and the error message already conveys the failure.
   const rawStatus = value.status ? String(value.status) : undefined
@@ -376,7 +424,7 @@ function normalizeOrderSubmission(raw: unknown): OrderSubmission {
       : Array.isArray(value.transactionsHashes)
         ? value.transactionsHashes.map(String)
         : undefined,
-    errorMsg: value.errorMsg ? String(value.errorMsg) : value.error ? String(value.error) : success ? undefined : "Order submission failed.",
+    errorMsg: errorMsg ?? (success ? undefined : "Order submission failed."),
   }
 }
 
@@ -427,7 +475,7 @@ function isWrongChainError(err: unknown) {
 }
 
 function errorMessage(err: unknown, fallback: string) {
-  const raw = err && typeof err === "object" && "message" in err ? String((err as any).message) : String(err ?? "")
+  const raw = extractErrorText(err) ?? ""
   const normalizedRaw = raw.toLowerCase()
 
   if (normalizedRaw.includes("maker address not allowed") || normalizedRaw.includes("deposit wallet flow")) {

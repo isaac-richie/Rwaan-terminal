@@ -132,7 +132,12 @@ function previewErrorLabel(error: string) {
 }
 
 function friendlyTradeError(error?: string | null) {
-  const raw = String(error ?? "").toLowerCase();
+  const message = String(error ?? "").trim();
+  const raw = message.toLowerCase();
+
+  if (!raw) {
+    return "We could not submit that order. Please check the amount and try again in a moment.";
+  }
 
   if (raw.includes("duplicat")) {
     return "This order was already submitted. Sign a fresh order and try again.";
@@ -141,20 +146,45 @@ function friendlyTradeError(error?: string | null) {
   if (
     raw.includes("transfer amount exceeds balance") ||
     raw.includes("insufficient funds") ||
-    raw.includes("insufficient balance")
+    raw.includes("insufficient balance") ||
+    raw.includes("not enough balance") ||
+    raw.includes("not enough funds")
   ) {
     return "Your wallet does not have enough spendable funds for this order. Add funds or lower the amount, then try again.";
+  }
+
+  if (
+    raw.includes("insufficient shares") ||
+    raw.includes("not enough shares") ||
+    raw.includes("insufficient tokens") ||
+    raw.includes("not enough tokens")
+  ) {
+    return "Your wallet does not have enough tradable shares for this sell amount. Lower the amount or refresh the portfolio.";
   }
 
   if (raw.includes("allowance") || raw.includes("approval")) {
     return "This order needs a fresh trading approval before it can be submitted.";
   }
 
+  if (raw.includes("minimum") || raw.includes("min size") || raw.includes("too small") || raw.includes("below min")) {
+    return "That order is below the exchange minimum. Increase the amount and try again.";
+  }
+
+  if (raw.includes("market") && (raw.includes("not found") || raw.includes("lookup failed") || raw.includes("unavailable"))) {
+    return "Rawli could not refresh this market from Polymarket. Wait a moment, then reopen the market.";
+  }
+
   if (raw.includes("market") && raw.includes("closed")) {
     return "This market is closed, so new orders cannot be submitted.";
   }
 
-  if (raw.includes("liquidity") || raw.includes("orderbook")) {
+  if (
+    raw.includes("liquidity") ||
+    raw.includes("orderbook") ||
+    raw.includes("no match") ||
+    raw.includes("not matchable") ||
+    raw.includes("would not be filled")
+  ) {
     return "There is not enough liquidity at that price right now. Try a smaller order or a limit order.";
   }
 
@@ -162,11 +192,15 @@ function friendlyTradeError(error?: string | null) {
     return "Trading is not available for this wallet or region right now.";
   }
 
+  if (raw.includes("signature") || raw.includes("signer") || raw.includes("maker address")) {
+    return "The exchange rejected the signature context. Refresh the page, reconnect the wallet, and sign a fresh order.";
+  }
+
   if (raw.includes("invalid") || raw.includes("bad request") || raw.includes("400")) {
     return "The order was rejected by the exchange. Please sign a new order and try again.";
   }
 
-  return "We could not submit that order. Please check the amount and try again in a moment.";
+  return message.length > 180 ? `Exchange rejected this order: ${message.slice(0, 180)}...` : `Exchange rejected this order: ${message}`;
 }
 
 function resolvesWithinHours(endDate: string | undefined, hours: number) {
