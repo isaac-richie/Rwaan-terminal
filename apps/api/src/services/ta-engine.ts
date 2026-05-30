@@ -2757,14 +2757,22 @@ export function classifyCryptoPriceQuestion(question: string): CryptoPriceQuesti
   const hasDown = DOWN_KEYWORDS.some((k) => q.includes(k));
   const hasReach = REACH_KEYWORDS.some((k) => q.includes(k));
   const hasNonPriceSubject = NON_PRICE_SUBJECTS.some((k) => q.includes(k));
+  // "Up or Down" style directional markets — outcomes are literally Up/Down, YES = Up.
+  // These have no $ target and don't match the threshold keyword lists, so detect them
+  // explicitly and treat as a target-less directional price question.
+  const isUpDownDirectional = /\bup\s*(?:or|\/|vs\.?|&)\s*down\b/.test(q);
 
   // A price question references a $ target and/or directional threshold language,
   // and is not really about a non-price metric (fees, TVL, ETF approval, etc.).
-  const isPriceQuestion = !hasNonPriceSubject && (Boolean(target) || hasUp || hasDown || hasReach);
+  const isPriceQuestion =
+    !hasNonPriceSubject && (Boolean(target) || hasUp || hasDown || hasReach || isUpDownDirectional);
 
   let yesMeansUp: boolean | null = null;
   let comparator: "above" | "below" | "reach" | null = null;
-  if (hasDown && !hasUp) {
+  if (isUpDownDirectional) {
+    yesMeansUp = true; // YES = "Up" (Polymarket lists the Up outcome first)
+    comparator = null; // no threshold — pure directional
+  } else if (hasDown && !hasUp) {
     yesMeansUp = false;
     comparator = "below";
   } else if (hasUp && !hasDown) {
@@ -2856,7 +2864,11 @@ function estimateYesProbability(params: {
   // Mean of the terminal log-return = TA drift tilt (bounded to ~0.6σ) plus the
   // martingale convexity term (−½σ²): with no view the fair baseline is E[S_T]=S₀,
   // which puts the median log-return below zero. Negligible intraday, material at 30-90d.
-  const driftTilt = (Math.max(-100, Math.min(100, netScore)) / 100) * 0.6 * sigmaT;
+  // A 1h/4h technical read says little about a 15-minute outcome, so the directional
+  // edge decays ∝√T for short horizons (full strength only at ~3+ days). This makes
+  // ultra-short "up or down" markets resolve to an honest ~coin-flip, not fake conviction.
+  const horizonEdgeFactor = Math.min(1, Math.sqrt(Math.max(days, 0) / 3));
+  const driftTilt = (Math.max(-100, Math.min(100, netScore)) / 100) * 0.6 * sigmaT * horizonEdgeFactor;
   const m = driftTilt - 0.5 * sigmaT * sigmaT;
 
   // Directional question with no explicit target → P(end higher/lower than now).
@@ -2987,8 +2999,12 @@ export function deriveMarketAwareVerdict(
   const winningProb = Math.max(finalPYes, 1 - finalPYes);
   const confidence = Math.max(50, Math.min(95, Math.round(winningProb * 100)));
 
+  // Directional (no-target) market, e.g. "Up or Down".
+  const directional = !pq.target && pq.comparator === null;
   const polarityText = ambiguousPolarity
     ? "Question polarity is ambiguous"
+    : directional
+    ? `Market YES = price ${yesMeansUp ? "higher" : "lower"} at resolution (directional)`
     : yesMeansUp
     ? "Market YES requires price to rise to / stay above the target"
     : "Market YES requires price to fall to / stay below the target";
@@ -3003,9 +3019,15 @@ export function deriveMarketAwareVerdict(
           ? ` ⚠ ${Math.abs(edge * 100).toFixed(0)}pt divergence from market — potential ${edge > 0 ? "under" : "over"}pricing of YES.`
           : "")
       : ` Modelled P(YES) ≈ ${(modelPYes * 100).toFixed(0)}% (no market price to blend).`;
+  // Be explicit when there is genuinely no actionable edge (near coin-flip, or an
+  // ultra-short directional market where short-term TA can't predict the outcome).
+  const noEdge = Math.abs(finalPYes - 0.5) < 0.04 || (directional && days < 1);
+  const coinFlipNote = noEdge
+    ? " No actionable edge — this is effectively a coin flip at this horizon."
+    : "";
   const mappingNote =
     `${polarityText}. Asset technicals read ${assetBias} (net ${netScore > 0 ? "+" : ""}${netScore.toFixed(0)}).` +
-    `${distanceNote}${marketNote}`;
+    `${distanceNote}${marketNote}${coinFlipNote}`;
 
   const verdict: ComputedVerdict = {
     ...base,
