@@ -1480,7 +1480,7 @@ function LoadingState({ status }: { status: string }) {
   return (
     <div className="flex min-h-[400px] flex-col items-center justify-center py-8 space-y-4">
       <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      <p className="text-sm font-medium text-foreground">
+      <p key={status} className="text-sm font-medium text-foreground">
         {messages[status] ?? "Processing..."}
       </p>
       <p className="text-xs text-muted-foreground">Estimated ~30 seconds</p>

@@ -989,23 +989,25 @@ export function BnbFundingModal({
                 ) : (
                   <Route className="w-4 h-4" />
                 )}
-                {withdrawStatus === "preparing"
-                  ? "Preparing withdrawal route..."
-                  : withdrawStatus === "switching"
-                  ? depositWalletWithdrawMode
-                    ? "Preparing relayed transfer..."
-                    : "Switching to Polygon..."
-                  : withdrawStatus === "sending"
-                  ? depositWalletWithdrawMode
-                    ? "Sign withdrawal..."
-                    : "Confirm pUSD transfer..."
-                  : withdrawStatus === "confirming"
-                  ? depositWalletWithdrawMode
-                    ? "Relaying transfer..."
-                    : "Confirming transfer..."
-                  : withdrawStatus === "done"
-                  ? "Withdrawal transfer sent ✓"
-                  : "Withdraw pUSD"}
+                <span key={`${withdrawStatus}:${depositWalletWithdrawMode}`}>
+                  {withdrawStatus === "preparing"
+                    ? "Preparing withdrawal route..."
+                    : withdrawStatus === "switching"
+                    ? depositWalletWithdrawMode
+                      ? "Preparing relayed transfer..."
+                      : "Switching to Polygon..."
+                    : withdrawStatus === "sending"
+                    ? depositWalletWithdrawMode
+                      ? "Sign withdrawal..."
+                      : "Confirm pUSD transfer..."
+                    : withdrawStatus === "confirming"
+                    ? depositWalletWithdrawMode
+                      ? "Relaying transfer..."
+                      : "Confirming transfer..."
+                    : withdrawStatus === "done"
+                    ? "Withdrawal transfer sent ✓"
+                    : "Withdraw pUSD"}
+                </span>
               </Button>
             </div>
           )}
@@ -1068,17 +1070,19 @@ export function BnbFundingModal({
               {!depositAddress ? (
                 <Button onClick={handlePrepareAddress} disabled={!profile || loadingDeposit} className="gap-2">
                   <Wallet className="w-4 h-4" />
-                  {loadingDeposit ? "Preparing" : "Prepare address"}
+                  <span key={loadingDeposit ? "prep" : "ready"}>{loadingDeposit ? "Preparing" : "Prepare address"}</span>
                 </Button>
               ) : (
                 <>
                   <Button onClick={handleSendFromWallet} disabled={sendDisabled} className="gap-2">
                     {sendStatus === "sending" || sendStatus === "confirming" || sendStatus === "switching" ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 key="spin" className="w-4 h-4 animate-spin" />
                     ) : (
-                      <Send className="w-4 h-4" />
+                      <Send key="send" className="w-4 h-4" />
                     )}
-                    {sendLabel}
+                    {/* keyed span → React swaps the node on label change so in-app
+                        browsers repaint cleanly instead of ghosting the old text */}
+                    <span key={sendLabel}>{sendLabel}</span>
                   </Button>
                   <Button onClick={copyDepositAddress} variant="secondary" className="gap-2">
                     <Copy className="w-4 h-4" />
