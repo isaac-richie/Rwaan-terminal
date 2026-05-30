@@ -57,6 +57,7 @@ import {
 import { useTradeReadiness } from "@/hooks/use-trade-readiness";
 import { shortAddress, useTradingProfile } from "@/hooks/use-trading-profile";
 import { addAccountRefreshListener, scheduleAccountRefresh } from "@/lib/account-events";
+import { friendlyErrorMessage } from "@/lib/friendly-errors";
 import { cachePortfolioPositionForDetail } from "@/lib/market-detail-cache";
 import { cn } from "@/lib/utils";
 
@@ -574,7 +575,8 @@ function PortfolioContent() {
   const closedPositions = data?.closedPositions ?? [];
   const trades = data?.trades ?? [];
   const portfolioWarning = portfolio.error && portfolio.data ? portfolio.error : null;
-  const allErrors = error ?? tradingProfile.error ?? (portfolio.data ? null : portfolio.error) ?? fundingStatus.error ?? clobSession.error;
+  const allErrorsRaw = error ?? tradingProfile.error ?? (portfolio.data ? null : portfolio.error) ?? fundingStatus.error ?? clobSession.error;
+  const allErrors = allErrorsRaw ? friendlyErrorMessage(allErrorsRaw, "Portfolio action failed. Please try again.", "portfolio") : null;
   const claimableGroups = useMemo(() => groupClaimablePositions(closedPositions), [closedPositions]);
   const claimableValue = useMemo(
     () => claimableGroups.reduce((total, group) => total + group.value, 0),
@@ -736,7 +738,9 @@ function PortfolioContent() {
       await readiness.refresh();
       scheduleAccountRefresh({ reason: "order_cancelled", address: tradingWalletAddress });
     } else {
-      toast.error("Cancel failed", { description: clobSession.error ?? "Order may have filled or expired." });
+      toast.error("Cancel failed", {
+        description: friendlyErrorMessage(clobSession.error, "Order may have filled or expired.", "trade"),
+      });
     }
   };
 

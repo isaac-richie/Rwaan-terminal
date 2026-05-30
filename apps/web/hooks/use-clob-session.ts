@@ -18,6 +18,7 @@ import {
 } from "@polymarket/clob-client-v2"
 import type { TradingProfile } from "@smartmarket/types"
 import type { ConnectedWallet } from "@privy-io/react-auth"
+import { extractErrorText, friendlyErrorMessage } from "@/lib/friendly-errors"
 
 const CLOB_HOST = "https://clob.polymarket.com"
 const POLYGON_CHAIN_ID = 137
@@ -357,49 +358,6 @@ function toSignedOrderPreview(order: SignedOrder, side: "BUY" | "SELL" = "BUY", 
   }
 }
 
-function extractErrorText(value: unknown, depth = 0): string | null {
-  if (value === undefined || value === null || depth > 4) return null
-  if (typeof value === "string") return value.trim() || null
-  if (typeof value === "number" || typeof value === "boolean") return String(value)
-  if (value instanceof Error) return extractErrorText(value.message, depth + 1)
-  if (Array.isArray(value)) {
-    const parts = value.map((item) => extractErrorText(item, depth + 1)).filter(Boolean)
-    return parts.length ? parts.join(" · ") : null
-  }
-  if (typeof value !== "object") return null
-
-  const raw = value as Record<string, unknown>
-  const directKeys = [
-    "errorMsg",
-    "error_msg",
-    "error",
-    "message",
-    "reason",
-    "details",
-    "detail",
-    "description",
-    "statusText",
-  ]
-
-  for (const key of directKeys) {
-    const text = extractErrorText(raw[key], depth + 1)
-    if (text) return text
-  }
-
-  const nestedKeys = ["data", "body", "response", "result"]
-  for (const key of nestedKeys) {
-    const text = extractErrorText(raw[key], depth + 1)
-    if (text) return text
-  }
-
-  try {
-    const json = JSON.stringify(raw)
-    return json && json !== "{}" ? json : null
-  } catch {
-    return null
-  }
-}
-
 function normalizeOrderSubmission(raw: unknown): OrderSubmission {
   const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {}
   const success = value.success === true
@@ -486,16 +444,7 @@ function errorMessage(err: unknown, fallback: string) {
     return "Rawli could not activate the Polygon execution context for the Polymarket signature. Approve the network request in your wallet and try again."
   }
 
-  const rejection = userRejectedMessage(err)
-  if (rejection) return rejection
-
-  if (!raw || raw === "[object Object]") return fallback
-
-  if (raw.toLowerCase().includes("could not coalesce error")) {
-    return "Wallet rejected the CLOB signature because it did not accept the Polygon execution context. Approve the network request in your wallet and try again."
-  }
-
-  return raw.length > 220 ? `${raw.slice(0, 220)}...` : raw
+  return friendlyErrorMessage(err, fallback, "trade")
 }
 
 function isChainMissingError(err: unknown) {
