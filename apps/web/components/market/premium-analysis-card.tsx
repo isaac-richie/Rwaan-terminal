@@ -46,6 +46,9 @@ interface PremiumAnalysisCardProps {
   }
 }
 
+const PREMIUM_ANALYSIS_FEE_ENABLED =
+  process.env.NEXT_PUBLIC_PREMIUM_ANALYSIS_FEE_ENABLED === "true"
+
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
 const GREEN = "oklch(0.68 0.18 155)"
@@ -1395,6 +1398,8 @@ function LockedState({
   onUnlock: () => void
   loading: boolean
 }) {
+  const feeEnabled = PREMIUM_ANALYSIS_FEE_ENABLED
+
   return (
     <div className="flex min-h-[400px] flex-col space-y-5">
       <div className="flex items-center justify-between gap-3">
@@ -1405,7 +1410,7 @@ function LockedState({
           </h3>
         </div>
         <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
-          Premium
+          {feeEnabled ? "Premium" : "Free testing"}
         </span>
       </div>
 
@@ -1458,7 +1463,7 @@ function LockedState({
         ) : (
           <Zap className="w-4 h-4 mr-2" />
         )}
-        Unlock for $1 USDT
+        {feeEnabled ? "Unlock for $1 USDT" : "Generate free analysis"}
       </Button>
     </div>
   )
@@ -1491,13 +1496,12 @@ export function PremiumAnalysisCard({ market }: PremiumAnalysisCardProps) {
   const { status, analysis, unlockAnalysis } = usePremiumAnalysis(market.id)
 
   const handleUnlock = async () => {
-    if (!authenticated) {
+    if (PREMIUM_ANALYSIS_FEE_ENABLED && !authenticated) {
       login()
       return
     }
-    const wallet = activePrivyWallet.wallet
-    if (!wallet) return
-    await unlockAnalysis(market, wallet)
+
+    await unlockAnalysis(market, activePrivyWallet.wallet)
   }
 
   const isLoading =

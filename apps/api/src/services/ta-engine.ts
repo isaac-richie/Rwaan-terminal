@@ -9,7 +9,7 @@
  * RSI + divergence detection, Fibonacci retracements, OBV, VWAP, ATR,
  * funding rates, open interest sentiment, Fear & Greed index.
  *
- * Used by the x402 premium analysis flow to give the AI real TA data
+ * Used by the premium analysis flow to give the AI real TA data
  * instead of relying on news-only reasoning for crypto markets.
  */
 

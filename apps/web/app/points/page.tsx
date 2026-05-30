@@ -18,6 +18,8 @@ import { useTradingProfile } from "@/hooks/use-trading-profile";
 import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+const PREMIUM_ANALYSIS_FEE_ENABLED =
+  process.env.NEXT_PUBLIC_PREMIUM_ANALYSIS_FEE_ENABLED === "true";
 
 const TIERS = [
   {
@@ -73,8 +75,10 @@ const EARNING_METHODS = [
   {
     icon: Sparkles,
     title: "Unlock intelligence",
-    detail: "Each paid analysis earns a premium points reward.",
-    pts: "+150 pts",
+    detail: PREMIUM_ANALYSIS_FEE_ENABLED
+      ? "Each paid analysis earns a premium points reward."
+      : "Free during testing; premium rewards resume when paid unlocks return.",
+    pts: PREMIUM_ANALYSIS_FEE_ENABLED ? "+150 pts" : "Testing",
     color: "oklch(0.78_0.16_82)",
   },
   {
@@ -101,8 +105,18 @@ const DEFAULT_QUESTS: QuestSnapshot[] = [
   { id: "daily_crypto_trade",  title: "Trade 1 crypto market",   detail: "Place one routed trade on a crypto market.", reward: "+25 pts",  progress: 0, target: 1, completed: false },
   { id: "daily_quick_settle",  title: "Trade 1 Quick Settle",    detail: "Trade a market resolving within 24 hours.",  reward: "+30 pts",  progress: 0, target: 1, completed: false },
   { id: "daily_two_trades",    title: "Place 2 trades today",    detail: "Two trades across any Rawli-routed markets.", reward: "+50 pts",  progress: 0, target: 2, completed: false },
-  { id: "daily_unlock_report", title: "Unlock 1 intel report",   detail: "Use premium analysis before entering a market.", reward: "+25 pts", progress: 0, target: 1, completed: false },
-  { id: "daily_cashback",      title: "Earn cashback credits",   detail: "Any eligible paid action or routed trade.",  reward: "Cashback", progress: 0, target: 1, completed: false },
+  {
+    id: "daily_unlock_report",
+    title: PREMIUM_ANALYSIS_FEE_ENABLED ? "Unlock 1 intel report" : "Generate 1 intel report",
+    detail: PREMIUM_ANALYSIS_FEE_ENABLED
+      ? "Use premium analysis before entering a market."
+      : "Report rewards are paused while analysis is free during testing.",
+    reward: PREMIUM_ANALYSIS_FEE_ENABLED ? "+25 pts" : "Testing",
+    progress: 0,
+    target: 1,
+    completed: false,
+  },
+  { id: "daily_cashback",      title: "Earn cashback credits",   detail: "Any eligible routed trade.",  reward: "Cashback", progress: 0, target: 1, completed: false },
 ];
 
 function tierForPoints(points: number) {

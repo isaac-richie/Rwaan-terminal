@@ -17,6 +17,9 @@ import {
   ChevronRight,
 } from "lucide-react"
 
+const PREMIUM_ANALYSIS_FEE_ENABLED =
+  process.env.NEXT_PUBLIC_PREMIUM_ANALYSIS_FEE_ENABLED === "true"
+
 // ─── Legal sheet (Terms / Privacy) ───────────────────────────────────────────
 
 function LegalSheet({
@@ -110,7 +113,13 @@ const TERMS_CONTENT = (
     </LegalSection>
 
     <LegalSection title="6. Fees">
-      <p>The Platform charges a platform fee on executed trades (currently 0.5%). Premium Intelligence Reports are priced at $1 USDT per report, paid on-chain via BNB Chain. All fees are shown to you before any transaction is signed. Fees are non-refundable.</p>
+      <p>
+        The Platform charges a platform fee on executed trades (currently 0.5%).{" "}
+        {PREMIUM_ANALYSIS_FEE_ENABLED
+          ? "Premium Intelligence Reports are priced at $1 USDT per report, paid on-chain via BNB Chain."
+          : "Premium Intelligence Reports are free during the current testing phase. If report pricing returns later, the fee will be disclosed before any transaction is signed."}{" "}
+        Fees are non-refundable.
+      </p>
     </LegalSection>
 
     <LegalSection title="7. AI-Generated Content">
@@ -153,7 +162,11 @@ const PRIVACY_CONTENT = (
         <li>Wallet addresses (public on-chain identifiers — never private keys)</li>
         <li>Trading activity you initiate through the Platform (logged for rewards tracking)</li>
         <li>Referral codes you use or share</li>
-        <li>Premium analysis purchase records (tx hash + market ID)</li>
+        <li>
+          {PREMIUM_ANALYSIS_FEE_ENABLED
+            ? "Premium analysis purchase records (tx hash + market ID)"
+            : "Premium analysis generation records (market ID + timestamp)"}
+        </li>
       </ul>
     </LegalSection>
 
@@ -175,7 +188,11 @@ const PRIVACY_CONTENT = (
     </LegalSection>
 
     <LegalSection title="5. Data Use">
-      <p>Data collected is used solely to: operate the Platform, calculate and distribute reward points, prevent duplicate premium analysis purchases, and improve Platform performance. We do not sell, rent, or share your data with third parties for marketing purposes.</p>
+      <p>
+        Data collected is used solely to: operate the Platform, calculate and distribute reward points,{" "}
+        {PREMIUM_ANALYSIS_FEE_ENABLED ? "prevent duplicate premium analysis purchases" : "cache premium analysis results"}{" "}
+        and improve Platform performance. We do not sell, rent, or share your data with third parties for marketing purposes.
+      </p>
     </LegalSection>
 
     <LegalSection title="6. Cookies & Local Storage">
@@ -236,10 +253,17 @@ const DOCS: Array<{
     icon: Brain,
     color: "oklch(0.68 0.18 230)",
     title: "AI Intelligence Engine",
-    body: "Unlock a $1 deep-research report on any market. Live news + quant model → definitive YES/NO verdict with full rationale.",
+    body: PREMIUM_ANALYSIS_FEE_ENABLED
+      ? "Unlock a $1 deep-research report on any market. Live news + quant model → definitive YES/NO verdict with full rationale."
+      : "Generate a free testing-phase deep-research report on any market. Live news + quant model → definitive YES/NO verdict with full rationale.",
     detail: (
       <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
-        <p>The AI Intelligence Engine is Rawli's premium research layer. For $1 USDT (paid on-chain via BNB Chain), you get a full institutional-grade analysis of any active prediction market.</p>
+        <p>
+          The AI Intelligence Engine is Rawli's premium research layer.{" "}
+          {PREMIUM_ANALYSIS_FEE_ENABLED
+            ? "For $1 USDT (paid on-chain via BNB Chain), you get a full institutional-grade analysis of any active prediction market."
+            : "During testing, reports are free on any active prediction market."}
+        </p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_230)]">What's in a Premium Report</p>
           <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
@@ -255,8 +279,14 @@ const DOCS: Array<{
         </div>
         <p>For crypto markets, the engine also runs a 16-signal quantitative model including RSI, MACD, Bollinger Bands, volume delta, open interest shifts, and taker ratio. For event markets, a 5-factor fundamental model evaluates sentiment, precedent, timeline, and consensus divergence.</p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_230)]">Payment flow</p>
-          <p>Payment happens entirely on-chain. Your wallet sends 1 USDT on BNB Chain to Rawli's receiver address. The backend verifies the transaction directly via BSC JSON-RPC before generating your report — no intermediaries, no subscriptions.</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_230)]">
+            {PREMIUM_ANALYSIS_FEE_ENABLED ? "Payment flow" : "Testing access"}
+          </p>
+          <p>
+            {PREMIUM_ANALYSIS_FEE_ENABLED
+              ? "Payment happens entirely on-chain. Your wallet sends 1 USDT on BNB Chain to Rawli's receiver address. The backend verifies the transaction directly via BSC JSON-RPC before generating your report — no intermediaries, no subscriptions."
+              : "Reports generate directly from Rawli's backend without a wallet payment while we tune the product for production. Future pricing, if re-enabled, will be shown before signing any transaction."}
+          </p>
         </div>
         <p className="text-[11px] text-muted-foreground/50">AI analysis is for informational purposes only and does not constitute financial advice.</p>
       </div>
@@ -284,7 +314,9 @@ const DOCS: Array<{
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">Supported networks</p>
           <ul className="space-y-1 list-disc list-inside text-muted-foreground/80">
-            <li>BNB Chain (BSC) — deposit & AI report payments</li>
+            <li>
+              BNB Chain (BSC) — {PREMIUM_ANALYSIS_FEE_ENABLED ? "deposits, withdrawals, and AI report payments" : "deposits and withdrawals"}
+            </li>
             <li>Polygon — live order execution</li>
           </ul>
         </div>

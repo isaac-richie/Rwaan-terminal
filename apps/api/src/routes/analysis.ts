@@ -5,6 +5,7 @@ import { generateMarketAnalysis, generatePremiumAnalysis } from "../services/ope
 import { paymentGate } from "../middleware/paymentGate.js";
 import { fetchPremiumNews } from "../services/news.js";
 import { buildPaymentRequirement } from "../services/payment.js";
+import { config } from "../config.js";
 import {
   detectCryptoSymbol,
   runTechnicalAnalysis,
@@ -72,15 +73,30 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/analysis/premium/price", async () => {
-    return { ok: true, price: buildPaymentRequirement() };
+    if (config.payment.analysisFeeEnabled) {
+      return { ok: true, free: false, testing: false, price: buildPaymentRequirement() };
+    }
+
+    return {
+      ok: true,
+      free: true,
+      testing: true,
+      price: null,
+      memo: "Premium intelligence reports are free during testing.",
+    };
+  });
+
+  const premiumPaymentGate = paymentGate({
+    extractMarketId: (req) => (req.body as any)?.market?.id ?? "",
   });
 
   app.post(
     "/analysis/premium",
     {
-      preHandler: paymentGate({
-        extractMarketId: (req) => (req.body as any)?.market?.id ?? "",
-      }),
+      preHandler: async (req, reply) => {
+        if (!config.payment.analysisFeeEnabled) return;
+        return premiumPaymentGate(req, reply);
+      },
     },
     async (req, reply) => {
       const payload = requestSchema.safeParse(req.body ?? null);

@@ -93,7 +93,8 @@ export default function TermsPage() {
           <Section title="6. Fees">
             <p>
               The Platform charges a platform fee on trades (currently 0.5%, subject to change). Premium intelligence
-              reports are priced at $1 USDT per report, paid on-chain. All fees are disclosed prior to any transaction.
+              reports are free during the current testing phase. If pricing returns later, all fees will be disclosed
+              prior to any transaction.
             </p>
           </Section>
 

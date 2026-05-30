@@ -16,6 +16,9 @@ import { cacheMarketForDetail } from "@/lib/market-detail-cache"
 import type { PolymarketMarket } from "@/lib/polymarket"
 import { cn } from "@/lib/utils"
 
+const PREMIUM_ANALYSIS_FEE_ENABLED =
+  process.env.NEXT_PUBLIC_PREMIUM_ANALYSIS_FEE_ENABLED === "true"
+
 function getPrimaryPrice(market?: PolymarketMarket | null) {
   if (!market) return 50
   const yes = market.outcomes?.find((o) => o.name.toLowerCase().includes("yes"))?.price
@@ -462,7 +465,9 @@ export function MarketHero() {
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.82_0.16_82)]">Rawli intelligence</span>
               </div>
               <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                Deep AI reports per market — live context, structural drivers, and a definitive YES/NO verdict. Unlock for $1 USDT.
+                {PREMIUM_ANALYSIS_FEE_ENABLED
+                  ? "Deep AI reports per market — live context, structural drivers, and a definitive YES/NO verdict. Unlock for $1 USDT."
+                  : "Free testing-phase AI reports per market — live context, structural drivers, and a definitive YES/NO verdict."}
               </p>
               <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-[oklch(0.78_0.16_82)]">
                 <span className="h-1 w-1 rounded-full bg-[oklch(0.78_0.16_82)]" />

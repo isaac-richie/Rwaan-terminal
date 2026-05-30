@@ -100,7 +100,14 @@ function premiumErrorMessage(err: any): { title: string; description: string } {
   if (err?.code === "ACTION_REJECTED" || rawMessage.includes("user rejected")) {
     return {
       title: "Transaction cancelled",
-      description: "No worries, nothing was charged. You can unlock the report whenever you're ready.",
+      description: "No worries, nothing was charged. You can generate the report whenever you're ready.",
+    }
+  }
+
+  if (rawMessage.includes("wallet_required")) {
+    return {
+      title: "Wallet required",
+      description: "Connect your wallet to unlock paid reports when analysis fees are enabled.",
     }
   }
 
@@ -123,7 +130,7 @@ function premiumErrorMessage(err: any): { title: string; description: string } {
   }
 
   return {
-    title: "Couldn't unlock the report",
+    title: "Couldn't generate the report",
     description: "Something got in the way. Please try again in a moment.",
   }
 }
@@ -155,20 +162,20 @@ export function usePremiumAnalysis(marketId: string) {
   }, [marketId])
 
   const unlockAnalysis = useCallback(
-    async (market: Record<string, unknown>, wallet: ConnectedWallet) => {
+    async (market: Record<string, unknown>, wallet?: ConnectedWallet | null) => {
       setError(null)
-      setStatus("paying")
+      setStatus("analyzing")
 
       try {
-        const initialRes = await fetch(`${API_BASE}/analysis/premium`, {
+        const res = await fetch(`${API_BASE}/analysis/premium`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ market }),
         })
 
-        if (initialRes.status !== 402) {
-          if (initialRes.ok) {
-            const data = await initialRes.json()
+        if (res.status !== 402) {
+          if (res.ok) {
+            const data = await res.json()
             if (data.analysis) {
               setAnalysis(data.analysis)
               saveCached(marketId, data.analysis)
@@ -179,10 +186,15 @@ export function usePremiumAnalysis(marketId: string) {
           throw new Error("Unexpected response from analysis endpoint")
         }
 
-        const { paymentRequired } = (await initialRes.json()) as {
+        if (!wallet) {
+          throw new Error("wallet_required")
+        }
+
+        const { paymentRequired } = (await res.json()) as {
           paymentRequired: PaymentRequirement
         }
 
+        setStatus("paying")
         const provider = await getBscProvider(wallet)
         const ethersProvider = new BrowserProvider(provider as any)
         const signer = await ethersProvider.getSigner()

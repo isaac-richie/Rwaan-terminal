@@ -1,5 +1,6 @@
 import { recordRewardEvent, getTotalTradeCount, getReferrerForReferee, markReferralRewarded, getRewardEventsSince } from "./db.js";
 import type { RewardEventRow } from "./db.js";
+import { config } from "../config.js";
 
 const PREMIUM_UNLOCK_POINTS = 150;
 const PREMIUM_UNLOCK_CASHBACK_CENTS = 5;
@@ -184,16 +185,18 @@ export function buildDailyQuests(events: RewardEventRow[]): QuestSnapshot[] {
     },
     {
       id: "daily_unlock_report",
-      title: "Unlock 1 intelligence report",
-      detail: "Use premium analysis before entering a market.",
-      reward: "+25 pts auto",
+      title: config.payment.analysisFeeEnabled ? "Unlock 1 intelligence report" : "Generate 1 intelligence report",
+      detail: config.payment.analysisFeeEnabled
+        ? "Use premium analysis before entering a market."
+        : "Premium report rewards are paused while analysis is free during testing.",
+      reward: config.payment.analysisFeeEnabled ? "+25 pts auto" : "Testing",
       progress: premiumUnlocks.length,
       target: 1,
     },
     {
       id: "daily_cashback",
       title: "Earn cashback credits",
-      detail: "Complete any eligible paid action or routed trade that generates credits.",
+      detail: "Complete any eligible routed trade that generates credits.",
       reward: "Cashback tracker",
       progress: cashbackCents > 0 ? 1 : 0,
       target: 1,

@@ -78,7 +78,7 @@ function buildPrompt(market: AnalysisMarketInput) {
       `- write in a confident, analytical, concise tone`,
       `- think like a macro strategist or intelligence analyst`,
       `- explain WHY something is happening, not WHAT will happen`,
-      `- provide insight that feels worth paying for`,
+      `- provide insight that feels worth trusting and coming back for`,
       ``
   ];
 
@@ -505,7 +505,9 @@ function buildPremiumPrompt(
 
   return [
     `You are a senior quantitative intelligence analyst producing a premium market report.`,
-    `You have been paid $1 for this analysis. Deliver maximum value.`,
+    config.payment.analysisFeeEnabled
+      ? `You have been paid $1 for this analysis. Deliver maximum value.`
+      : `This report is free during testing, but it must still feel production-grade and high-value.`,
     ta
       ? `Your analysis is backed by a real-time quantitative engine processing live Binance data.`
       : `Your analysis is backed by a fundamental signal engine and live news intelligence.`,

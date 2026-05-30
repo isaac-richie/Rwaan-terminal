@@ -91,6 +91,7 @@ export const config = {
     cooldownHours: Number(process.env.GAS_ASSIST_COOLDOWN_HOURS ?? 24)
   },
   payment: {
+    analysisFeeEnabled: process.env.PREMIUM_ANALYSIS_FEE_ENABLED === "true",
     receiverAddress: process.env.PAYMENT_RECEIVER_ADDRESS ?? "",
     // Primary RPC — set BSC_RPC_URL to your premium endpoint (NodeReal / QuickNode / Ankr)
     // Falls back through a prioritised list of public nodes if primary fails

@@ -261,6 +261,18 @@ describe("api routes", () => {
     expect(body.rail).toBe("direct");
   });
 
+  it("premium analysis price is disabled during testing by default", async () => {
+    const app = buildServer();
+    const res = await app.inject({ method: "GET", url: "/analysis/premium/price" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      free: true,
+      testing: true,
+      price: null,
+    });
+  }, UPSTREAM_TEST_TIMEOUT_MS);
+
   it("trade preview rejects invalid payloads", async () => {
     const app = buildServer();
     const res = await app.inject({

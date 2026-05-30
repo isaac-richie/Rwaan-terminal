@@ -62,8 +62,9 @@ export default function PrivacyPage() {
                 record the referring and referred wallet addresses.
               </li>
               <li>
-                <span className="text-foreground font-medium">Payment verification</span> — On-chain transaction hashes
-                for premium intelligence report unlocks (stored to prevent replay attacks).
+                <span className="text-foreground font-medium">Analysis generation</span> — Market IDs and timestamps
+                for generated premium intelligence reports. When report fees are enabled, transaction hashes may also be
+                stored to prevent replay.
               </li>
             </ul>
           </Section>
@@ -112,7 +113,7 @@ export default function PrivacyPage() {
               The Platform uses browser localStorage to cache the following data locally on your device:
             </p>
             <ul className="mt-2 space-y-1.5 list-disc list-inside">
-              <li>Purchased premium analysis reports (keyed by market ID)</li>
+              <li>Generated premium analysis reports (keyed by market ID)</li>
               <li>UI preferences (theme, sort order)</li>
             </ul>
             <p className="mt-3">
@@ -123,8 +124,9 @@ export default function PrivacyPage() {
           <Section title="7. Data Retention">
             <p>
               Wallet-linked data (trading profiles, reward events, referrals) is retained for the lifetime of your
-              account or until you request deletion. Payment verification hashes are retained indefinitely to prevent
-              replay attacks.
+              account or until you request deletion. Analysis generation records are retained to operate caching,
+              rewards, and product reliability. When report fees are enabled, payment verification hashes are retained
+              to prevent replay attacks.
             </p>
           </Section>
 
