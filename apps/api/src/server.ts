@@ -23,6 +23,7 @@ import { catalystRoutes } from "./routes/catalyst.js";
 import { cryptoRoutes } from "./routes/crypto.js";
 import { referralRoutes } from "./routes/referral.js";
 import { opsRoutes } from "./routes/ops.js";
+import { edgeScannerRoutes } from "./routes/edgeScanner.js";
 import { recordBackendError } from "./services/errorLog.js";
 
 export function buildServer() {
@@ -98,6 +99,7 @@ export function buildServer() {
   app.register(cryptoRoutes);
   app.register(referralRoutes);
   app.register(opsRoutes);
+  app.register(edgeScannerRoutes);
 
   app.addHook("onResponse", async (req, reply) => {
     if (reply.statusCode < 500) return;
