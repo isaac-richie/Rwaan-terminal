@@ -7,6 +7,7 @@ const PREMIUM_UNLOCK_CASHBACK_CENTS = 5;
 const TRADE_CASHBACK_BPS = 25;
 const MAX_TRADE_CASHBACK_CENTS = 100;
 export const REFERRAL_POINTS = 500;
+export const REFEREE_REFERRAL_POINTS = 50;
 const DAILY_QUEST_POINTS: Record<string, number> = {
   daily_crypto_trade: 25,
   daily_quick_settle: 30,

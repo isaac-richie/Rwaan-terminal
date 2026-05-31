@@ -9,7 +9,7 @@ import {
   recordRewardEvent,
   resolveReferralCode,
 } from "../services/db.js";
-import { REFERRAL_POINTS } from "../services/rewards.js";
+import { REFEREE_REFERRAL_POINTS, REFERRAL_POINTS } from "../services/rewards.js";
 
 const EVM_RE = /^0x[a-fA-F0-9]{40}$/;
 
@@ -47,7 +47,7 @@ export async function referralRoutes(app: FastifyInstance): Promise<void> {
 
       try {
         const referral = await getOrCreateReferralCode(wallet);
-        return reply.send({ ok: true, ...referral, rewardPoints: REFERRAL_POINTS });
+        return reply.send({ ok: true, ...referral, rewardPoints: REFERRAL_POINTS, refereeRewardPoints: REFEREE_REFERRAL_POINTS });
       } catch (err) {
         req.log.error({ err }, "referral code error");
         return reply.status(500).send({ ok: false, error: "internal_error" });
@@ -69,7 +69,7 @@ export async function referralRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({ ok: false, error: parsed.error.issues[0]?.message ?? "invalid_input" });
       }
 
-      const { referee } = parsed.data;
+      const referee = parsed.data.referee.toLowerCase();
       const referrerInput = parsed.data.referrer ?? parsed.data.code ?? "";
 
       try {
@@ -79,7 +79,35 @@ export async function referralRoutes(app: FastifyInstance): Promise<void> {
         }
 
         const result = await recordReferral({ referrer: resolved.referrer, referee });
-        return reply.send({ ok: true, ...result, referrer: resolved.referrer, referralCode: resolved.referralCode, rewardPoints: REFERRAL_POINTS });
+        let refereePoints = 0;
+        if (result.recorded) {
+          await recordRewardEvent({
+            wallet: referee,
+            eventType: "referral_join_bonus",
+            idempotencyKey: `referral_join:${referee}`,
+            points: REFEREE_REFERRAL_POINTS,
+            cashbackCents: 0,
+            amountUsd: 0,
+            marketId: null,
+            metadata: {
+              referrer: resolved.referrer,
+              referralCode: resolved.referralCode,
+              source: "referral_code",
+            },
+          });
+          refereePoints = REFEREE_REFERRAL_POINTS;
+        }
+
+        return reply.send({
+          ok: true,
+          ...result,
+          referrer: resolved.referrer,
+          referralCode: resolved.referralCode,
+          rewardPoints: REFERRAL_POINTS,
+          referrerRewardPoints: REFERRAL_POINTS,
+          refereeRewardPoints: REFEREE_REFERRAL_POINTS,
+          refereePoints,
+        });
       } catch (err) {
         req.log.error({ err }, "referral track error");
         return reply.status(500).send({ ok: false, error: "internal_error" });
@@ -102,7 +130,7 @@ export async function referralRoutes(app: FastifyInstance): Promise<void> {
 
       try {
         const stats = await getReferralStats(wallet);
-        return reply.send({ ok: true, ...stats, rewardPoints: REFERRAL_POINTS });
+        return reply.send({ ok: true, ...stats, rewardPoints: REFERRAL_POINTS, refereeRewardPoints: REFEREE_REFERRAL_POINTS });
       } catch (err) {
         req.log.error({ err }, "referral stats error");
         return reply.status(500).send({ ok: false, error: "internal_error" });

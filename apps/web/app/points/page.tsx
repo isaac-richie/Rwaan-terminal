@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Award, BarChart3, CheckCircle2, ChevronRight, Copy,
   Crown, Link2, Loader2, Lock, Sparkles, Star, Target,
@@ -172,7 +172,7 @@ export default function PointsPage() {
   const readiness = useTradeReadiness({ connectedWalletAddress, profile: tradingProfile.profile });
   const collateral = readiness.readiness?.collateral ?? null;
   const depositAddress = tradingProfile.profile?.depositAddress?.evm ?? null;
-  const { stats: referralStats, referralCode, referralLink, loading: referralLoading, tracking: referralTracking } = useReferral(connectedWalletAddress);
+  const { stats: referralStats, referralCode, referralLink, loading: referralLoading, tracking: referralTracking, applyReferralCode } = useReferral(connectedWalletAddress);
   const [summary, setSummary] = useState<PointsSummary | null>(null);
   const [quests, setQuests] = useState<QuestSnapshot[]>(DEFAULT_QUESTS);
   const [questResetAt, setQuestResetAt] = useState<string | null>(null);
@@ -180,6 +180,7 @@ export default function PointsPage() {
   const [fundingOpen, setFundingOpen] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[] | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [incomingReferralCode, setIncomingReferralCode] = useState("");
 
   useEffect(() => {
     if (!connectedWalletAddress) { setSummary(null); setQuests(DEFAULT_QUESTS); setQuestResetAt(null); return; }
@@ -224,6 +225,49 @@ export default function PointsPage() {
   const CurrentTierIcon = currentTier.icon;
   const completedQuests = quests.filter((q) => q.completed).length;
   const resetLabel = questResetAt ? new Date(questResetAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--";
+  const refreshPoints = useCallback(async () => {
+    if (!connectedWalletAddress) return;
+    try {
+      const [summaryData, questData] = await Promise.all([
+        fetch(`${API_BASE}/points/summary/${connectedWalletAddress}`, { headers: { Accept: "application/json" } }).then((r) => r.ok ? r.json() : null),
+        fetch(`${API_BASE}/points/quests/${connectedWalletAddress}`, { headers: { Accept: "application/json" } }).then((r) => r.ok ? r.json() : null),
+      ]);
+      setSummary(summaryData?.summary ?? null);
+      setQuests(Array.isArray(questData?.quests) ? questData.quests : DEFAULT_QUESTS);
+      setQuestResetAt(questData?.resetAt ?? null);
+    } catch {
+      // Keep the existing points view if this non-critical refresh misses.
+    }
+  }, [connectedWalletAddress]);
+
+  const handleApplyReferralCode = useCallback(async () => {
+    if (!connectedWalletAddress) {
+      toast.error("Connect your wallet before applying a code.");
+      return;
+    }
+
+    const result = await applyReferralCode(incomingReferralCode);
+    if (!result.ok) {
+      const message =
+        result.error === "invalid_code" ? "Enter a valid Rawli referral code." :
+        result.error === "self_referral" ? "You cannot use your own referral code." :
+        result.error === "referral_code_not_found" ? "That referral code was not found." :
+        result.error === "connect_wallet" ? "Connect your wallet before applying a code." :
+        "Could not apply that referral code. Try again.";
+      toast.error(message);
+      return;
+    }
+
+    if (result.recorded) {
+      const points = result.refereePoints || referralStats?.refereeRewardPoints || 50;
+      toast.success(`Referral applied. +${points} pts added.`);
+      setIncomingReferralCode("");
+      await refreshPoints();
+      return;
+    }
+
+    toast("Referral already linked for this wallet.");
+  }, [applyReferralCode, connectedWalletAddress, incomingReferralCode, referralStats?.refereeRewardPoints, refreshPoints]);
 
   return (
     <div className="terminal-grid-bg ambient-glow flex min-h-screen flex-col bg-background">
@@ -505,7 +549,7 @@ export default function PointsPage() {
             <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-muted-foreground">Referrals</div>
             <h2 className="mt-1 text-2xl font-bold text-foreground">Invite traders. Earn points automatically.</h2>
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-3">
             {/* Invite code */}
             <div className="surface-card rounded-2xl p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -562,6 +606,54 @@ export default function PointsPage() {
               )}
               <p className="mt-3 text-[11px] text-muted-foreground leading-5">
                 A referred wallet connects through your code and completes its first Rawli-routed trade. Your points credit automatically.
+              </p>
+            </div>
+
+            {/* Apply code */}
+            <div className="surface-card rounded-2xl p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
+                  Have a code?
+                </div>
+                <span className="rounded-full border border-[oklch(0.68_0.18_155/0.22)] bg-[oklch(0.68_0.18_155/0.08)] px-2.5 py-1 font-mono text-[10px] font-bold text-[oklch(0.76_0.17_155)]">
+                  +{referralStats?.refereeRewardPoints ?? 50} pts
+                </span>
+              </div>
+
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleApplyReferralCode();
+                }}
+              >
+                <input
+                  value={incomingReferralCode}
+                  onChange={(event) => {
+                    const value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+                    setIncomingReferralCode(value);
+                  }}
+                  disabled={!connectedWalletAddress}
+                  inputMode="text"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  placeholder="RWABC12345"
+                  className="h-14 w-full rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.013_255)] px-4 font-mono text-lg font-bold tracking-[0.08em] text-foreground outline-none transition-colors placeholder:text-muted-foreground/45 focus:border-[oklch(0.78_0.16_82/0.55)] disabled:opacity-45"
+                />
+
+                <button
+                  type="submit"
+                  disabled={!connectedWalletAddress || !incomingReferralCode.trim() || referralTracking}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[oklch(0.78_0.16_82)] px-4 text-[12px] font-black uppercase tracking-[0.12em] text-black transition-transform hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {referralTracking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {connectedWalletAddress ? "Apply code" : "Connect wallet"}
+                </button>
+              </form>
+
+              <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+                New wallets get +50 points once. Your referrer earns +500 after your first eligible trade.
               </p>
             </div>
 

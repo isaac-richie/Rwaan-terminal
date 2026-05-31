@@ -207,7 +207,31 @@ describe("points routes", () => {
         payload: { referrer: referralCode, referee: walletA },
       });
       expect(trackRes.statusCode).toBe(200);
-      expect(trackRes.json()).toMatchObject({ ok: true, recorded: true, referrer: walletB });
+      expect(trackRes.json()).toMatchObject({
+        ok: true,
+        recorded: true,
+        referrer: walletB,
+        refereePoints: 50,
+        referrerRewardPoints: 500,
+      });
+
+      const duplicateTrackRes = await app.inject({
+        method: "POST",
+        url: "/referral/track",
+        payload: { referrer: referralCode, referee: walletA },
+      });
+      expect(duplicateTrackRes.statusCode).toBe(200);
+      expect(duplicateTrackRes.json()).toMatchObject({
+        ok: true,
+        recorded: false,
+        alreadyReferred: true,
+        refereePoints: 0,
+      });
+
+      const refereeSummaryBeforeTradeRes = await app.inject({ method: "GET", url: `/points/summary/${walletA}` });
+      expect(refereeSummaryBeforeTradeRes.statusCode).toBe(200);
+      expect(refereeSummaryBeforeTradeRes.json().summary.totalPoints).toBe(50);
+      expect(refereeSummaryBeforeTradeRes.json().summary.events.map((event: any) => event.eventType)).toContain("referral_join_bonus");
 
       vi.mocked(getClobAuthenticated).mockResolvedValueOnce({
         owner: walletA,
