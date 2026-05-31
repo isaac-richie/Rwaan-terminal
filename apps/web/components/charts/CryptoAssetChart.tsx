@@ -7,7 +7,11 @@ import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
-type CryptoAsset = "BTC" | "ETH" | "BNB" | "SOL" | "XRP" | "DOGE";
+type CryptoAsset =
+  | "BTC" | "ETH" | "BNB" | "SOL" | "XRP" | "DOGE"
+  | "ADA" | "AVAX" | "LINK" | "DOT" | "POL" | "MATIC" | "TRX" | "TON"
+  | "SHIB" | "PEPE" | "WIF" | "BONK" | "RENDER" | "NEAR" | "SUI" | "APT"
+  | "ARB" | "OP" | "UNI" | "LTC" | "BCH";
 type ChartRange = "1D" | "1W" | "1M" | "3M" | "1Y";
 
 type Candle = {
@@ -39,7 +43,30 @@ const assetMeta: Record<CryptoAsset, { color: string; soft: string; name: string
   SOL: { color: "#14f195", soft: "rgba(20, 241, 149, 0.14)", name: "Solana" },
   XRP: { color: "#94a3b8", soft: "rgba(148, 163, 184, 0.14)", name: "XRP" },
   DOGE: { color: "#d4a84f", soft: "rgba(212, 168, 79, 0.14)", name: "Dogecoin" },
+  ADA: { color: "#3b82f6", soft: "rgba(59, 130, 246, 0.14)", name: "Cardano" },
+  AVAX: { color: "#ef4444", soft: "rgba(239, 68, 68, 0.14)", name: "Avalanche" },
+  LINK: { color: "#2563eb", soft: "rgba(37, 99, 235, 0.14)", name: "Chainlink" },
+  DOT: { color: "#ec4899", soft: "rgba(236, 72, 153, 0.14)", name: "Polkadot" },
+  POL: { color: "#a855f7", soft: "rgba(168, 85, 247, 0.14)", name: "Polygon" },
+  MATIC: { color: "#a855f7", soft: "rgba(168, 85, 247, 0.14)", name: "Polygon" },
+  TRX: { color: "#ef4444", soft: "rgba(239, 68, 68, 0.14)", name: "TRON" },
+  TON: { color: "#38bdf8", soft: "rgba(56, 189, 248, 0.14)", name: "Toncoin" },
+  SHIB: { color: "#f97316", soft: "rgba(249, 115, 22, 0.14)", name: "Shiba Inu" },
+  PEPE: { color: "#22c55e", soft: "rgba(34, 197, 94, 0.14)", name: "Pepe" },
+  WIF: { color: "#facc15", soft: "rgba(250, 204, 21, 0.14)", name: "dogwifhat" },
+  BONK: { color: "#fb923c", soft: "rgba(251, 146, 60, 0.14)", name: "Bonk" },
+  RENDER: { color: "#f43f5e", soft: "rgba(244, 63, 94, 0.14)", name: "Render" },
+  NEAR: { color: "#10b981", soft: "rgba(16, 185, 129, 0.14)", name: "NEAR" },
+  SUI: { color: "#0ea5e9", soft: "rgba(14, 165, 233, 0.14)", name: "Sui" },
+  APT: { color: "#a3e635", soft: "rgba(163, 230, 53, 0.14)", name: "Aptos" },
+  ARB: { color: "#60a5fa", soft: "rgba(96, 165, 250, 0.14)", name: "Arbitrum" },
+  OP: { color: "#ef4444", soft: "rgba(239, 68, 68, 0.14)", name: "Optimism" },
+  UNI: { color: "#ff4ecd", soft: "rgba(255, 78, 205, 0.14)", name: "Uniswap" },
+  LTC: { color: "#64748b", soft: "rgba(100, 116, 139, 0.14)", name: "Litecoin" },
+  BCH: { color: "#16a34a", soft: "rgba(22, 163, 74, 0.14)", name: "Bitcoin Cash" },
 };
+
+const lowPriceAssets = new Set<CryptoAsset>(["DOGE", "ADA", "XRP", "SHIB", "PEPE", "WIF", "BONK", "TRX"])
 
 function hasToken(text: string, token: string) {
   return new RegExp(`(^|[^a-z0-9])${token}([^a-z0-9]|$)`, "i").test(text);
@@ -72,6 +99,26 @@ export function detectCryptoAsset(input: { title?: string; category?: string; de
     ["SOL", ["solana", /\bsol\b/i]],
     ["XRP", [/\bxrp\b/i, "ripple"]],
     ["DOGE", ["dogecoin", /\bdoge\b/i]],
+    ["ADA", ["cardano", /\bada\b/i]],
+    ["AVAX", ["avalanche", /\bavax\b/i]],
+    ["LINK", ["chainlink", /\blink\b/i]],
+    ["DOT", ["polkadot", /\bdot\b/i]],
+    ["POL", ["polygon", /\bpol\b/i, /\bmatic\b/i]],
+    ["TRX", ["tron", /\btrx\b/i]],
+    ["TON", ["toncoin", /\bton\b/i]],
+    ["SHIB", ["shiba", /\bshib\b/i]],
+    ["PEPE", [/\bpepe\b/i]],
+    ["WIF", ["dogwifhat", /\bwif\b/i]],
+    ["BONK", [/\bbonk\b/i]],
+    ["RENDER", ["render", /\brndr\b/i]],
+    ["NEAR", ["near protocol", /\bnear\b/i]],
+    ["SUI", [/\bsui\b/i]],
+    ["APT", ["aptos", /\bapt\b/i]],
+    ["ARB", ["arbitrum", /\barb\b/i]],
+    ["OP", ["optimism"]],
+    ["UNI", ["uniswap", /\buni\b/i]],
+    ["LTC", ["litecoin", /\bltc\b/i]],
+    ["BCH", ["bitcoin cash", /\bbch\b/i]],
   ];
   return (
     candidates.find(([, needles]) =>
@@ -132,8 +179,8 @@ export function CryptoAssetChart({ asset, marketTitle }: { asset: CryptoAsset; m
       borderVisible: false,
       priceFormat: {
         type: "price",
-        precision: asset === "BTC" || asset === "ETH" || asset === "BNB" ? 2 : 4,
-        minMove: asset === "BTC" || asset === "ETH" || asset === "BNB" ? 0.01 : 0.0001,
+        precision: lowPriceAssets.has(asset) ? 4 : 2,
+        minMove: lowPriceAssets.has(asset) ? 0.0001 : 0.01,
       },
     });
     seriesRef.current = series;

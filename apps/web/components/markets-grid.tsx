@@ -155,7 +155,7 @@ export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
       <div className="surface-card rounded-2xl p-8 text-center border border-[oklch(0.22_0.015_255)]">
         <p className="text-sm font-semibold text-foreground">No active events in {categoryLabel} right now.</p>
         <p className="text-xs text-muted-foreground mt-2">
-          Rawli is focused on Entertainment, Sport, News, Crypto, and Geopolitics. Try a broader category or remove your search term.
+          Rawli is focused on Crypto, Tech/AI, Finance, Politics, Entertainment, Sport, News, Africa, Legal, and Geopolitics. Try a broader category or remove your search term.
         </p>
       </div>
     )

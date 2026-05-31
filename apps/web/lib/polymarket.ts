@@ -93,6 +93,8 @@ const NICE_MARKET_MIN_VOLUME = 50
 
 type FeedGammaMarket = GammaMarketRaw & {
   feedBadges?: string[]
+  feedCategory?: string
+  cryptoAsset?: string
   smartScore?: number
 }
 
@@ -130,6 +132,104 @@ const categoryNeedles: Record<string, string[]> = {
     "grammys",
     "box office",
     "gta",
+  ],
+  tech: [
+    "ai",
+    "artificial intelligence",
+    "openai",
+    "chatgpt",
+    "gpt",
+    "claude",
+    "anthropic",
+    "gemini",
+    "google",
+    "nvidia",
+    "spacex",
+    "starship",
+    "tesla",
+    "robotaxi",
+    "technology",
+    "tech",
+    "software",
+    "hardware",
+    "quantum",
+    "nasa",
+    "cybertruck",
+    "apple",
+    "microsoft",
+    "meta",
+  ],
+  finance: [
+    "finance",
+    "financial",
+    "business",
+    "economy",
+    "economic",
+    "macro",
+    "fed",
+    "fomc",
+    "rate cut",
+    "rate hike",
+    "interest rate",
+    "inflation",
+    "cpi",
+    "gdp",
+    "recession",
+    "jobs",
+    "unemployment",
+    "treasury",
+    "dollar",
+    "stock",
+    "stocks",
+    "ipo",
+    "earnings",
+    "nasdaq",
+    "s&p",
+    "sp500",
+    "oil",
+    "gold",
+    "etf",
+    "yield",
+    "kraken",
+    "coinbase",
+    "microstrategy",
+  ],
+  politics: [
+    "politics",
+    "political",
+    "election",
+    "elections",
+    "president",
+    "senate",
+    "senator",
+    "congress",
+    "parliament",
+    "prime minister",
+    "government",
+    "vote",
+    "ballot",
+    "poll",
+    "campaign",
+    "democrat",
+    "republican",
+  ],
+  legal: [
+    "legal",
+    "court",
+    "lawsuit",
+    "trial",
+    "ruling",
+    "verdict",
+    "judge",
+    "justice",
+    "supreme court",
+    "regulation",
+    "regulatory",
+    "ban",
+    "sanction",
+    "bill",
+    "law",
+    "legislation",
   ],
   sports: [
     "sport",
@@ -183,8 +283,40 @@ const categoryNeedles: Record<string, string[]> = {
     "solana",
     "sol",
     "xrp",
+    "ripple",
     "doge",
+    "dogecoin",
+    "cardano",
+    "ada",
+    "avalanche",
+    "avax",
+    "chainlink",
+    "link",
+    "polkadot",
+    "dot",
+    "polygon",
+    "matic",
+    "pol",
+    "tron",
+    "trx",
+    "ton",
+    "toncoin",
+    "shiba",
+    "shib",
+    "pepe",
+    "bonk",
+    "wif",
+    "render",
+    "near",
+    "sui",
+    "aptos",
+    "apt",
+    "arbitrum",
+    "arb",
+    "optimism",
+    "op",
     "memecoin",
+    "meme coin",
     "defi",
     "altcoin",
     "stablecoin",
@@ -217,7 +349,7 @@ const categoryNeedles: Record<string, string[]> = {
   ],
 }
 
-const targetCategoryIds = ["africa", "entertainment", "sports", "news", "crypto", "geopolitics"] as const
+const targetCategoryIds = ["africa", "entertainment", "sports", "news", "crypto", "tech", "finance", "politics", "legal", "geopolitics"] as const
 const targetCategoryNeedles = targetCategoryIds.flatMap((id) => categoryNeedles[id])
 const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> = {
   // Africa: AFCON/ACN tags + Soccer + FIFA WC + Egypt PL + Sports (broad catch-all)
@@ -228,6 +360,10 @@ const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> =
   sports: ["1"],
   news: ["2", "144"],
   crypto: ["21", "235", "101611", "1312"],
+  tech: ["1401", "439", "537", "103303", "101604"],
+  finance: ["120", "600", "370", "102000", "101250", "101247", "833"],
+  politics: ["2", "144", "100344", "933", "1558", "1588"],
+  legal: ["757"],
   geopolitics: ["100265", "1396", "101970", "366"],
 }
 const categoryExclusionNeedles: Record<string, string[]> = {
@@ -251,6 +387,20 @@ const categoryExclusionNeedles: Record<string, string[]> = {
     ...categoryNeedles.entertainment,
     ...categoryNeedles.sports,
     ...categoryNeedles.crypto,
+  ],
+  finance: [
+    "will bitcoin hit",
+    "will ethereum hit",
+    "will solana hit",
+    "price of bitcoin",
+    "price of ethereum",
+    "price of solana",
+  ],
+  tech: [
+    ...categoryNeedles.sports,
+    "box office",
+    "album",
+    "song",
   ],
   geopolitics: [
     ...categoryNeedles.entertainment,
@@ -350,8 +500,50 @@ function isCryptoMarket(text: string): boolean {
   return categoryNeedles.crypto.some((needle) => includesNeedle(text, needle.toLowerCase()))
 }
 
+const cryptoAssetNeedles: Record<string, string[]> = {
+  BTC: ["bitcoin", "btc"],
+  ETH: ["ethereum", "ether", "eth"],
+  SOL: ["solana", "sol"],
+  BNB: ["bnb", "binance coin"],
+  XRP: ["xrp", "ripple"],
+  DOGE: ["dogecoin", "doge"],
+  ADA: ["cardano", "ada"],
+  AVAX: ["avalanche", "avax"],
+  LINK: ["chainlink", "link"],
+  DOT: ["polkadot", "dot"],
+  POL: ["polygon", "matic", "pol"],
+  TRX: ["tron", "trx"],
+  TON: ["toncoin", "ton"],
+  SHIB: ["shiba", "shib"],
+  PEPE: ["pepe"],
+  WIF: ["wif", "dogwifhat"],
+  BONK: ["bonk"],
+  RENDER: ["render", "rndr"],
+  NEAR: ["near protocol", "near"],
+  SUI: ["sui"],
+  APT: ["aptos", "apt"],
+  ARB: ["arbitrum", "arb"],
+  OP: ["optimism"],
+}
+
+function detectCryptoAsset(text: string): string | null {
+  for (const [asset, needles] of Object.entries(cryptoAssetNeedles)) {
+    if (needles.some((needle) => includesNeedle(text, needle.toLowerCase()))) return asset
+  }
+  return null
+}
+
 function isAfricaMarket(text: string): boolean {
   return categoryNeedles.africa.some((needle) => includesNeedle(text, needle.toLowerCase()))
+}
+
+function detectTargetCategory(text: string): string | null {
+  const priority = ["crypto", "tech", "finance", "geopolitics", "politics", "legal", "sports", "entertainment", "africa", "news"]
+  for (const category of priority) {
+    const needles = categoryNeedles[category]
+    if (needles?.some((needle) => includesNeedle(text, needle.toLowerCase()))) return category
+  }
+  return null
 }
 
 function priceOpportunityScore(market: GammaMarketRaw): number {
@@ -373,7 +565,9 @@ function qualityBadges(input: {
   const badges: string[] = []
   const quick = isQuickSettle(input.endDate, input.now)
   const crypto = isCryptoMarket(input.text)
+  const asset = crypto ? detectCryptoAsset(input.text) : null
   const africa = isAfricaMarket(input.text)
+  if (asset) badges.push(asset)
   // Highest-priority combo badge
   if (quick && crypto) badges.push("24h Crypto")
   else if (quick) badges.push("Closes today")
@@ -399,6 +593,7 @@ function smartMarketScore(input: {
 }) {
   const quick = isQuickSettle(input.endDate, input.now)
   const crypto = isCryptoMarket(input.text)
+  const detectedCategory = detectTargetCategory(input.text)
   const hasVisual = Boolean(input.market.image || input.market.icon || input.event.image || input.event.icon)
   const hasTokens = parseTokenIds(input.market).length > 0
   const hours = hoursUntil(input.endDate, input.now)
@@ -416,6 +611,7 @@ function smartMarketScore(input: {
   const africa = isAfricaMarket(input.text)
   // Africa markets get a boost when browsing the Africa category
   const africaBoost = africa && input.normalizedCategory === "africa" ? 25 : 0
+  const categoryBoost = input.normalizedCategory !== "all" && input.normalizedCategory === detectedCategory ? 18 : 0
 
   return (
     logScore(input.liquidity) * 32 +
@@ -424,6 +620,7 @@ function smartMarketScore(input: {
     (crypto ? (input.normalizedCategory === "crypto" ? 26 : 16) : 0) +
     cryptoQuickBoost +
     africaBoost +
+    categoryBoost +
     priceOpportunityScore(input.market) * 10 +
     (hasTokens ? 8 : 0) +
     (hasVisual ? 5 : 0) +
@@ -435,18 +632,61 @@ function marketKey(market: GammaMarketRaw, event: GammaEventRaw) {
   return market.id ?? market.slug ?? market.conditionId ?? `${event.id}:${market.question}`
 }
 
+function pickUniqueMarkets(markets: FeedGammaMarket[], limit: number, used = new Set<string>()) {
+  const selected: FeedGammaMarket[] = []
+  for (const market of markets) {
+    const key = market.id ?? market.slug ?? market.conditionId ?? market.question
+    if (key && used.has(key)) continue
+    if (key) used.add(key)
+    selected.push(market)
+    if (selected.length >= limit) break
+  }
+  return selected
+}
+
+function blendAllCategoryMarkets(markets: FeedGammaMarket[], limit: number): FeedGammaMarket[] {
+  const used = new Set<string>()
+  const sorted = [...markets].sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0))
+  const priority = ["crypto", "tech", "finance", "geopolitics", "politics", "sports", "entertainment", "africa", "legal", "news"]
+  const categorySlots = Math.min(priority.length, Math.max(5, Math.round(limit * 0.7)))
+  const selected: FeedGammaMarket[] = []
+
+  for (const category of priority) {
+    if (selected.length >= categorySlots) break
+    selected.push(...pickUniqueMarkets(sorted.filter((market) => market.feedCategory === category), 1, used))
+  }
+
+  selected.push(...pickUniqueMarkets(sorted, limit - selected.length, used))
+  return selected.sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0)).slice(0, limit)
+}
+
+function blendCryptoAssetMarkets(markets: FeedGammaMarket[], limit: number, now: number): FeedGammaMarket[] {
+  const used = new Set<string>()
+  const sorted = [...markets].sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0))
+  const assetPriority = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "PEPE", "WIF", "BONK", "TRX", "TON"]
+  const assetSlots = Math.min(assetPriority.length, Math.max(4, Math.round(limit * 0.65)))
+  const selected: FeedGammaMarket[] = []
+
+  for (const asset of assetPriority) {
+    if (selected.length >= assetSlots) break
+    selected.push(...pickUniqueMarkets(sorted.filter((market) => market.cryptoAsset === asset), 1, used))
+  }
+
+  selected.push(
+    ...pickUniqueMarkets(
+      sorted.filter((market) => market.feedBadges?.includes("24h Crypto") || isQuickSettle(market.endDate ?? market.end_date_iso, now)),
+      Math.max(0, Math.round(limit * 0.25)),
+      used
+    )
+  )
+  selected.push(...pickUniqueMarkets(sorted, limit - selected.length, used))
+  return selected.sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0)).slice(0, limit)
+}
+
 function blendSmartMarkets(markets: FeedGammaMarket[], limit: number, now: number): FeedGammaMarket[] {
   const used = new Set<string>()
   const pick = (pool: FeedGammaMarket[], count: number) => {
-    const selected: FeedGammaMarket[] = []
-    for (const market of pool) {
-      const key = market.id ?? market.slug ?? market.conditionId ?? market.question
-      if (key && used.has(key)) continue
-      if (key) used.add(key)
-      selected.push(market)
-      if (selected.length >= count) break
-    }
-    return selected
+    return pickUniqueMarkets(pool, count, used)
   }
 
   const sorted = [...markets].sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0))
@@ -599,9 +839,9 @@ function fetchGammaMarketsAsEvents(baseParams: URLSearchParams): Promise<GammaEv
   ])
 }
 
-// For "all" + trending/volume, use the highest-traffic tags.
-// All 4 crypto tag IDs included so 24h crypto markets are never missed.
-const FAST_ALL_TAG_IDS = ["21", "235", "101611", "1312", "2", "596", "1", "102974", "102969"] // all crypto + news + entertainment + sports + AFCON
+// For "all" + trending/volume, use curated tags across categories Rawli can analyze.
+// This gives the first screen category diversity instead of whichever single tag is hottest.
+const FAST_ALL_TAG_IDS = Array.from(new Set(targetCategoryIds.flatMap((id) => categoryFeedTagIds[id])))
 
 export async function fetchPolymarketMarkets(
   category?: string,
@@ -613,12 +853,15 @@ export async function fetchPolymarketMarkets(
   try {
     const normalizedCat = normalizeCategory(category)
     const fastAllFeed = normalizedCat === "all" && (sortBy === "trending" || sortBy === "volume") && !search
+    const cryptoCategory = normalizedCat === "crypto"
     const fetchLimit =
       fastAllFeed
-        ? Math.max(limit * 2, 24)
+        ? Math.max(limit * 8, 96)
+        : cryptoCategory
+        ? Math.max(limit * 20, 240)
         : sortBy === "daily"
         ? Math.max(limit * 24, 240)
-        : Math.max(limit * 4, 48)
+        : Math.max(limit * 8, 96)
     const baseParams = new URLSearchParams({
       active: "true",
       closed: "false",
@@ -640,7 +883,7 @@ export async function fetchPolymarketMarkets(
       baseParams.set("offset", "0")
     }
 
-    // Fast path: "all" with trending/volume uses only broad tags (not 14)
+    // Fast path: "all" uses the curated category tag union, served from backend prewarm caches.
     const tagIds = fastAllFeed
       ? FAST_ALL_TAG_IDS
       : getCategoryFeedTagIds(category)
@@ -648,14 +891,10 @@ export async function fetchPolymarketMarkets(
 
     let batchEvents: GammaEventRaw[]
     try {
-      // The broad All feed is fastest through Gamma's markets index. Category
-      // feeds still use the batched event route for tighter tag targeting.
-      batchEvents = fastAllFeed
-        ? await fetchGammaMarketsAsEvents(baseParams)
-        : await fetchGammaEventsBatch(baseParams, tagIds)
+      batchEvents = await fetchGammaEventsBatch(baseParams, tagIds)
     } catch (err) {
       if (!fastAllFeed) throw err
-      batchEvents = await fetchGammaEventsBatch(baseParams, tagIds)
+      batchEvents = await fetchGammaMarketsAsEvents(baseParams)
     }
 
     const mergedEvents = new Map<string, GammaEventRaw>()
@@ -720,6 +959,8 @@ export async function fetchPolymarketMarkets(
           endDate,
           tags: candidate.tags ?? event.tags,
         }
+        enriched.feedCategory = detectTargetCategory(haystack) ?? normalizedCategory
+        enriched.cryptoAsset = detectCryptoAsset(haystack) ?? undefined
         enriched.feedBadges = qualityBadges({
           market: enriched,
           event,
@@ -780,7 +1021,11 @@ export async function fetchPolymarketMarkets(
     }
 
     const finalMarkets = sortBy === "trending" && !search
-      ? blendSmartMarkets(filteredBySearch, limit, now)
+      ? normalizedCategory === "all"
+        ? blendAllCategoryMarkets(filteredBySearch, limit)
+        : normalizedCategory === "crypto"
+        ? blendCryptoAssetMarkets(filteredBySearch, limit, now)
+        : blendSmartMarkets(filteredBySearch, limit, now)
       : filteredBySearch.slice(0, limit)
 
     return finalMarkets.map((m) => ({

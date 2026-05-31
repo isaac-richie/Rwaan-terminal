@@ -15,6 +15,12 @@ const FEED_PREWARM_INTERVAL_MS = 60_000;
 const PREWARM_TAG_IDS = [
   // crypto
   "21", "235", "101611", "1312",
+  // tech / AI
+  "1401", "439", "537", "103303", "101604",
+  // finance / macro
+  "120", "600", "370", "102000", "101250", "101247", "833",
+  // politics / legal
+  "100344", "933", "1558", "1588", "757",
   // news
   "2", "144",
   // entertainment
@@ -29,13 +35,21 @@ const PREWARM_TAG_IDS = [
 
 // CRITICAL: these params must byte-for-byte match what the web client sends for a
 // category switch, because `buildCacheKey` hashes the full param set (limit included).
-// The client uses limit=48 (display 12 × 4) at the default "trending" sort
-// (order=volume_24hr, ascending=false). A mismatch here = the prewarm cache never hits.
-const CATEGORY_EVENT_LIMIT = "48";
-const FEED_PREWARM_QUERIES: Array<Record<string, string>> = PREWARM_TAG_IDS.map((tagId) => ({
+// The default category feed uses limit=96; crypto uses a deeper limit=240 so
+// SOL/BNB/XRP/DOGE/altcoin markets are not crowded out by BTC/ETH.
+const CATEGORY_EVENT_LIMIT = "96";
+const CRYPTO_EVENT_LIMIT = "240";
+const CRYPTO_PREWARM_TAG_IDS = ["21", "235", "101611", "1312"];
+const FEED_PREWARM_QUERIES: Array<Record<string, string>> = [
+  ...PREWARM_TAG_IDS.map((tagId) => ({
   active: "true", closed: "false", compact: "true", limit: CATEGORY_EVENT_LIMIT, offset: "0",
   order: "volume_24hr", ascending: "false", tag_id: tagId, related_tags: "true",
-}));
+  })),
+  ...CRYPTO_PREWARM_TAG_IDS.map((tagId) => ({
+    active: "true", closed: "false", compact: "true", limit: CRYPTO_EVENT_LIMIT, offset: "0",
+    order: "volume_24hr", ascending: "false", tag_id: tagId, related_tags: "true",
+  })),
+];
 
 // The "all" feed loads through the Gamma markets index, not the events batch.
 // Client uses limit=24 (display 12 × 2) at the default trending sort.
