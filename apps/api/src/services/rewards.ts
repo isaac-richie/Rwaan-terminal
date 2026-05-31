@@ -6,7 +6,7 @@ const PREMIUM_UNLOCK_POINTS = 150;
 const PREMIUM_UNLOCK_CASHBACK_CENTS = 5;
 const TRADE_CASHBACK_BPS = 25;
 const MAX_TRADE_CASHBACK_CENTS = 100;
-const REFERRAL_POINTS = 500;
+export const REFERRAL_POINTS = 500;
 const DAILY_QUEST_POINTS: Record<string, number> = {
   daily_crypto_trade: 25,
   daily_quick_settle: 30,
@@ -77,7 +77,7 @@ export async function recordTradeReward(input: TradeRewardInput): Promise<void> 
 
   // After recording, check if this was the wallet's very first trade.
   // If it was, and if they were referred, fire the referral reward for their referrer.
-  void triggerReferralRewardIfFirstTrade(input.wallet);
+  await triggerReferralRewardIfFirstTrade(input.wallet);
 }
 
 /**
@@ -94,7 +94,6 @@ async function triggerReferralRewardIfFirstTrade(wallet: string): Promise<void> 
     const referrer = await getReferrerForReferee(wallet);
     if (!referrer) return; // Not referred
 
-    await markReferralRewarded(wallet);
     await recordRewardEvent({
       wallet: referrer,
       eventType: "referral_reward",
@@ -105,6 +104,7 @@ async function triggerReferralRewardIfFirstTrade(wallet: string): Promise<void> 
       marketId: null,
       metadata: { referee: wallet, source: "first_trade", earlyAdopter: isEarlyAdopter() },
     });
+    await markReferralRewarded(wallet);
   } catch {
     // Referral rewards are non-critical — never let them affect trade flow
   }

@@ -191,4 +191,54 @@ describe("points routes", () => {
       );
     });
   });
+
+  it("tracks referral codes and credits the referrer after the referee's first trade", async () => {
+    await withRewardStore(async () => {
+      const app = buildServer();
+
+      const codeRes = await app.inject({ method: "GET", url: `/referral/code/${walletB}` });
+      expect(codeRes.statusCode).toBe(200);
+      const referralCode = codeRes.json().code as string;
+      expect(referralCode).toMatch(/^RW[A-Z0-9]{8,}$/);
+
+      const trackRes = await app.inject({
+        method: "POST",
+        url: "/referral/track",
+        payload: { referrer: referralCode, referee: walletA },
+      });
+      expect(trackRes.statusCode).toBe(200);
+      expect(trackRes.json()).toMatchObject({ ok: true, recorded: true, referrer: walletB });
+
+      vi.mocked(getClobAuthenticated).mockResolvedValueOnce({
+        owner: walletA,
+        maker_address: walletA,
+        asset_id: tokenId,
+        price: "0.5",
+        original_size: "20",
+        size_matched: "10",
+      });
+
+      const rewardRes = await app.inject({
+        method: "POST",
+        url: "/points/events/trade",
+        headers: clobHeaders,
+        payload: tradePayload("order-referred-first-trade"),
+      });
+      expect(rewardRes.statusCode).toBe(200);
+
+      const statsRes = await app.inject({ method: "GET", url: `/referral/stats/${walletB}` });
+      expect(statsRes.statusCode).toBe(200);
+      expect(statsRes.json()).toMatchObject({
+        totalReferrals: 1,
+        rewardedReferrals: 1,
+        pendingReferrals: 0,
+        rewardPoints: 500,
+      });
+
+      const referrerSummaryRes = await app.inject({ method: "GET", url: `/points/summary/${walletB}` });
+      expect(referrerSummaryRes.statusCode).toBe(200);
+      expect(referrerSummaryRes.json().summary.totalPoints).toBe(500);
+      expect(referrerSummaryRes.json().summary.events.map((event: any) => event.eventType)).toContain("referral_reward");
+    });
+  });
 });

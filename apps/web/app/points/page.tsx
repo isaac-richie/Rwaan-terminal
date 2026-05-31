@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Award, BarChart3, CheckCircle2, ChevronRight, Copy,
-  Crown, Loader2, Lock, Sparkles, Star, Target,
+  Crown, Link2, Loader2, Lock, Sparkles, Star, Target,
   TrendingUp, Trophy, Users, Wallet, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -172,7 +172,7 @@ export default function PointsPage() {
   const readiness = useTradeReadiness({ connectedWalletAddress, profile: tradingProfile.profile });
   const collateral = readiness.readiness?.collateral ?? null;
   const depositAddress = tradingProfile.profile?.depositAddress?.evm ?? null;
-  const { stats: referralStats, referralLink } = useReferral(connectedWalletAddress);
+  const { stats: referralStats, referralCode, referralLink, loading: referralLoading, tracking: referralTracking } = useReferral(connectedWalletAddress);
   const [summary, setSummary] = useState<PointsSummary | null>(null);
   const [quests, setQuests] = useState<QuestSnapshot[]>(DEFAULT_QUESTS);
   const [questResetAt, setQuestResetAt] = useState<string | null>(null);
@@ -503,32 +503,65 @@ export default function PointsPage() {
         <section className="mt-10">
           <div className="mb-5">
             <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-muted-foreground">Referrals</div>
-            <h2 className="mt-1 text-2xl font-bold text-foreground">+500 pts per trader you bring in.</h2>
+            <h2 className="mt-1 text-2xl font-bold text-foreground">Invite traders. Earn points automatically.</h2>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Invite link */}
+            {/* Invite code */}
             <div className="surface-card rounded-2xl p-5">
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground mb-4">
-                <Users className="h-3.5 w-3.5 text-[oklch(0.72_0.22_45)]" />
-                Your referral link
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                  <Users className="h-3.5 w-3.5 text-[oklch(0.72_0.22_45)]" />
+                  Your referral code
+                </div>
+                <span className="rounded-full border border-[oklch(0.78_0.16_82/0.20)] bg-[oklch(0.78_0.16_82/0.08)] px-2.5 py-1 font-mono text-[10px] font-bold text-[oklch(0.82_0.16_82)]">
+                  +{referralStats?.rewardPoints ?? 500} pts
+                </span>
               </div>
-              {connectedWalletAddress && referralLink ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 min-w-0 rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.013_255)] px-4 py-3">
-                    <p className="font-mono text-[11px] text-muted-foreground truncate">{referralLink}</p>
+
+              {connectedWalletAddress ? (
+                <div className="space-y-3">
+                  <div className="flex items-stretch gap-2">
+                    <div className="flex min-h-14 flex-1 min-w-0 items-center rounded-2xl border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.07)] px-4">
+                      <span className="font-mono text-xl font-bold tracking-[0.10em] text-foreground sm:text-2xl">
+                        {referralCode || "LOADING"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!referralCode) return;
+                        void navigator.clipboard.writeText(referralCode);
+                        toast.success("Referral code copied");
+                      }}
+                      disabled={!referralCode}
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.013_255)] transition-colors hover:border-[oklch(0.78_0.16_82/0.4)] disabled:opacity-40"
+                      aria-label="Copy referral code"
+                    >
+                      <Copy className="h-4 w-4 text-muted-foreground" />
+                    </button>
                   </div>
+
                   <button
-                    onClick={() => { navigator.clipboard.writeText(referralLink); toast.success("Copied!"); }}
-                    className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.013_255)] hover:border-[oklch(0.78_0.16_82/0.4)] transition-colors shrink-0"
+                    type="button"
+                    onClick={() => {
+                      if (!referralLink) return;
+                      void navigator.clipboard.writeText(referralLink);
+                      toast.success("Invite link copied");
+                    }}
+                    disabled={!referralLink}
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.013_255)] px-4 text-[12px] font-bold text-foreground transition-colors hover:border-[oklch(0.78_0.16_82/0.4)] disabled:opacity-40"
                   >
-                    <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Link2 className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
+                    Copy invite link
                   </button>
+
+                  <p className="font-mono text-[10px] text-muted-foreground truncate">{referralLink || "Generating invite link..."}</p>
                 </div>
               ) : (
-                <p className="text-[12px] text-muted-foreground">Connect wallet to generate your referral link.</p>
+                <p className="text-[12px] leading-5 text-muted-foreground">Connect wallet to generate your referral code and invite link.</p>
               )}
               <p className="mt-3 text-[11px] text-muted-foreground leading-5">
-                Referred wallet completes its first trade → you earn <span className="text-[oklch(0.78_0.16_82)] font-semibold">+500 points</span>.
+                A referred wallet connects through your code and completes its first Rawli-routed trade. Your points credit automatically.
               </p>
             </div>
 
@@ -537,6 +570,7 @@ export default function PointsPage() {
               <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground mb-4">
                 <Trophy className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
                 Your referrals
+                {(referralLoading || referralTracking) && <Loader2 className="h-3 w-3 animate-spin" />}
               </div>
               <div className="grid grid-cols-3 gap-3">
                 {[
@@ -551,7 +585,7 @@ export default function PointsPage() {
                 ))}
               </div>
               <p className="mt-3 text-[11px] text-muted-foreground leading-5">
-                Rewards credit when a referred wallet executes its first trade.
+                Pending invites become rewarded when the new trader completes their first eligible trade.
               </p>
             </div>
           </div>

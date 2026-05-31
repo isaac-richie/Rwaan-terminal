@@ -2,6 +2,7 @@
 
 import { PrivyProvider } from "@privy-io/react-auth";
 import { polygon, bsc } from "viem/chains";
+import { ReferralTracker } from "@/components/referral-tracker";
 import { Toaster } from "@/components/ui/sonner";
 import type { ReactNode } from "react";
 
@@ -56,7 +57,10 @@ export default function Providers({ children }: { children: ReactNode }) {
         },
       }}
     >
-      {content}
+      <>
+        <ReferralTracker />
+        {content}
+      </>
     </PrivyProvider>
   );
 }

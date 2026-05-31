@@ -48,3 +48,23 @@ CREATE TABLE IF NOT EXISTS reward_events (
 
 CREATE INDEX IF NOT EXISTS idx_reward_events_wallet_created
   ON reward_events(wallet, created_at);
+
+CREATE TABLE IF NOT EXISTS referrals (
+  id         BIGSERIAL PRIMARY KEY,
+  referrer   TEXT NOT NULL,
+  referee    TEXT NOT NULL UNIQUE,
+  rewarded   BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer
+  ON referrals(referrer);
+
+CREATE TABLE IF NOT EXISTS referral_codes (
+  wallet     TEXT PRIMARY KEY,
+  code       TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_codes_code
+  ON referral_codes(code);

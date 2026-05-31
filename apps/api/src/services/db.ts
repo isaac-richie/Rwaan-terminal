@@ -104,6 +104,15 @@ const sqliteSchema = `
   CREATE INDEX IF NOT EXISTS idx_referrals_referrer
     ON referrals(referrer);
 
+  CREATE TABLE IF NOT EXISTS referral_codes (
+    wallet     TEXT PRIMARY KEY,
+    code       TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_referral_codes_code
+    ON referral_codes(code);
+
   CREATE TABLE IF NOT EXISTS prediction_log (
     signal_hash       TEXT PRIMARY KEY,
     market_id         TEXT NOT NULL,
@@ -189,6 +198,15 @@ const postgresSchema = `
 
   CREATE INDEX IF NOT EXISTS idx_referrals_referrer
     ON referrals(referrer);
+
+  CREATE TABLE IF NOT EXISTS referral_codes (
+    wallet     TEXT PRIMARY KEY,
+    code       TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_referral_codes_code
+    ON referral_codes(code);
 
   CREATE TABLE IF NOT EXISTS prediction_log (
     signal_hash       TEXT PRIMARY KEY,
@@ -1002,10 +1020,94 @@ export async function recordGasAssist(input: {
 
 export type ReferralStats = {
   referrer: string;
+  referralCode: string;
   totalReferrals: number;
   rewardedReferrals: number;
   pendingReferrals: number;
 };
+
+export type ReferralCodeRecord = {
+  wallet: string;
+  code: string;
+};
+
+const REFERRAL_CODE_RE = /^[A-Z0-9]{6,16}$/;
+
+function normalizeReferralCode(input: string): string {
+  return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function referralCodeCandidate(wallet: string, attempt: number): string {
+  const body = wallet.replace(/^0x/i, "").toUpperCase();
+  const leftStart = (attempt * 4) % Math.max(body.length - 4, 1);
+  const left = body.slice(leftStart, leftStart + 4).padEnd(4, "0");
+  const rightStart = Math.max(0, body.length - 4 - attempt * 3);
+  const right = body.slice(rightStart, rightStart + 4).padEnd(4, "0");
+  const suffix = attempt === 0 ? "" : attempt.toString(36).toUpperCase();
+  return `RW${left}${right}${suffix}`.slice(0, 16);
+}
+
+export async function getOrCreateReferralCode(walletInput: string): Promise<ReferralCodeRecord> {
+  assertEvmAddress(walletInput, "wallet");
+  const wallet = walletInput.toLowerCase();
+  const createdAt = new Date().toISOString();
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    const existing = await pool.query<{ code: string }>("SELECT code FROM referral_codes WHERE wallet = $1 LIMIT 1", [wallet]);
+    if (existing.rows[0]?.code) return { wallet, code: existing.rows[0].code };
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const code = referralCodeCandidate(wallet, attempt);
+      try {
+        const inserted = await pool.query<{ code: string }>(
+          `
+            INSERT INTO referral_codes (wallet, code, created_at)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (wallet) DO NOTHING
+            RETURNING code
+          `,
+          [wallet, code, createdAt],
+        );
+        if (inserted.rows[0]?.code) return { wallet, code: inserted.rows[0].code };
+
+        const row = await pool.query<{ code: string }>("SELECT code FROM referral_codes WHERE wallet = $1 LIMIT 1", [wallet]);
+        if (row.rows[0]?.code) return { wallet, code: row.rows[0].code };
+      } catch (err: any) {
+        if (err?.code !== "23505") throw err;
+      }
+    }
+    throw new Error("referral_code_generation_failed");
+  }
+
+  const db = await getDb();
+  const existing = db.prepare("SELECT code FROM referral_codes WHERE wallet = ? LIMIT 1").get(wallet) as { code: string } | undefined;
+  if (existing?.code) return { wallet, code: existing.code };
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const code = referralCodeCandidate(wallet, attempt);
+    db.prepare("INSERT OR IGNORE INTO referral_codes (wallet, code, created_at) VALUES (?, ?, ?)").run(wallet, code, createdAt);
+    const row = db.prepare("SELECT code FROM referral_codes WHERE wallet = ? LIMIT 1").get(wallet) as { code: string } | undefined;
+    if (row?.code) return { wallet, code: row.code };
+  }
+
+  throw new Error("referral_code_generation_failed");
+}
+
+export async function resolveReferralCode(input: string): Promise<string | null> {
+  const code = normalizeReferralCode(input);
+  if (!REFERRAL_CODE_RE.test(code)) return null;
+
+  if (usePostgres()) {
+    const pool = await getPgPool();
+    const { rows } = await pool.query<{ wallet: string }>("SELECT wallet FROM referral_codes WHERE code = $1 LIMIT 1", [code]);
+    return rows[0]?.wallet ?? null;
+  }
+
+  const db = await getDb();
+  const row = db.prepare("SELECT wallet FROM referral_codes WHERE code = ? LIMIT 1").get(code) as { wallet: string } | undefined;
+  return row?.wallet ?? null;
+}
 
 /**
  * Record a new referee linking to a referrer.
@@ -1050,6 +1152,7 @@ export async function recordReferral(input: {
 export async function getReferralStats(walletInput: string): Promise<ReferralStats> {
   assertEvmAddress(walletInput, "wallet");
   const referrer = walletInput.toLowerCase();
+  const referralCode = (await getOrCreateReferralCode(referrer)).code;
 
   if (usePostgres()) {
     const pool = await getPgPool();
@@ -1067,6 +1170,7 @@ export async function getReferralStats(walletInput: string): Promise<ReferralSta
     const rewardedCount = Number(rows[0]?.rewarded ?? 0);
     return {
       referrer,
+      referralCode,
       totalReferrals: total,
       rewardedReferrals: rewardedCount,
       pendingReferrals: total - rewardedCount,
@@ -1081,6 +1185,7 @@ export async function getReferralStats(walletInput: string): Promise<ReferralSta
   const rewardedCount = Number(row?.rewarded ?? 0);
   return {
     referrer,
+    referralCode,
     totalReferrals: total,
     rewardedReferrals: rewardedCount,
     pendingReferrals: total - rewardedCount,

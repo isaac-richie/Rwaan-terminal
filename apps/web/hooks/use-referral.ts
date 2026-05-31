@@ -6,9 +6,23 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"
 
 export type ReferralStats = {
   referrer: string
+  referralCode: string
+  rewardPoints: number
   totalReferrals: number
   rewardedReferrals: number
   pendingReferrals: number
+}
+
+const PENDING_REFERRAL_KEY = "rawli.pendingReferral"
+const REFERRAL_CODE_RE = /^[A-Za-z0-9-]{3,32}$/
+const EVM_RE = /^0x[a-fA-F0-9]{40}$/
+
+function normalizeIncomingRef(value: string | null): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (EVM_RE.test(trimmed)) return trimmed.toLowerCase()
+  const code = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "")
+  return REFERRAL_CODE_RE.test(code) ? code : null
 }
 
 /**
@@ -23,34 +37,61 @@ export function useReferral(wallet: string | null | undefined) {
   const [stats, setStats] = useState<ReferralStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [referralLink, setReferralLink] = useState<string>("")
+  const [referralCode, setReferralCode] = useState<string>("")
+  const [tracking, setTracking] = useState(false)
 
-  // Process incoming ?ref= param
+  // Capture incoming ?ref=CODE immediately, even before the wallet connects.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+    const ref = normalizeIncomingRef(params.get("ref") ?? params.get("r"))
+    if (!ref) return
+
+    window.localStorage.setItem(PENDING_REFERRAL_KEY, ref)
+
+    // Clean the ref param from the URL without a full reload
+    params.delete("ref")
+    params.delete("r")
+    const newUrl = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}`
+    window.history.replaceState({}, "", newUrl)
+  }, [])
+
+  // Process stored referral once the referee wallet is known.
   useEffect(() => {
     if (!wallet) return
     if (typeof window === "undefined") return
 
-    const params = new URLSearchParams(window.location.search)
-    const ref = params.get("ref")
-    if (!ref || ref.toLowerCase() === wallet.toLowerCase()) return
+    const ref = normalizeIncomingRef(window.localStorage.getItem(PENDING_REFERRAL_KEY))
+    if (!ref || ref.toLowerCase() === wallet.toLowerCase()) {
+      window.localStorage.removeItem(PENDING_REFERRAL_KEY)
+      return
+    }
 
-    // Record referral (fire-and-forget, backend is idempotent)
+    let alive = true
+    setTracking(true)
     fetch(`${API_BASE}/referral/track`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ referrer: ref, referee: wallet }),
-    }).catch(() => {/* ignore — non-critical */})
+    })
+      .then((res) => {
+        if (res.ok || res.status === 404) {
+          window.localStorage.removeItem(PENDING_REFERRAL_KEY)
+        }
+      })
+      .catch(() => {/* ignore — non-critical */})
+      .finally(() => { if (alive) setTracking(false) })
 
-    // Clean the ref param from the URL without a full reload
-    params.delete("ref")
-    const newUrl = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}`
-    window.history.replaceState({}, "", newUrl)
+    return () => { alive = false }
   }, [wallet])
 
-  // Build shareable referral link for this wallet
+  // Build shareable referral link for this wallet once stats/code are loaded.
   useEffect(() => {
     if (!wallet || typeof window === "undefined") return
-    setReferralLink(`${window.location.origin}/?ref=${wallet}`)
-  }, [wallet])
+    const ref = referralCode || wallet
+    setReferralLink(`${window.location.origin}/?ref=${encodeURIComponent(ref)}`)
+  }, [referralCode, wallet])
 
   // Fetch referral stats
   const fetchStats = useCallback(async () => {
@@ -61,8 +102,12 @@ export function useReferral(wallet: string | null | undefined) {
       if (!res.ok) return
       const data = await res.json() as ReferralStats & { ok: boolean }
       if (data.ok) {
+        const code = data.referralCode ?? ""
+        setReferralCode(code)
         setStats({
           referrer: data.referrer,
+          referralCode: code,
+          rewardPoints: Number(data.rewardPoints ?? 500),
           totalReferrals: data.totalReferrals,
           rewardedReferrals: data.rewardedReferrals,
           pendingReferrals: data.pendingReferrals,
@@ -79,5 +124,5 @@ export function useReferral(wallet: string | null | undefined) {
     fetchStats()
   }, [fetchStats])
 
-  return { stats, loading, referralLink, refetch: fetchStats }
+  return { stats, loading, tracking, referralCode, referralLink, refetch: fetchStats }
 }
