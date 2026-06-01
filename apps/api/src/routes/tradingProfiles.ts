@@ -40,8 +40,14 @@ export async function tradingProfileRoutes(app: FastifyInstance): Promise<void> 
       return { error: "invalid_trading_profile_payload", issues: body.error.issues };
     }
 
-    const profile = await resolveTradingProfile(body.data);
-    return { profile };
+    const result = await resolveTradingProfile(body.data);
+    if (result.reason === "profile_mutation_blocked") {
+      req.log.warn(
+        { connectedWalletAddress: body.data.connectedWalletAddress },
+        "Blocked trading profile mutation via public resolve"
+      );
+    }
+    return result;
   });
 
   app.post<{ Params: { connectedWalletAddress: string } }>(

@@ -17,12 +17,34 @@ export async function getTradingProfile(connectedWalletAddress: string): Promise
   return getProfile(connectedWalletAddress);
 }
 
+export type ResolveTradingProfileResult = {
+  profile: TradingProfile;
+  unchanged?: boolean;
+  reason?: "profile_exists" | "profile_mutation_blocked";
+};
+
 export async function resolveTradingProfile(input: {
   connectedWalletAddress: string;
   tradingWalletAddress?: string;
   tradingWalletKind?: TradingWalletKind;
-}): Promise<TradingProfile> {
-  return upsertProfile(input);
+}): Promise<ResolveTradingProfileResult> {
+  const existing = await getProfile(input.connectedWalletAddress);
+  if (existing) {
+    const requestedWallet = input.tradingWalletAddress?.toLowerCase();
+    const requestedKind = input.tradingWalletKind;
+    const walletMutation = Boolean(
+      requestedWallet && requestedWallet !== existing.tradingWalletAddress.toLowerCase()
+    );
+    const kindMutation = Boolean(requestedKind && requestedKind !== existing.tradingWalletKind);
+
+    return {
+      profile: existing,
+      unchanged: true,
+      reason: walletMutation || kindMutation ? "profile_mutation_blocked" : "profile_exists",
+    };
+  }
+
+  return { profile: await upsertProfile(input) };
 }
 
 export async function attachDepositAddress(
