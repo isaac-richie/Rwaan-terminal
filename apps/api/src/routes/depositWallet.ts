@@ -78,6 +78,13 @@ const claimSubmitSchema = z.object({
   signature: z.string().regex(/^0x[a-fA-F0-9]+$/),
 });
 
+function depositWalletSubmitStatus(errorMessage: string | undefined, clientErrors: Set<string>) {
+  const normalized = String(errorMessage ?? "").toLowerCase();
+  if (clientErrors.has(errorMessage ?? "") || normalized.includes("invalid signature")) return 400;
+  if (errorMessage === "builder_relayer_not_configured") return 503;
+  return 502;
+}
+
 export async function depositWalletRoutes(app: FastifyInstance): Promise<void> {
   app.get("/deposit-wallet/status", async (req, reply) => {
     const parsed = statusQuerySchema.safeParse(req.query ?? null);
@@ -155,7 +162,7 @@ export async function depositWalletRoutes(app: FastifyInstance): Promise<void> {
         "deposit_wallet_batch_mismatch",
         "invalid_signature",
       ]);
-      reply.status(clientErrors.has(err?.message) ? 400 : err?.message === "builder_relayer_not_configured" ? 503 : 502);
+      reply.status(depositWalletSubmitStatus(err?.message, clientErrors));
       return { ok: false, error: err?.message ?? "deposit_wallet_approval_submit_failed" };
     }
   });
@@ -209,7 +216,7 @@ export async function depositWalletRoutes(app: FastifyInstance): Promise<void> {
         "invalid_signature",
         "invalid_withdraw_amount",
       ]);
-      reply.status(clientErrors.has(err?.message) ? 400 : err?.message === "builder_relayer_not_configured" ? 503 : 502);
+      reply.status(depositWalletSubmitStatus(err?.message, clientErrors));
       return { ok: false, error: err?.message ?? "deposit_wallet_withdraw_submit_failed" };
     }
   });
@@ -263,7 +270,7 @@ export async function depositWalletRoutes(app: FastifyInstance): Promise<void> {
         "invalid_signature",
         "invalid_condition_id",
       ]);
-      reply.status(clientErrors.has(err?.message) ? 400 : err?.message === "builder_relayer_not_configured" ? 503 : 502);
+      reply.status(depositWalletSubmitStatus(err?.message, clientErrors));
       return { ok: false, error: err?.message ?? "deposit_wallet_claim_submit_failed" };
     }
   });

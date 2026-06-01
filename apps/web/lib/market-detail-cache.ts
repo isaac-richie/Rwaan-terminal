@@ -1,7 +1,7 @@
 import type { PolymarketMarket } from "./polymarket"
 
 const MARKET_DETAIL_CACHE_PREFIX = "rawli:market-detail:"
-const MARKET_DETAIL_CACHE_TTL_MS = 10 * 60_000
+const MARKET_DETAIL_CACHE_TTL_MS = 24 * 60 * 60_000
 
 export type CachedMarketDetail = {
   cachedAt: number

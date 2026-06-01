@@ -225,6 +225,9 @@ function claimErrorMessage(err: any) {
   if (normalized.includes("builder_relayer_not_configured")) {
     return "Relayed deposit-wallet claims are not configured on the backend."
   }
+  if (normalized.includes("signature")) {
+    return "Claim signature could not be verified. Refresh, sign a fresh claim, and try again."
+  }
   if (normalized.includes("deposit_wallet")) {
     return "Deposit-wallet claim failed. Refresh the portfolio and try again."
   }
