@@ -18,7 +18,7 @@ const tickerItems = [
 
 const stats = [
   { label: "Total Volume", value: "$1.24B", sub: "+12.4% this week", icon: DollarSign, up: true },
-  { label: "Open Markets", value: "3,847", sub: "across 12 categories", icon: Activity, up: true },
+  { label: "Open Markets", value: "3,847", sub: "across 6 focus lanes", icon: Activity, up: true },
   { label: "Liquidity Pools", value: "$284M", sub: "+$8.2M today", icon: TrendingUp, up: true },
   { label: "Active Traders", value: "142K", sub: "24h unique wallets", icon: Users, up: false },
 ]

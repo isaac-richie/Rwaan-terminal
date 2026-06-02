@@ -6,15 +6,11 @@ import {
   Coins,
   Flame,
   Trophy,
-  Sparkles,
-  Newspaper,
   ArrowDownUp,
   ChevronDown,
   MapPin,
-  Cpu,
-  Landmark,
-  Scale,
   TrendingUp,
+  Sparkles,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -30,16 +26,12 @@ type CategoryItem = {
 
 const polymarketCategories: CategoryItem[] = [
   { id: "all", label: "All", icon: Flame },
-  { id: "Africa", label: "Africa 🌍", icon: MapPin },
   { id: "Crypto", label: "Crypto", icon: Coins },
-  { id: "Tech", label: "Tech / AI", icon: Cpu },
-  { id: "Finance", label: "Finance", icon: TrendingUp },
-  { id: "Politics", label: "Politics", icon: Landmark },
-  { id: "Legal", label: "Legal", icon: Scale },
-  { id: "Entertainment", label: "Entertainment", icon: Sparkles },
+  { id: "Africa", label: "Africa 🌍", icon: MapPin },
   { id: "Sports", label: "Sport", icon: Trophy },
-  { id: "News", label: "News", icon: Newspaper },
-  { id: "Geopolitics", label: "Geopolitics", icon: Globe },
+  { id: "Entertainment", label: "Entertainment", icon: Sparkles },
+  { id: "World", label: "World", icon: Globe },
+  { id: "Macro", label: "Macro", icon: TrendingUp },
 ]
 
 const sortOptions = [

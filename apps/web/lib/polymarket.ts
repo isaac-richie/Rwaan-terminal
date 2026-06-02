@@ -111,10 +111,23 @@ const categoryNeedles: Record<string, string[]> = {
     "afcon", "africa cup", "caf", "super eagles", "black stars",
     "bafana bafana", "pharaohs", "teranga lions", "atlas lions",
     "indomitable lions", "eagles of carthage", "harambee stars",
+    // African athletes and clubs with liquid global markets
+    "mohamed salah", "salah", "victor osimhen", "osimhen", "sadio mane",
+    "sadio mané", "achraf hakimi", "hakimi", "riyad mahrez", "mahrez",
+    "andre onana", "onana", "ademola lookman", "lookman", "mohammed kudus",
+    "kudus", "thomas partey", "partey", "pierre-emerick aubameyang",
+    "aubameyang", "boniface", "mbeumo", "nicolas jackson", "israel adesanya",
+    "adesanya", "kamaru usman", "francis ngannou", "ngannou",
+    "dricus du plessis", "du plessis", "anthony joshua", "joel embiid",
+    "embiid", "pascal siakam", "siakam", "giannis", "antetokounmpo",
+    // African entertainment and creator culture
+    "wizkid", "burna boy", "davido", "tems", "tyla", "rema", "ayra starr",
+    "asake", "afrobeats", "afrobeat", "nollywood", "uncle waffles",
+    "amaarae", "tiwa savage", "yemi alade", "shaboozey",
     // General
     "african", "africa",
     // Economic
-    "naira", "cedi", "rand", "birr", "shilling",
+    "naira", "cedi", "south african rand", "zar", "birr", "shilling",
   ],
   entertainment: [
     "entertainment",
@@ -130,6 +143,16 @@ const categoryNeedles: Record<string, string[]> = {
     "awards",
     "oscars",
     "grammys",
+    "emmys",
+    "billboard",
+    "spotify",
+    "netflix",
+    "disney",
+    "taylor swift",
+    "drake",
+    "kendrick",
+    "beyonce",
+    "bad bunny",
     "box office",
     "gta",
   ],
@@ -347,24 +370,95 @@ const categoryNeedles: Record<string, string[]> = {
     "border",
     "treaty",
   ],
+  world: [
+    "politics",
+    "political",
+    "election",
+    "elections",
+    "president",
+    "senate",
+    "congress",
+    "parliament",
+    "prime minister",
+    "government",
+    "policy",
+    "court",
+    "supreme court",
+    "legal",
+    "lawsuit",
+    "trial",
+    "ruling",
+    "regulation",
+    "sanction",
+    "geopolitics",
+    "geopolitical",
+    "war",
+    "ceasefire",
+    "nato",
+    "iran",
+    "china",
+    "russia",
+    "ukraine",
+    "israel",
+    "gaza",
+    "taiwan",
+    "military",
+    "border",
+    "treaty",
+  ],
+  macro: [
+    "finance",
+    "financial",
+    "business",
+    "economy",
+    "economic",
+    "macro",
+    "fed",
+    "fomc",
+    "rate cut",
+    "rate hike",
+    "interest rate",
+    "inflation",
+    "cpi",
+    "gdp",
+    "recession",
+    "jobs",
+    "unemployment",
+    "treasury",
+    "dollar",
+    "stock",
+    "stocks",
+    "ipo",
+    "earnings",
+    "nasdaq",
+    "s&p",
+    "sp500",
+    "oil",
+    "gold",
+    "etf",
+    "yield",
+    "kraken",
+    "coinbase",
+    "microstrategy",
+  ],
 }
 
-const targetCategoryIds = ["africa", "entertainment", "sports", "news", "crypto", "tech", "finance", "politics", "legal", "geopolitics"] as const
+const targetCategoryIds = ["crypto", "africa", "sports", "entertainment", "world", "macro"] as const
 const targetCategoryNeedles = targetCategoryIds.flatMap((id) => categoryNeedles[id])
 const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> = {
-  // Africa: AFCON/ACN tags + Soccer + FIFA WC + Egypt PL + Sports (broad catch-all)
-  // 102974 = Africa Cup of Nations, 102969 = Afcon, 100350 = Soccer,
-  // 102350 = 2026 FIFA World Cup, 102232 = FIFA World Cup, 104397 = Egypt Premier League
-  africa: ["102974", "102969", "100350", "102350", "102232", "104397", "2"],
-  entertainment: ["596", "100", "53"],
-  sports: ["1"],
-  news: ["2", "144"],
+  // Africa: broad sports/entertainment/world tags filtered by strict African identity needles.
+  africa: [
+    "102974", "102969", "104397",
+    "100350", "102350", "102232", "1",
+    "596", "100", "53",
+    "144", "100344", "933", "1558", "1588", "100265", "1396", "101970", "366",
+  ],
   crypto: ["21", "235", "101611", "1312"],
-  tech: ["1401", "439", "537", "103303", "101604"],
-  finance: ["120", "600", "370", "102000", "101250", "101247", "833"],
-  politics: ["2", "144", "100344", "933", "1558", "1588"],
-  legal: ["757"],
-  geopolitics: ["100265", "1396", "101970", "366"],
+  sports: ["1"],
+  entertainment: ["596", "100", "53"],
+  // World folds News + Politics + Legal + Geopolitics into one cleaner lane.
+  world: ["2", "144", "100344", "933", "1558", "1588", "757", "100265", "1396", "101970", "366"],
+  macro: ["120", "600", "370", "102000", "101250", "101247", "833"],
 }
 const categoryExclusionNeedles: Record<string, string[]> = {
   entertainment: [
@@ -382,6 +476,8 @@ const categoryExclusionNeedles: Record<string, string[]> = {
     "government",
     "senate",
     "congress",
+    "jesus christ",
+    "return before gta",
   ],
   news: [
     ...categoryNeedles.entertainment,
@@ -389,6 +485,14 @@ const categoryExclusionNeedles: Record<string, string[]> = {
     ...categoryNeedles.crypto,
   ],
   finance: [
+    "will bitcoin hit",
+    "will ethereum hit",
+    "will solana hit",
+    "price of bitcoin",
+    "price of ethereum",
+    "price of solana",
+  ],
+  macro: [
     "will bitcoin hit",
     "will ethereum hit",
     "will solana hit",
@@ -413,6 +517,14 @@ const categoryExclusionNeedles: Record<string, string[]> = {
     "acquire",
     "acquisition",
     "stock",
+    "box office",
+    "album",
+    "sales",
+  ],
+  world: [
+    ...categoryNeedles.entertainment,
+    ...categoryNeedles.sports,
+    ...categoryNeedles.crypto,
     "box office",
     "album",
     "sales",
@@ -537,8 +649,36 @@ function isAfricaMarket(text: string): boolean {
   return categoryNeedles.africa.some((needle) => includesNeedle(text, needle.toLowerCase()))
 }
 
+function focusedMarketText(market: GammaMarketRaw): string {
+  const marketTags = market.tags?.map((t) => t.label) ?? []
+  return [
+    ...marketTags,
+    market.category ?? "",
+    market.question ?? "",
+    market.slug ?? "",
+  ].join(" ").toLowerCase()
+}
+
+function isSingleTeamWinMarket(question?: string): boolean {
+  if (!question) return false
+  return /^will\s+.+\s+win\s+on\s+\d{4}-\d{2}-\d{2}\??$/i.test(question.trim())
+}
+
+function shouldKeepAfricaMarket(event: GammaEventRaw, market: GammaMarketRaw): boolean {
+  const fullText = marketText(event, market)
+  if (!isAfricaMarket(fullText)) return false
+
+  const focusedText = focusedMarketText(market)
+  if (isAfricaMarket(focusedText)) return true
+
+  // Match pages can contain African teams in the event title while individual
+  // submarkets ask for the non-African opponent to win. Keep draws/totals, drop
+  // those opponent-only win markets from the Africa lane.
+  return !isSingleTeamWinMarket(market.question)
+}
+
 function detectTargetCategory(text: string): string | null {
-  const priority = ["crypto", "tech", "finance", "geopolitics", "politics", "legal", "sports", "entertainment", "africa", "news"]
+  const priority = ["crypto", "africa", "sports", "entertainment", "macro", "world"]
   for (const category of priority) {
     const needles = categoryNeedles[category]
     if (needles?.some((needle) => includesNeedle(text, needle.toLowerCase()))) return category
@@ -647,7 +787,7 @@ function pickUniqueMarkets(markets: FeedGammaMarket[], limit: number, used = new
 function blendAllCategoryMarkets(markets: FeedGammaMarket[], limit: number): FeedGammaMarket[] {
   const used = new Set<string>()
   const sorted = [...markets].sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0))
-  const priority = ["crypto", "tech", "finance", "geopolitics", "politics", "sports", "entertainment", "africa", "legal", "news"]
+  const priority = ["crypto", "africa", "sports", "entertainment", "world", "macro"]
   const categorySlots = Math.min(priority.length, Math.max(5, Math.round(limit * 0.7)))
   const selected: FeedGammaMarket[] = []
 
@@ -919,7 +1059,9 @@ export async function fetchPolymarketMarkets(
 
       for (const candidate of candidates) {
         const haystack = marketText(event, candidate)
-        if (needles.length) {
+        if (normalizedCategory === "africa") {
+          if (!shouldKeepAfricaMarket(event, candidate)) continue
+        } else if (needles.length) {
           const fuzzyMatch = needles.length > 0 ? needles.some((needle) => includesNeedle(haystack, needle.toLowerCase())) : false
           const excluded = exclusionNeedles.some((needle) => includesNeedle(haystack, needle.toLowerCase()))
           if (!fuzzyMatch || excluded) continue

@@ -93,7 +93,7 @@ export function MarketHero() {
   const router = useRouter()
   // Hydrate from cache — instant render on re-navigation, no shimmers
   const cachedTrending = getCachedMarkets("all", 10, "trending", 0)
-  const cachedBreaking = getCachedMarkets("News", 14, "newest", 0)
+  const cachedBreaking = getCachedMarkets("World", 14, "newest", 0)
   const [trending, setTrending] = useState<PolymarketMarket[]>(cachedTrending ?? [])
   const [breaking, setBreaking] = useState<PolymarketMarket[]>(
     cachedBreaking?.length ? cachedBreaking : cachedTrending?.slice(0, 8) ?? []
@@ -120,7 +120,7 @@ export function MarketHero() {
       try {
         const [hotMarkets, newsMarkets] = await Promise.all([
           fetchMarkets("all", 10, "trending", 0),
-          fetchMarkets("News", 14, "newest", 0).catch(() => []),
+          fetchMarkets("World", 14, "newest", 0).catch(() => []),
         ])
         if (cancelled) return
         setTrending(hotMarkets)

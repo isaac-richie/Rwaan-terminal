@@ -380,7 +380,7 @@ const DOCS: Array<{
     icon: Zap,
     color: "oklch(0.78 0.16 82)",
     title: "Live Market Feed",
-    body: "Hundreds of active markets filtered by Africa 🌍, Crypto, Sports, News, and Geopolitics — surfacing the best opportunities first.",
+    body: "Hundreds of active markets filtered through Rawli's Crypto-first lanes — Crypto, Africa, Sports, Entertainment, World, and Macro.",
     detail: (
       <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
         <p>The Rawli market feed aggregates hundreds of live prediction markets and applies a smart ranking algorithm to surface the highest-quality trading opportunities first.</p>
@@ -390,9 +390,9 @@ const DOCS: Array<{
             <li>🪙 Crypto — BTC, ETH, SOL price & event markets</li>
             <li>🌍 Africa — Nigerian elections, AFCON, African markets</li>
             <li>⚽ Sports — football, basketball, tennis, F1</li>
-            <li>📰 News — geopolitics, breaking events</li>
-            <li>🏛️ Politics — global elections, governance</li>
-            <li>📈 Economics — rate decisions, inflation, GDP</li>
+            <li>✨ Entertainment — music, film, celebrity, awards, and culture markets</li>
+            <li>🌐 World — politics, legal, geopolitics, and breaking events</li>
+            <li>📈 Macro — rate decisions, inflation, GDP, commodities, and equities</li>
           </ul>
         </div>
         <p>24-hour crypto markets are pinned to the top of the feed — these markets resolve within a day, giving you fast feedback loops and high trading frequency opportunities.</p>
