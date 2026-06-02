@@ -5,9 +5,10 @@ import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import {
   ChevronDown, Copy, Menu, Search, Wallet, X, Briefcase,
-  TrendingUp, ArrowUpRight, Activity, Award, Bell, CircleDollarSign
+  TrendingUp, ArrowUpRight, Activity, Award, Bell, CircleDollarSign,
+  Check, LogOut, Plus
 } from "lucide-react"
-import { usePrivy } from "@privy-io/react-auth"
+import { usePrivy, type ConnectedWallet } from "@privy-io/react-auth"
 import { BnbFundingModal } from "@/components/funding/bnb-funding-modal"
 import {
   formatPortfolioMoney,
@@ -37,6 +38,33 @@ function walletGradient(addr: string) {
   const h1 = seed % 360
   const h2 = (seed * 137 + 60) % 360
   return `linear-gradient(135deg, oklch(0.55 0.18 ${h1}), oklch(0.45 0.16 ${h2}))`
+}
+
+function shortWalletAddress(address?: string | null) {
+  return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : ""
+}
+
+function sameWalletAddress(a?: string | null, b?: string | null) {
+  return Boolean(a && b && a.toLowerCase() === b.toLowerCase())
+}
+
+function isNavbarEthereumWallet(wallet: unknown): wallet is ConnectedWallet {
+  return Boolean(
+    wallet &&
+      typeof wallet === "object" &&
+      "type" in wallet &&
+      (wallet as { type?: unknown }).type === "ethereum" &&
+      "address" in wallet &&
+      typeof (wallet as { address?: unknown }).address === "string"
+  )
+}
+
+function walletActionError(err: any, fallback: string) {
+  const message = String(err?.shortMessage ?? err?.message ?? "")
+  const normalized = message.toLowerCase()
+  if (normalized.includes("user rejected") || normalized.includes("rejected")) return "Request cancelled in wallet."
+  if (normalized.includes("connector")) return "Wallet connector did not respond. Reopen the wallet and try again."
+  return message && message !== "[object Object]" ? message.slice(0, 180) : fallback
 }
 
 function numericValue(...values: any[]) {
@@ -336,6 +364,7 @@ function NavbarNotifications() {
 
 function PrivyDesktopWallet() {
   const router = useRouter()
+  const walletMenuRef = useRef<HTMLDivElement>(null)
   const [walletMenuOpen, setWalletMenuOpen] = useState(false)
   const [walletError, setWalletError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -343,43 +372,62 @@ function PrivyDesktopWallet() {
   const { ready, authenticated, login, logout, connectWallet } = usePrivy()
   const activePrivyWallet = useActivePrivyWallet()
   const walletAddress = activePrivyWallet.walletAddress
-  const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : ""
+  const shortAddress = shortWalletAddress(walletAddress)
+  const walletOptions = activePrivyWallet.wallets.filter(isNavbarEthereumWallet)
 
   useEffect(() => {
     if (!walletMenuOpen) return
-    const onClick = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest("[data-wallet-menu]")) setWalletMenuOpen(false)
+    const onClick = (e: PointerEvent) => {
+      if (!walletMenuRef.current?.contains(e.target as Node)) setWalletMenuOpen(false)
     }
-    window.addEventListener("mousedown", onClick)
-    return () => window.removeEventListener("mousedown", onClick)
+    window.addEventListener("pointerdown", onClick)
+    return () => window.removeEventListener("pointerdown", onClick)
   }, [walletMenuOpen])
 
   const handleConnect = async () => {
     setWalletError(null)
     try {
-      if (authenticated) connectWallet()
+      if (authenticated) await connectWallet()
       else await login()
     } catch (err: any) {
-      setWalletError(err?.message ?? "Connection failed")
+      setWalletError(walletActionError(err, "Connection failed. Try again."))
     }
   }
 
   const handleCopy = async () => {
-    await navigator.clipboard?.writeText(walletAddress!)
+    if (!walletAddress) return
+    await navigator.clipboard?.writeText(walletAddress)
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
     setWalletMenuOpen(false)
   }
 
+  const handleSelectWallet = (wallet: ConnectedWallet) => {
+    activePrivyWallet.rememberWallet(wallet)
+    setWalletError(null)
+    setWalletMenuOpen(false)
+  }
+
+  const handleSwitchWallet = async () => {
+    setWalletError(null)
+    setWalletMenuOpen(false)
+    try {
+      await connectWallet()
+    } catch (err: any) {
+      setWalletError(walletActionError(err, "Wallet switch failed. Try again."))
+    }
+  }
+
   const handleDisconnect = async () => {
     setDisconnecting(true)
+    setWalletError(null)
     setWalletMenuOpen(false)
     try {
       await logout()
-      window.localStorage.removeItem("smartmarket.wallet")
     } catch (err: any) {
-      setWalletError(err?.message ?? "Disconnect failed")
+      setWalletError(walletActionError(err, "Disconnect failed. Try again."))
     } finally {
+      window.localStorage.removeItem("smartmarket.wallet")
       setDisconnecting(false)
     }
   }
@@ -401,7 +449,7 @@ function PrivyDesktopWallet() {
   }
 
   return (
-    <div className="flex items-center gap-2" data-wallet-menu>
+    <div className="relative flex items-center gap-2" data-wallet-menu ref={walletMenuRef}>
       {/* BNB Chain pill */}
       <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[oklch(0.15_0.014_255/0.8)] border border-[oklch(0.22_0.015_255/0.6)]">
         <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
@@ -427,7 +475,7 @@ function PrivyDesktopWallet() {
         </button>
 
         {walletMenuOpen && (
-          <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[oklch(0.145_0.013_255)] border border-[oklch(0.22_0.015_255)] shadow-[0_20px_60px_oklch(0_0_0/0.6)] overflow-hidden z-50">
+          <div className="absolute right-0 mt-2 w-64 rounded-xl bg-[oklch(0.145_0.013_255)] border border-[oklch(0.22_0.015_255)] shadow-[0_20px_60px_oklch(0_0_0/0.6)] overflow-hidden z-[80]">
             {/* Menu header */}
             <div className="px-3.5 py-2.5 border-b border-[oklch(0.2_0.014_255)] flex items-center gap-2.5">
               <div
@@ -456,20 +504,53 @@ function PrivyDesktopWallet() {
                 <Copy className="w-3.5 h-3.5" />
                 {copied ? "Copied!" : "Copy address"}
               </button>
-              <button
-                onClick={() => { connectWallet(); setWalletMenuOpen(false) }}
-                className="w-full text-left px-3.5 py-2.5 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-[oklch(0.2_0.014_255)] transition-colors"
-              >
-                Switch wallet
-              </button>
             </div>
+
+            {walletOptions.length > 1 ? (
+              <div className="border-t border-[oklch(0.2_0.014_255)] py-1">
+                <div className="px-3.5 py-2 text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                  Connected wallets
+                </div>
+                {walletOptions.map((wallet) => {
+                  const selected = sameWalletAddress(wallet.address, walletAddress)
+                  return (
+                    <button
+                      key={wallet.address}
+                      type="button"
+                      onClick={() => handleSelectWallet(wallet)}
+                      className={cn(
+                        "w-full px-3.5 py-2.5 text-left text-[11px] font-medium transition-colors flex items-center gap-2.5",
+                        selected
+                          ? "bg-[oklch(0.78_0.16_82/0.10)] text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-[oklch(0.2_0.014_255)]"
+                      )}
+                    >
+                      <span
+                        className="h-5 w-5 shrink-0 rounded-full ring-1 ring-[oklch(0.78_0.16_82/0.25)]"
+                        style={{ background: walletGradient(wallet.address) }}
+                      />
+                      <span className="font-mono">{shortWalletAddress(wallet.address)}</span>
+                      {selected ? <Check className="ml-auto h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" /> : null}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
 
             <div className="border-t border-[oklch(0.2_0.014_255)] py-1">
               <button
+                onClick={handleSwitchWallet}
+                className="w-full text-left px-3.5 py-2.5 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-[oklch(0.2_0.014_255)] transition-colors flex items-center gap-2.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add / switch wallet
+              </button>
+              <button
                 onClick={handleDisconnect}
                 disabled={disconnecting}
-                className="w-full text-left px-3.5 py-2.5 text-[11px] font-medium text-[oklch(0.60_0.18_25)] hover:bg-[oklch(0.2_0.014_255)] hover:text-[oklch(0.68_0.2_25)] transition-colors"
+                className="w-full text-left px-3.5 py-2.5 text-[11px] font-medium text-[oklch(0.60_0.18_25)] hover:bg-[oklch(0.2_0.014_255)] hover:text-[oklch(0.68_0.2_25)] transition-colors flex items-center gap-2.5 disabled:opacity-60"
               >
+                <LogOut className="w-3.5 h-3.5" />
                 {disconnecting ? "Disconnecting…" : "Disconnect"}
               </button>
             </div>
@@ -478,7 +559,7 @@ function PrivyDesktopWallet() {
       </div>
 
       {walletError && (
-        <div className="absolute right-4 top-16 w-64 rounded-lg border border-[oklch(0.58_0.2_25/0.45)] bg-[oklch(0.16_0.014_255)] p-3 text-[11px] text-[oklch(0.68_0.2_25)] shadow-2xl z-50">
+        <div className="absolute right-0 top-12 w-64 rounded-lg border border-[oklch(0.58_0.2_25/0.45)] bg-[oklch(0.16_0.014_255)] p-3 text-[11px] text-[oklch(0.68_0.2_25)] shadow-2xl z-[80]">
           {walletError}
         </div>
       )}
@@ -487,25 +568,191 @@ function PrivyDesktopWallet() {
 }
 
 function PrivyMobileWallet({ onDone }: { onDone: () => void }) {
-  const { ready, authenticated, login, connectWallet } = usePrivy()
+  const router = useRouter()
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false)
+  const [walletError, setWalletError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
+  const { ready, authenticated, login, logout, connectWallet } = usePrivy()
   const activePrivyWallet = useActivePrivyWallet()
   const walletAddress = activePrivyWallet.walletAddress
-  const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : ""
+  const shortAddress = shortWalletAddress(walletAddress)
+  const walletOptions = activePrivyWallet.wallets.filter(isNavbarEthereumWallet)
+
+  const handleConnect = async () => {
+    setWalletError(null)
+    try {
+      if (walletAddress || authenticated) await connectWallet()
+      else await login()
+      onDone()
+    } catch (err: any) {
+      setWalletError(walletActionError(err, "Connection failed. Try again."))
+    }
+  }
+
+  const handleCopy = async () => {
+    if (!walletAddress) return
+    await navigator.clipboard?.writeText(walletAddress)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+
+  const handleSelectWallet = (wallet: ConnectedWallet) => {
+    activePrivyWallet.rememberWallet(wallet)
+    setWalletError(null)
+    onDone()
+  }
+
+  const handleSwitchWallet = async () => {
+    setWalletError(null)
+    setWalletMenuOpen(false)
+    try {
+      await connectWallet()
+      onDone()
+    } catch (err: any) {
+      setWalletError(walletActionError(err, "Wallet switch failed. Try again."))
+    }
+  }
+
+  const handleDisconnect = async () => {
+    setDisconnecting(true)
+    setWalletError(null)
+    try {
+      await logout()
+      onDone()
+    } catch (err: any) {
+      setWalletError(walletActionError(err, "Disconnect failed. Try again."))
+    } finally {
+      window.localStorage.removeItem("smartmarket.wallet")
+      setDisconnecting(false)
+    }
+  }
+
+  if (!walletAddress) {
+    return (
+      <div>
+        <button
+          onClick={handleConnect}
+          disabled={!ready || !activePrivyWallet.ready}
+          className="w-full mt-2 flex items-center justify-center gap-2 h-11 px-3 rounded-xl text-sm font-bold text-[oklch(0.12_0.01_255)] disabled:opacity-60"
+          style={{ background: "linear-gradient(135deg, oklch(0.82 0.16 82), oklch(0.72 0.18 75))" }}
+        >
+          <Wallet className="w-4 h-4" />
+          {!ready || !activePrivyWallet.ready ? "Loading…" : "Connect Wallet"}
+        </button>
+        {walletError ? (
+          <div className="mt-2 rounded-lg border border-[oklch(0.58_0.2_25/0.45)] bg-[oklch(0.16_0.014_255)] p-3 text-[11px] text-[oklch(0.68_0.2_25)]">
+            {walletError}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
 
   return (
-    <button
-      onClick={async () => {
-        if (walletAddress || authenticated) connectWallet()
-        else await login()
-        onDone()
-      }}
-      disabled={!ready || !activePrivyWallet.ready}
-      className="w-full mt-2 flex items-center justify-center gap-2 h-11 px-3 rounded-xl text-sm font-bold text-[oklch(0.12_0.01_255)] disabled:opacity-60"
-      style={{ background: "linear-gradient(135deg, oklch(0.82 0.16 82), oklch(0.72 0.18 75))" }}
-    >
-      <Wallet className="w-4 h-4" />
-      {walletAddress ? shortAddress : !ready || !activePrivyWallet.ready ? "Loading…" : "Connect Wallet"}
-    </button>
+    <div className="mt-2 overflow-hidden rounded-xl border border-[oklch(0.22_0.015_255/0.85)] bg-[oklch(0.13_0.013_255)]">
+      <button
+        type="button"
+        onClick={() => setWalletMenuOpen((value) => !value)}
+        disabled={!ready || !activePrivyWallet.ready}
+        className="flex h-12 w-full items-center gap-3 px-3 text-left disabled:opacity-60"
+        aria-expanded={walletMenuOpen}
+      >
+        <span
+          className="h-7 w-7 shrink-0 rounded-full ring-1 ring-[oklch(0.78_0.16_82/0.35)]"
+          style={{ background: walletGradient(walletAddress) }}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+            Active wallet
+          </span>
+          <span className="block truncate font-mono text-sm font-semibold text-foreground">{shortAddress}</span>
+        </span>
+        <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", walletMenuOpen && "rotate-180")} />
+      </button>
+
+      {walletMenuOpen ? (
+        <div className="border-t border-[oklch(0.22_0.015_255/0.8)] py-1">
+          <button
+            type="button"
+            onClick={() => {
+              router.push("/portfolio")
+              onDone()
+            }}
+            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-[oklch(0.17_0.014_255)] hover:text-foreground"
+          >
+            <Briefcase className="h-4 w-4" />
+            Portfolio
+            <ArrowUpRight className="ml-auto h-3.5 w-3.5 opacity-50" />
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-[oklch(0.17_0.014_255)] hover:text-foreground"
+          >
+            <Copy className="h-4 w-4" />
+            {copied ? "Copied!" : "Copy address"}
+          </button>
+
+          {walletOptions.length > 1 ? (
+            <div className="border-t border-[oklch(0.22_0.015_255/0.8)] py-1">
+              <div className="px-3 py-2 text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                Connected wallets
+              </div>
+              {walletOptions.map((wallet) => {
+                const selected = sameWalletAddress(wallet.address, walletAddress)
+                return (
+                  <button
+                    key={wallet.address}
+                    type="button"
+                    onClick={() => handleSelectWallet(wallet)}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium transition-colors",
+                      selected
+                        ? "bg-[oklch(0.78_0.16_82/0.10)] text-foreground"
+                        : "text-muted-foreground hover:bg-[oklch(0.17_0.014_255)] hover:text-foreground"
+                    )}
+                  >
+                    <span
+                      className="h-6 w-6 shrink-0 rounded-full ring-1 ring-[oklch(0.78_0.16_82/0.25)]"
+                      style={{ background: walletGradient(wallet.address) }}
+                    />
+                    <span className="font-mono">{shortWalletAddress(wallet.address)}</span>
+                    {selected ? <Check className="ml-auto h-4 w-4 text-[oklch(0.78_0.16_82)]" /> : null}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+
+          <div className="border-t border-[oklch(0.22_0.015_255/0.8)] py-1">
+            <button
+              type="button"
+              onClick={handleSwitchWallet}
+              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-[oklch(0.17_0.014_255)] hover:text-foreground"
+            >
+              <Plus className="h-4 w-4" />
+              Add / switch wallet
+            </button>
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-[oklch(0.60_0.18_25)] hover:bg-[oklch(0.17_0.014_255)] hover:text-[oklch(0.68_0.2_25)] disabled:opacity-60"
+            >
+              <LogOut className="h-4 w-4" />
+              {disconnecting ? "Disconnecting…" : "Disconnect"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {walletError ? (
+        <div className="m-2 rounded-lg border border-[oklch(0.58_0.2_25/0.45)] bg-[oklch(0.16_0.014_255)] p-3 text-[11px] text-[oklch(0.68_0.2_25)]">
+          {walletError}
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -671,7 +918,7 @@ export function Navbar() {
     <>
       <header
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 pt-safe-top transform-gpu bg-[oklch(0.09_0.012_260)] sm:bg-[oklch(0.09_0.012_260/0.96)] backdrop-blur-xl [backface-visibility:hidden] [contain:paint] [will-change:transform] transition-[background-color,box-shadow] duration-200",
+          "fixed top-0 left-0 right-0 z-50 pt-safe-top transform-gpu bg-[oklch(0.09_0.012_260)] sm:bg-[oklch(0.09_0.012_260/0.96)] backdrop-blur-xl [backface-visibility:hidden] [will-change:transform] transition-[background-color,box-shadow] duration-200",
           scrolled
             ? "shadow-[0_1px_0_oklch(0.78_0.16_82/0.12),0_10px_34px_oklch(0_0_0/0.26)]"
             : "shadow-none"
