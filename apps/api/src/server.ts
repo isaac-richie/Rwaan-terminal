@@ -24,6 +24,7 @@ import { cryptoRoutes } from "./routes/crypto.js";
 import { referralRoutes } from "./routes/referral.js";
 import { opsRoutes } from "./routes/ops.js";
 import { edgeScannerRoutes } from "./routes/edgeScanner.js";
+import { rwaRoutes } from "./routes/rwa.js";
 import { recordBackendError } from "./services/errorLog.js";
 
 export function buildServer() {
@@ -100,6 +101,7 @@ export function buildServer() {
   app.register(referralRoutes);
   app.register(opsRoutes);
   app.register(edgeScannerRoutes);
+  app.register(rwaRoutes);
 
   app.addHook("onResponse", async (req, reply) => {
     if (reply.statusCode < 500) return;
