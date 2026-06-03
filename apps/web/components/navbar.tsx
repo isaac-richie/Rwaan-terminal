@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation"
 import {
   ChevronDown, Copy, Menu, Search, Wallet, X, Briefcase,
   TrendingUp, ArrowUpRight, Activity, Award, Bell, CircleDollarSign,
-  Check, LogOut, Plus
+  Check, LogOut, Plus, Building2
 } from "lucide-react"
 import { usePrivy, type ConnectedWallet } from "@privy-io/react-auth"
 import { BnbFundingModal } from "@/components/funding/bnb-funding-modal"
@@ -965,6 +965,7 @@ export function Navbar() {
           {/* Nav links */}
           <nav className="hidden md:flex items-center gap-1">
             <NavLink href="/">Markets</NavLink>
+            <NavLink href="/stocks">Stocks</NavLink>
             <NavLink href="/portfolio">Portfolio</NavLink>
             <NavLink href="/points">Points</NavLink>
           </nav>
@@ -1024,6 +1025,14 @@ export function Navbar() {
             >
               <TrendingUp className="w-3.5 h-3.5 text-[oklch(0.78_0.16_82)]" />
               Markets
+            </Link>
+            <Link
+              href="/stocks"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-[oklch(0.16_0.014_255)] transition-colors"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              Stocks
             </Link>
             <Link
               href="/portfolio"

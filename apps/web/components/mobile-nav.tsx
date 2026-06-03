@@ -2,11 +2,12 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Star, Briefcase } from "lucide-react"
+import { Home, Star, Briefcase, Building2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const TABS = [
   { href: "/",          label: "Markets",   icon: Home },
+  { href: "/stocks",    label: "Stocks",    icon: Building2 },
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/points",    label: "Points",    icon: Star },
 ]
