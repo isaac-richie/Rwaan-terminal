@@ -28,7 +28,7 @@ function formatMoney(value?: number | null, currency = "USD") {
   if (value == null || !Number.isFinite(value)) return "--"
   return new Intl.NumberFormat("en-US", {
     style: "currency", currency,
-    minimumFractionDigits: value >= 100 ? 2 : 2,
+    minimumFractionDigits: 2,
     maximumFractionDigits: value >= 100 ? 2 : 3,
   }).format(value)
 }
@@ -64,13 +64,13 @@ function formatEndDate(d: string | null) {
 }
 
 function routeLabel(route?: RwaAsset["route"]) {
-  if (!route) return "Checking route"
+  if (!route) return "Checking"
   if (route.exitVerified) return "Live"
-  if (route.status === "blocked") return "Region blocked"
-  if (route.status === "watch_only") return "Watch only"
-  if (route.status === "route_unsafe") return "Thin liquidity"
-  if (route.status === "quote_adapter_unavailable") return "Route offline"
-  return "Buy/Sell locked"
+  if (route.status === "blocked") return "Unavailable"
+  if (route.status === "watch_only") return "Coming Soon"
+  if (route.status === "route_unsafe") return "Low Liquidity"
+  if (route.status === "quote_adapter_unavailable") return "Paused"
+  return "Checking"
 }
 
 function routeTone(route?: RwaAsset["route"]) {
@@ -173,7 +173,7 @@ async function ensureBscWallet(wallet: ConnectedWallet): Promise<Eip1193Provider
   await sleep(350)
   provider = (await wallet.getEthereumProvider()) as Eip1193Provider
   if (!(await waitForChain(provider, BSC_CHAIN_HEX))) {
-    throw new Error("Could not switch wallet to BNB Smart Chain.")
+    throw new Error("Could not connect to the right network. Please try again.")
   }
   return provider
 }
@@ -191,7 +191,7 @@ function AssetMark({ asset, size = "md" }: { asset: RwaAsset; size?: "sm" | "md"
   )
 }
 
-// ─── Mini sparkline (purely decorative — no historical data yet) ─────────────
+// ─── Mini sparkline (decorative) ─────────────────────────────────────────────
 function MiniSpark({ positive, accent }: { positive: boolean; accent: string }) {
   const pts = positive
     ? [6, 5, 7, 4, 8, 5, 9, 6, 10, 7, 12]
@@ -209,7 +209,7 @@ function MiniSpark({ positive, accent }: { positive: boolean; accent: string }) 
   )
 }
 
-// ─── Asset card (grid) ───────────────────────────────────────────────────────
+// ─── Asset card ───────────────────────────────────────────────────────────────
 function AssetCard({ asset, quote, selected, onSelect }: {
   asset: RwaAsset; quote?: RwaQuote; selected: boolean; onSelect: () => void
 }) {
@@ -242,7 +242,7 @@ function AssetCard({ asset, quote, selected, onSelect }: {
                 ? "bg-[oklch(0.62_0.17_250/0.12)] text-[oklch(0.72_0.16_250)]"
                 : "bg-[oklch(0.78_0.16_82/0.12)] text-[oklch(0.82_0.16_82)]"
             )}>
-              {asset.assetClass}
+              {asset.assetClass === "etf" ? "ETF" : "Stock"}
             </span>
           </div>
 
@@ -263,12 +263,11 @@ function AssetCard({ asset, quote, selected, onSelect }: {
         </div>
       </div>
 
-      {/* Sector tag */}
       <div className="mt-3 flex items-center gap-1.5">
         <span className="text-[10px] text-muted-foreground/60 font-medium">{asset.sector}</span>
         {asset.risk === "high" && (
           <span className="rounded px-1 py-0.5 text-[9px] font-bold bg-[oklch(0.62_0.18_25/0.12)] text-[oklch(0.68_0.18_25)]">
-            High beta
+            Volatile
           </span>
         )}
         <span
@@ -281,14 +280,14 @@ function AssetCard({ asset, quote, selected, onSelect }: {
               : "bg-[oklch(0.78_0.16_82/0.12)] text-[oklch(0.82_0.16_82)]"
           )}
         >
-          {asset.route?.token.symbol ?? routeLabel(asset.route)}
+          {routeLabel(asset.route)}
         </span>
       </div>
     </button>
   )
 }
 
-// ─── Related market chip ─────────────────────────────────────────────────────
+// ─── Related market chip ──────────────────────────────────────────────────────
 function RelatedMarketChip({ market }: { market: RelatedMarket }) {
   const router = useRouter()
   const positive = (market.yesPrice ?? 0.5) >= 0.5
@@ -315,7 +314,7 @@ function RelatedMarketChip({ market }: { market: RelatedMarket }) {
   )
 }
 
-// ─── Filters ─────────────────────────────────────────────────────────────────
+// ─── Filters ──────────────────────────────────────────────────────────────────
 type StockFilterKey =
   | "all"
   | "live"
@@ -335,7 +334,7 @@ type StockSortKey = "smart" | "volume" | "newest" | "movers" | "live"
 
 const STOCK_FILTERS: Array<{ key: StockFilterKey; label: string; icon: LucideIcon }> = [
   { key: "all", label: "All", icon: Layers3 },
-  { key: "live", label: "Live", icon: Activity },
+  { key: "live", label: "Trading Now", icon: Activity },
   { key: "new", label: "New", icon: Sparkles },
   { key: "big-tech", label: "Big Tech", icon: BarChart3 },
   { key: "ai", label: "AI", icon: Cpu },
@@ -345,16 +344,16 @@ const STOCK_FILTERS: Array<{ key: StockFilterKey; label: string; icon: LucideIco
   { key: "consumer", label: "Consumer", icon: Wallet },
   { key: "global", label: "Global", icon: ArrowUpRight },
   { key: "healthcare", label: "Health", icon: ShieldCheck },
-  { key: "high-beta", label: "High Beta", icon: TrendingUp },
-  { key: "watch", label: "Watch", icon: ShieldCheck },
+  { key: "high-beta", label: "Volatile", icon: TrendingUp },
+  { key: "watch", label: "Coming Soon", icon: Clock3 },
 ]
 
 const STOCK_SORTS: Array<{ key: StockSortKey; label: string; icon: LucideIcon }> = [
-  { key: "smart", label: "Smart Feed", icon: Sparkles },
-  { key: "volume", label: "Volume", icon: BarChart3 },
+  { key: "smart", label: "Trending", icon: Sparkles },
+  { key: "volume", label: "Most Traded", icon: BarChart3 },
   { key: "newest", label: "Newest", icon: Clock3 },
   { key: "movers", label: "Top Movers", icon: TrendingUp },
-  { key: "live", label: "Live Route", icon: Activity },
+  { key: "live", label: "Live First", icon: Activity },
 ]
 
 const STOCK_BATCH_SIZE = 12
@@ -400,7 +399,7 @@ function assetListedTime(asset: RwaAsset) {
   return asset.listedAt ? new Date(asset.listedAt).getTime() : 0
 }
 
-// ─── Main page ───────────────────────────────────────────────────────────────
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function StocksPage() {
   const { login } = usePrivy()
   const { wallet, walletAddress, authenticated } = useActivePrivyWallet()
@@ -512,10 +511,10 @@ export default function StocksPage() {
         const quoteMap = await fetchRwaQuotes(catalog.assets.map((a) => a.quoteSymbol))
         setQuotes(quoteMap)
       } catch {
-        setQuoteError("Quotes are delayed. Rawli is showing the stock catalog with fallback ranking.")
+        setQuoteError("Prices are temporarily delayed. Showing available stocks.")
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Catalog unavailable")
+      setError(err instanceof Error ? err.message : "Unable to load stocks. Please try again.")
       setLoading(false)
     } finally {
       setRefreshing(false)
@@ -537,7 +536,6 @@ export default function StocksPage() {
     return () => window.removeEventListener("mousedown", handle)
   }, [sortOpen])
 
-  // Load related Polymarket markets when asset changes
   useEffect(() => {
     if (!selectedAsset) return
     setRelatedMarkets([])
@@ -582,21 +580,21 @@ export default function StocksPage() {
     <div className="terminal-grid-bg min-h-screen bg-background flex flex-col ambient-glow">
       <Navbar />
 
-      <main className="relative z-[1] flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 rawli-page-top pb-20 lg:pb-10">
+      <main className="relative z-[1] flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 rawli-page-top pb-36 sm:pb-24 lg:pb-10">
 
         {/* ── Header ────────────────────────────────────────────────────── */}
-        <div className="mb-5 sm:mb-6">
+        <div className="mb-6 sm:mb-8">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.24)] bg-[oklch(0.78_0.16_82/0.08)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.82_0.16_82)]">
                 <Zap className="h-3 w-3" />
-                Tokenized Stocks · Beta
+                Stocks · Beta
               </div>
-              <h1 className="mt-2 sm:mt-3 text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-foreground">
-                Global equities via BNB Chain
+              <h1 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+                Real Stocks. Live Prices.
               </h1>
-              <p className="mt-1 text-sm text-muted-foreground max-w-xl">
-                Live quotes on US stocks and ETFs. Verified assets can now buy and sell through PancakeSwap V3.
+              <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-lg">
+                Browse and trade top US stocks and ETFs with real-time pricing — from anywhere in the world.
               </p>
             </div>
             <button
@@ -611,19 +609,19 @@ export default function StocksPage() {
           </div>
 
           {/* Stats strip */}
-          <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
             {[
-              { label: "Assets", value: assets.length > 0 ? String(assets.length) : "--", icon: TrendingUp },
+              { label: "Stocks", value: assets.length > 0 ? String(assets.length) : "--", icon: TrendingUp },
               {
-                label: "Tokens mapped",
+                label: "Available",
                 value: assets.length > 0 ? `${mappedCount}/${assets.length}` : "--",
                 icon: Wallet,
                 green: mappedCount > 0,
               },
               {
-                label: "Exit verified",
-                value: exitVerifiedCount > 0 ? `${exitVerifiedCount} live` : "Locked",
-                icon: ArrowDownUp,
+                label: "Live Now",
+                value: exitVerifiedCount > 0 ? `${exitVerifiedCount} live` : "Soon",
+                icon: Activity,
                 green: exitVerifiedCount > 0,
               },
             ].map(({ label, value, icon: Icon, green }) => (
@@ -646,27 +644,21 @@ export default function StocksPage() {
 
           {/* ── Left: asset grid ──────────────────────────────────────── */}
           <section className="min-w-0 space-y-4">
-            {/* Search + stock lanes */}
-            <div className="min-w-0 rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.72)] p-3 sm:p-3.5">
+            {/* Search + filters */}
+            <div className="min-w-0 rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.72)] p-3 sm:p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-[oklch(0.82_0.16_82)]" />
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
-                    Rawli lanes
-                  </div>
+                <div className="text-sm font-semibold text-foreground">
+                  {loading ? "Loading..." : `${filteredAssets.length} stock${filteredAssets.length !== 1 ? "s" : ""}`}
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="font-mono text-[11px] text-muted-foreground">
-                    {loading ? "--" : `${visibleAssets.length}/${filteredAssets.length}`}
-                  </div>
                   <div className="relative shrink-0" data-stock-sort-menu>
                     <button
                       type="button"
-                      aria-label={`Sort stocks by ${currentSort.label}`}
+                      aria-label={`Sort by ${currentSort.label}`}
                       aria-expanded={sortOpen}
                       onClick={() => setSortOpen((value) => !value)}
                       className={cn(
-                        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold uppercase tracking-wide transition-all active:scale-[0.97]",
+                        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold transition-all active:scale-[0.97]",
                         sortOpen
                           ? "border-[oklch(0.78_0.16_82/0.45)] bg-[oklch(0.18_0.014_255)] text-foreground"
                           : "border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] text-muted-foreground hover:text-foreground"
@@ -712,7 +704,7 @@ export default function StocksPage() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search ticker, company, theme…"
+                  placeholder="Search by name or ticker…"
                   className="w-full h-11 pl-9 pr-9 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-[oklch(0.78_0.16_82/0.4)] transition-colors"
                 />
                 {search && (
@@ -720,9 +712,9 @@ export default function StocksPage() {
                     type="button"
                     onClick={() => setSearch("")}
                     className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:bg-[oklch(0.20_0.014_255)] hover:text-foreground"
-                    aria-label="Clear stock search"
+                    aria-label="Clear search"
                   >
-                    <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
@@ -732,31 +724,32 @@ export default function StocksPage() {
                   const Icon = filter.icon
                   const active = activeFilter === filter.key
                   return (
-                  <button
-                    key={filter.key}
-                    type="button"
-                    onClick={() => setActiveFilter(filter.key)}
-                    className={cn(
-                      "shrink-0 inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold uppercase tracking-wide transition-all active:scale-[0.97]",
-                      active
-                        ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] shadow-[0_2px_8px_oklch(0.78_0.16_82/0.3)]"
-                        : "border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260)] text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    <span>{filter.label}</span>
-                    <span
+                    <button
+                      key={filter.key}
+                      type="button"
+                      onClick={() => setActiveFilter(filter.key)}
                       className={cn(
-                        "rounded-full px-1.5 py-0.5 font-mono text-[10px]",
+                        "shrink-0 inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold transition-all active:scale-[0.97]",
                         active
-                          ? "bg-[oklch(0.10_0.012_260/0.16)]"
-                          : "bg-[oklch(0.22_0.015_255/0.80)] text-muted-foreground/80"
+                          ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] shadow-[0_2px_8px_oklch(0.78_0.16_82/0.3)]"
+                          : "border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260)] text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      {filterCounts[filter.key] ?? 0}
-                    </span>
-                  </button>
-                )})}
+                      <Icon className="h-3.5 w-3.5" />
+                      <span>{filter.label}</span>
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 py-0.5 font-mono text-[10px]",
+                          active
+                            ? "bg-[oklch(0.10_0.012_260/0.20)]"
+                            : "bg-[oklch(0.22_0.015_255/0.80)] text-muted-foreground/80"
+                        )}
+                      >
+                        {filterCounts[filter.key] ?? 0}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -783,8 +776,8 @@ export default function StocksPage() {
                   ))
                 : filteredAssets.length === 0
                 ? (
-                    <div className="col-span-full rounded-2xl border border-dashed border-[oklch(0.22_0.015_255)] p-8 text-center text-sm text-muted-foreground">
-                      No assets in this lane match your search.
+                    <div className="col-span-full rounded-2xl border border-dashed border-[oklch(0.22_0.015_255)] p-10 text-center">
+                      <p className="text-sm text-muted-foreground">No stocks found.</p>
                       {(search || activeFilter !== "all") && (
                         <button
                           type="button"
@@ -792,10 +785,10 @@ export default function StocksPage() {
                             setSearch("")
                             setActiveFilter("all")
                           }}
-                          className="mx-auto mt-4 flex h-9 items-center gap-2 rounded-xl border border-[oklch(0.78_0.16_82/0.32)] px-3 text-[11px] font-bold uppercase tracking-wide text-[oklch(0.82_0.16_82)] hover:bg-[oklch(0.78_0.16_82/0.08)]"
+                          className="mx-auto mt-4 inline-flex h-9 items-center gap-2 rounded-xl border border-[oklch(0.78_0.16_82/0.32)] px-4 text-[11px] font-bold text-[oklch(0.82_0.16_82)] hover:bg-[oklch(0.78_0.16_82/0.08)] transition-colors"
                         >
                           <X className="h-3.5 w-3.5" />
-                          Reset filters
+                          Clear filters
                         </button>
                       )}
                     </div>
@@ -813,25 +806,23 @@ export default function StocksPage() {
 
             {!loading && filteredAssets.length > 0 && (
               <div className="flex flex-col items-center gap-3 pt-2">
-                <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground/65">
+                <div className="text-xs text-muted-foreground/65">
                   Showing {visibleAssets.length} of {filteredAssets.length}
                 </div>
                 {hasMoreAssets && (
                   <button
                     type="button"
                     onClick={() => setVisibleAssetCount((count) => count + STOCK_BATCH_SIZE)}
-                    className="inline-flex h-11 items-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] px-5 text-[12px] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-all hover:border-[oklch(0.78_0.16_82/0.45)] hover:text-foreground active:scale-[0.98]"
+                    className="inline-flex h-11 items-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] px-6 text-sm font-semibold text-muted-foreground transition-all hover:border-[oklch(0.78_0.16_82/0.45)] hover:text-foreground active:scale-[0.98]"
                   >
-                    <RefreshCw className="h-4 w-4" />
-                    Show {Math.min(STOCK_BATCH_SIZE, remainingAssetCount)} more
+                    Load {Math.min(STOCK_BATCH_SIZE, remainingAssetCount)} more
                   </button>
                 )}
               </div>
             )}
           </section>
 
-          {/* ── Right: detail panel (desktop sticky, mobile sheet) ─────── */}
-          {/* Desktop */}
+          {/* ── Right: detail panel (desktop) ─────────────────────────── */}
           <aside className="hidden lg:block">
             {selectedAsset ? (
               <DetailPanel
@@ -844,30 +835,30 @@ export default function StocksPage() {
               />
             ) : (
               <div className="rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.11_0.012_260/0.92)] p-6 text-center text-sm text-muted-foreground sticky top-24 min-h-[300px] flex items-center justify-center">
-                Select an asset to see details
+                Select a stock to see details
               </div>
             )}
           </aside>
         </div>
       </main>
 
-      {/* ── Mobile: sticky bottom CTA ─────────────────────────────────── */}
+      {/* ── Mobile: sticky bottom bar (sits above mobile nav) ────────── */}
       {selectedAsset && (
-        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 glass-surface border-t border-[oklch(0.28_0.016_255/0.55)] safe-bottom">
-          <div className="flex items-center gap-2 px-4 py-2.5 max-w-7xl mx-auto">
+        <div className="lg:hidden fixed bottom-16 sm:bottom-0 inset-x-0 z-40 glass-surface border-t border-[oklch(0.28_0.016_255/0.55)]">
+          <div className="flex items-center gap-3 px-4 py-3 max-w-7xl mx-auto">
             <AssetMark asset={selectedAsset} size="sm" />
             <div className="flex-1 min-w-0">
               <div className="font-mono text-sm font-bold text-foreground">{selectedAsset.displaySymbol}</div>
               <div className={cn("text-[11px] font-bold tabular-nums", positive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.62_0.18_25)]")}>
-                {formatMoney(selectedQuote?.price)} {formatPct(selectedQuote?.changePct)}
+                {formatMoney(selectedQuote?.price)}{selectedQuote?.changePct != null ? ` · ${formatPct(selectedQuote.changePct)}` : ""}
               </div>
             </div>
             <button
               type="button"
               onClick={() => setDetailOpen(true)}
-              className="h-9 px-4 rounded-xl bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] text-[11px] font-bold active:scale-95 transition-transform"
+              className="h-10 px-5 rounded-xl bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] text-sm font-bold active:scale-95 transition-transform shadow-[0_4px_16px_oklch(0.78_0.16_82/0.30)]"
             >
-              Details
+              View
             </button>
           </div>
         </div>
@@ -881,13 +872,18 @@ export default function StocksPage() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setDetailOpen(false)}
           />
-          <div className="relative mt-auto max-h-[90dvh] overflow-y-auto rounded-t-3xl border-t border-[oklch(0.28_0.016_255/0.55)] bg-[oklch(0.11_0.012_260)]">
-            <div className="sticky top-0 z-10 flex items-center justify-between bg-[oklch(0.11_0.012_260)] px-5 pt-4 pb-3 border-b border-[oklch(0.22_0.015_255/0.5)]">
-              <div className="h-1 w-10 rounded-full bg-[oklch(0.30_0.016_255)] mx-auto absolute left-1/2 -translate-x-1/2 top-2" />
-              <span className="font-mono font-bold text-foreground">{selectedAsset.displaySymbol}</span>
-              <button onClick={() => setDetailOpen(false)} className="h-8 w-8 flex items-center justify-center rounded-lg border border-[oklch(0.22_0.015_255)] text-muted-foreground">
-                <X className="h-4 w-4" />
-              </button>
+          <div className="relative mt-auto max-h-[92dvh] overflow-y-auto rounded-t-3xl border-t border-[oklch(0.28_0.016_255/0.55)] bg-[oklch(0.11_0.012_260)]">
+            <div className="sticky top-0 z-10 bg-[oklch(0.11_0.012_260)] px-5 pt-5 pb-3 border-b border-[oklch(0.22_0.015_255/0.5)]">
+              <div className="h-1 w-10 rounded-full bg-[oklch(0.30_0.016_255)] mx-auto mb-3" />
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-bold text-foreground">{selectedAsset.displaySymbol}</span>
+                <button
+                  onClick={() => setDetailOpen(false)}
+                  className="h-8 w-8 flex items-center justify-center rounded-lg border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className="p-4">
               <DetailPanel
@@ -917,7 +913,7 @@ export default function StocksPage() {
   )
 }
 
-// ─── Detail panel (shared desktop + mobile sheet) ────────────────────────────
+// ─── Detail panel ─────────────────────────────────────────────────────────────
 function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, onTrade }: {
   asset: RwaAsset
   quote?: RwaQuote
@@ -945,7 +941,7 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
                   ? "bg-[oklch(0.62_0.17_250/0.12)] text-[oklch(0.72_0.16_250)]"
                   : "bg-[oklch(0.78_0.16_82/0.12)] text-[oklch(0.82_0.16_82)]"
               )}>
-                {asset.assetClass}
+                {asset.assetClass === "etf" ? "ETF" : "Stock"}
               </span>
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">{asset.name}</p>
@@ -956,7 +952,7 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
         <div className="mt-4 rounded-xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.62)] p-4">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1">Live Quote</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1">Current Price</div>
               <div className="font-mono text-4xl font-semibold text-foreground leading-none">
                 {formatMoney(quote?.price, quote?.currency)}
               </div>
@@ -992,25 +988,25 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
           </div>
         </div>
 
-        {/* Theme read */}
+        {/* Overview */}
         <div className="mt-3 rounded-xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.54)] p-3.5">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Rawli Read</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Overview</div>
           <p className="text-sm leading-relaxed text-foreground">{asset.theme}</p>
           <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-            Full AI analysis — catalysts, regime, volatility, and tokenized route risk — coming in the next update.
+            In-depth analysis with price catalysts and risk signals coming soon.
           </p>
         </div>
 
-        {/* Buy/Sell route health */}
+        {/* Trading status */}
         <div className="mt-3 rounded-xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.54)] p-3.5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Buy/Sell Route</div>
-              <div className="mt-1 text-sm font-bold text-foreground">{route?.copy.primary ?? "Checking route"}</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Trading Status</div>
+              <div className="mt-1 text-sm font-bold text-foreground">{route?.copy.primary ?? "Checking availability"}</div>
             </div>
             <span
               className={cn(
-                "shrink-0 rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-wide",
+                "shrink-0 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide",
                 routeStatusTone === "positive"
                   ? "bg-[oklch(0.68_0.18_155/0.12)] text-[oklch(0.68_0.18_155)]"
                   : routeStatusTone === "danger"
@@ -1023,28 +1019,28 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
           </div>
 
           <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-            {route?.copy.secondary ?? "Rawli checks both entry and exit before enabling stock trades."}
+            {route?.copy.secondary ?? "We verify buy and sell availability before enabling trading for each stock."}
           </p>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-lg border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.09_0.01_260/0.5)] p-2.5">
-              <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Ondo token</div>
+              <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Token</div>
               <div className="mt-1 truncate text-xs font-semibold text-foreground">{route?.token.symbol ?? "Not mapped"}</div>
             </div>
             <div className="rounded-lg border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.09_0.01_260/0.5)] p-2.5">
-              <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Pair asset</div>
-              <div className="mt-1 text-xs font-semibold text-foreground">{route?.settlementAsset.symbol ?? "USDon"}</div>
+              <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Paired With</div>
+              <div className="mt-1 text-xs font-semibold text-foreground">{route?.settlementAsset.symbol ?? "USDT"}</div>
             </div>
           </div>
 
           {route?.dex ? (
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div className="rounded-lg border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.09_0.01_260/0.5)] p-2.5">
-                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Venue</div>
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Exchange</div>
                 <div className="mt-1 text-xs font-semibold text-foreground">{route.dex.venue}</div>
               </div>
               <div className="rounded-lg border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.09_0.01_260/0.5)] p-2.5">
-                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Exit test</div>
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Spread</div>
                 <div className="mt-1 text-xs font-semibold text-[oklch(0.68_0.18_155)]">{(route.dex.roundTripBps / 100).toFixed(1)}%</div>
               </div>
             </div>
@@ -1064,9 +1060,9 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
             <div className="mt-1 text-xs font-semibold text-foreground">{asset.sector}</div>
           </div>
           <div className="rounded-lg border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.09_0.01_260/0.5)] p-2.5">
-            <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Beta</div>
+            <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Volatility</div>
             <div className={cn("mt-1 text-xs font-semibold", asset.risk === "high" ? "text-[oklch(0.68_0.18_25)]" : "text-[oklch(0.68_0.18_155)]")}>
-              {asset.risk === "high" ? "High" : "Medium"}
+              {asset.risk === "high" ? "High" : "Moderate"}
             </div>
           </div>
         </div>
@@ -1076,7 +1072,7 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
           <button
             type="button"
             disabled
-            className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[oklch(0.78_0.16_82/0.40)] text-[oklch(0.10_0.012_260)] text-xs font-bold opacity-60 cursor-not-allowed"
+            className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[oklch(0.78_0.16_82/0.40)] text-[oklch(0.10_0.012_260)] text-xs font-bold opacity-50 cursor-not-allowed"
           >
             <Brain className="h-4 w-4" />
             Analyze
@@ -1089,7 +1085,7 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
               "flex h-11 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all",
               canBuy
                 ? "bg-[oklch(0.68_0.18_155)] text-[oklch(0.08_0.01_260)] hover:brightness-110 active:scale-[0.98]"
-                : "border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] text-muted-foreground opacity-60 cursor-not-allowed"
+                : "border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] text-muted-foreground opacity-50 cursor-not-allowed"
             )}
           >
             <Wallet className="h-4 w-4" />
@@ -1102,8 +1098,8 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
             className={cn(
               "flex h-11 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all",
               canSell
-                ? "border border-[oklch(0.78_0.16_82/0.40)] bg-[oklch(0.78_0.16_82)] text-[oklch(0.08_0.01_260)] hover:brightness-110 active:scale-[0.98]"
-                : "border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] text-muted-foreground opacity-60 cursor-not-allowed"
+                ? "bg-[oklch(0.78_0.16_82)] text-[oklch(0.08_0.01_260)] hover:brightness-110 active:scale-[0.98]"
+                : "border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] text-muted-foreground opacity-50 cursor-not-allowed"
             )}
           >
             <ArrowDownUp className="h-4 w-4" />
@@ -1111,21 +1107,21 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
           </button>
         </div>
 
-        {/* Eligibility note */}
+        {/* Note */}
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-[oklch(0.78_0.16_82/0.22)] bg-[oklch(0.78_0.16_82/0.06)] p-2.5">
-          <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[oklch(0.82_0.16_82)]" />
+          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[oklch(0.82_0.16_82)]" />
           <p className="text-[11px] leading-4 text-[oklch(0.78_0.12_82)]">
-            Stock flow is buy and sell through secondary-market liquidity. Rawli unlocks Buy only after the Sell route is verified.
+            Buying is only enabled once we confirm you can also sell. Your trade is protected end to end.
           </p>
         </div>
       </div>
 
-      {/* Related Polymarket prediction markets */}
+      {/* Related prediction markets */}
       {(relatedMarkets.length > 0 || relatedLoading) && (
         <div className="rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.82)] p-4">
           <div className="flex items-center justify-between gap-2 mb-3">
             <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
-              Related Prediction Markets
+              Related Markets
             </div>
             <Link
               href={`/?q=${encodeURIComponent(asset.polymarketKeyword ?? asset.displaySymbol)}`}
@@ -1151,11 +1147,24 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
         href="/"
         className="flex h-10 items-center justify-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260)] text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
       >
-        Back to prediction markets <ChevronRight className="h-3.5 w-3.5" />
+        Back to Markets <ChevronRight className="h-3.5 w-3.5" />
       </Link>
     </div>
   )
 }
+
+// ─── Trade modal ──────────────────────────────────────────────────────────────
+type TradeStatus = "idle" | "quoting" | "checking" | "approving" | "swapping" | "confirming" | "done" | "error"
+
+const EXEC_STEPS: Array<{ key: TradeStatus; label: string }> = [
+  { key: "checking",   label: "Checking balance" },
+  { key: "approving",  label: "Approving token" },
+  { key: "swapping",   label: "Executing swap" },
+  { key: "confirming", label: "Confirming on-chain" },
+]
+
+const QUICK_BUY  = ["10", "50", "100"]
+const QUICK_SELL = ["0.1", "0.5", "1"]
 
 function RwaTradeModal({
   request,
@@ -1174,72 +1183,91 @@ function RwaTradeModal({
 }) {
   const [amount, setAmount] = useState("")
   const [quote, setQuote] = useState<RwaSwapQuote | null>(null)
-  const [status, setStatus] = useState<"idle" | "quoting" | "approving" | "swapping" | "confirming" | "done" | "error">("idle")
+  const [quoteAge, setQuoteAge] = useState<number>(0) // seconds since quote
+  const [status, setStatus] = useState<TradeStatus>("idle")
   const [error, setError] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
 
   const asset = request?.asset ?? null
   const side = request?.side ?? "buy"
-  const busy = ["quoting", "approving", "swapping", "confirming"].includes(status)
-  const inputSymbol = side === "buy" ? "USDT" : asset?.route?.token.symbol ?? asset?.displaySymbol ?? "Stock"
-  const outputSymbol = side === "buy" ? asset?.route?.token.symbol ?? asset?.displaySymbol ?? "Stock" : "USDT"
+  const executing = ["checking", "approving", "swapping", "confirming"].includes(status)
+  const busy = status === "quoting" || executing
+  const inputSymbol = side === "buy" ? "USDT" : (asset?.route?.token.symbol ?? asset?.displaySymbol ?? "Stock")
+  const outputSymbol = side === "buy" ? (asset?.route?.token.symbol ?? asset?.displaySymbol ?? "Stock") : "USDT"
   const title = side === "buy" ? `Buy ${asset?.displaySymbol ?? ""}` : `Sell ${asset?.displaySymbol ?? ""}`
+  const quickAmounts = side === "buy" ? QUICK_BUY : QUICK_SELL
+  const quoteStale = quoteAge > 30
 
+  // Reset when modal opens for a new asset/side
   useEffect(() => {
     if (!request) return
-    setAmount(request.side === "buy" ? "10" : "0.01")
+    setAmount(request.side === "buy" ? "10" : "0.1")
     setQuote(null)
+    setQuoteAge(0)
     setStatus("idle")
     setError(null)
     setTxHash(null)
   }, [request?.asset.id, request?.side])
 
+  // Age the quote so user knows when it's going stale
+  useEffect(() => {
+    if (!quote || executing || status === "done") return
+    setQuoteAge(0)
+    const timer = setInterval(() => setQuoteAge((a) => a + 1), 1000)
+    return () => clearInterval(timer)
+  }, [quote, executing, status])
+
   if (!request || !asset) return null
 
-  const previewQuote = async () => {
-    if (!amount || Number(amount) <= 0) {
-      setError("Enter a positive amount first.")
+  const clearQuote = () => {
+    setQuote(null)
+    setQuoteAge(0)
+    if (status === "error") { setStatus("idle"); setError(null) }
+  }
+
+  const getQuote = async () => {
+    const num = Number(amount)
+    if (!amount || !Number.isFinite(num) || num <= 0) {
+      setError("Enter a valid amount first.")
       return
     }
-
     setStatus("quoting")
     setError(null)
-    setTxHash(null)
     try {
-      const nextQuote = await fetchRwaSwapQuote({
-        symbol: asset.displaySymbol,
-        side,
-        amount,
-        slippageBps: 200,
-      })
-      setQuote(nextQuote)
+      const q = await fetchRwaSwapQuote({ symbol: asset.displaySymbol, side, amount, slippageBps: 200 })
+      setQuote(q)
       setStatus("idle")
     } catch (err) {
       setQuote(null)
       setStatus("error")
-      setError(friendlyErrorMessage(err, "Rawli could not quote this stock route. Try again in a moment.", "trade"))
+      setError(friendlyErrorMessage(err, "Could not get a price right now. Please try again.", "trade"))
     }
   }
 
   const executeTrade = async () => {
-    if (!authenticated || !wallet) {
-      onConnect()
-      return
-    }
+    if (!authenticated || !wallet) { onConnect(); return }
 
-    const activeQuote = quote ?? await fetchRwaSwapQuote({
-      symbol: asset.displaySymbol,
-      side,
-      amount,
-      slippageBps: 200,
-    })
-
-    setQuote(activeQuote)
-    setStatus("approving")
     setError(null)
     setTxHash(null)
 
+    // If no quote yet (or stale), fetch one before executing
+    let activeQuote = quote
+    if (!activeQuote || quoteStale) {
+      setStatus("quoting")
+      try {
+        activeQuote = await fetchRwaSwapQuote({ symbol: asset.displaySymbol, side, amount, slippageBps: 200 })
+        setQuote(activeQuote)
+        setQuoteAge(0)
+      } catch (err) {
+        setStatus("error")
+        setError(friendlyErrorMessage(err, "Could not get a price right now. Please try again.", "trade"))
+        return
+      }
+    }
+
     try {
+      // Step 1 — check balance + allowance
+      setStatus("checking")
       const provider = await ensureBscWallet(wallet)
       const ethersProvider = new BrowserProvider(provider as any)
       const signer = await ethersProvider.getSigner()
@@ -1249,16 +1277,18 @@ function RwaTradeModal({
       const inputToken = new Contract(activeQuote.tokenIn.address, ERC20_ABI, signer)
       const balance = await inputToken.balanceOf(signerAddress) as bigint
       if (balance < amountInRaw) {
-        throw new Error(`Not enough ${activeQuote.tokenIn.symbol} balance for this ${side}.`)
+        throw new Error(`Not enough ${activeQuote.tokenIn.symbol} in your wallet for this trade.`)
       }
 
+      // Step 2 — approve if needed
       const allowance = await inputToken.allowance(signerAddress, activeQuote.spender) as bigint
       if (allowance < amountInRaw) {
-        const approvalTx = await inputToken.approve(activeQuote.spender, amountInRaw)
         setStatus("approving")
+        const approvalTx = await inputToken.approve(activeQuote.spender, amountInRaw)
         await approvalTx.wait(1)
       }
 
+      // Step 3 — execute swap
       setStatus("swapping")
       const router = new Contract(activeQuote.router, PANCAKE_V3_ROUTER_ABI, signer)
       const deadline = Math.floor(Date.now() / 1000) + 10 * 60
@@ -1273,140 +1303,255 @@ function RwaTradeModal({
         sqrtPriceLimitX96: 0n,
       })
 
+      // Step 4 — wait for confirmation
       setStatus("confirming")
       const receipt = await swapTx.wait(1)
       setTxHash(receipt?.hash ?? swapTx.hash)
       setStatus("done")
     } catch (err) {
       setStatus("error")
-      setError(friendlyErrorMessage(err, "Stock trade failed. Check balance, approval, and liquidity, then try again.", "trade"))
+      setError(friendlyErrorMessage(err, "Trade failed. Check your balance and try again.", "trade"))
     }
   }
+
+  const currentStepIdx = EXEC_STEPS.findIndex((s) => s.key === status)
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center lg:items-center">
       <button
         type="button"
-        aria-label="Close trade modal"
+        aria-label="Close"
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={busy ? undefined : onClose}
       />
-      <div className="relative w-full max-w-lg rounded-t-3xl border border-[oklch(0.25_0.016_255/0.78)] bg-[oklch(0.10_0.012_260)] p-4 shadow-[0_-20px_80px_oklch(0_0_0/0.55)] lg:rounded-2xl lg:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.08)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">
-              <ShieldCheck className="h-3 w-3" />
-              Verified route
-            </div>
-            <h3 className="mt-2 text-2xl font-bold text-foreground">{title}</h3>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              PancakeSwap V3 · {asset.route?.settlementAsset.symbol ?? "USDT"} pair · {walletAddress ? shortHash(walletAddress) : "Wallet not connected"}
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground disabled:opacity-50"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+      <div className="relative w-full max-w-lg rounded-t-3xl border border-[oklch(0.25_0.016_255/0.78)] bg-[oklch(0.10_0.012_260)] shadow-[0_-20px_80px_oklch(0_0_0/0.55)] lg:rounded-2xl">
 
-        <div className="mt-4 rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.72)] p-3.5">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
-            You pay
-          </label>
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              value={amount}
-              onChange={(event) => {
-                setAmount(event.target.value)
-                setQuote(null)
-                if (status === "error") {
-                  setStatus("idle")
-                  setError(null)
-                }
-              }}
-              inputMode="decimal"
-              placeholder="0.00"
-              disabled={busy || status === "done"}
-              className="h-12 min-w-0 flex-1 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] px-3 font-mono text-lg font-bold text-foreground outline-none focus:border-[oklch(0.78_0.16_82/0.45)] disabled:opacity-60"
-            />
-            <div className="flex h-12 min-w-[86px] items-center justify-center rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260)] px-3 font-mono text-sm font-bold text-foreground">
-              {inputSymbol}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.62)] p-3">
-            <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Est. receive</div>
-            <div className="mt-1 font-mono text-lg font-bold text-foreground">
-              {quote ? rawToHuman(quote.amountOutRaw, quote.tokenOut.decimals) : "--"}
-            </div>
-            <div className="mt-0.5 text-[10px] text-muted-foreground">{outputSymbol}</div>
-          </div>
-          <div className="rounded-xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.62)] p-3">
-            <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Min receive</div>
-            <div className="mt-1 font-mono text-lg font-bold text-foreground">
-              {quote ? rawToHuman(quote.amountOutMinimumRaw, quote.tokenOut.decimals) : "--"}
-            </div>
-            <div className="mt-0.5 text-[10px] text-muted-foreground">2% slippage</div>
-          </div>
-        </div>
-
-        {quote ? (
-          <div className="mt-3 rounded-xl border border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.06)] p-3 text-[11px] leading-5 text-[oklch(0.72_0.16_155)]">
-            Fee tier {(quote.fee / 10_000).toFixed(2)}% · exit test {(quote.roundTripBps / 100).toFixed(1)}% · router {shortHash(quote.router)}
-          </div>
-        ) : null}
-
-        {error ? (
-          <div className="mt-3 flex gap-2 rounded-xl border border-[oklch(0.60_0.18_25/0.36)] bg-[oklch(0.60_0.18_25/0.08)] p-3 text-sm text-[oklch(0.72_0.18_25)]">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        ) : null}
-
+        {/* ── Success screen ─────────────────────────────────────────── */}
         {status === "done" ? (
-          <div className="mt-3 rounded-xl border border-[oklch(0.68_0.18_155/0.30)] bg-[oklch(0.68_0.18_155/0.09)] p-3 text-sm text-[oklch(0.72_0.16_155)]">
-            Trade confirmed{txHash ? (
-              <>
-                {" · "}
-                <a className="font-mono underline" href={`https://bscscan.com/tx/${txHash}`} target="_blank" rel="noreferrer">
-                  {shortHash(txHash)}
-                </a>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={previewQuote}
-            disabled={busy || status === "done"}
-            className="flex h-12 items-center justify-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] text-sm font-bold text-foreground disabled:opacity-50"
-          >
-            {status === "quoting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Preview
-          </button>
-          <button
-            type="button"
-            onClick={executeTrade}
-            disabled={busy || status === "done" || !amount}
-            className={cn(
-              "flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50",
-              side === "buy"
-                ? "bg-[oklch(0.68_0.18_155)] text-[oklch(0.08_0.01_260)]"
-                : "bg-[oklch(0.78_0.16_82)] text-[oklch(0.08_0.01_260)]"
+          <div className="p-6 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[oklch(0.68_0.18_155/0.12)] border border-[oklch(0.68_0.18_155/0.25)]">
+              <ShieldCheck className="h-7 w-7 text-[oklch(0.68_0.18_155)]" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">Trade Complete</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {side === "buy" ? "You bought" : "You sold"} <span className="font-semibold text-foreground">{outputSymbol}</span>
+            </p>
+            {txHash && (
+              <a
+                href={`https://bscscan.com/tx/${txHash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.07)] px-3 py-2 font-mono text-[11px] text-[oklch(0.72_0.16_155)] hover:bg-[oklch(0.68_0.18_155/0.12)] transition-colors"
+              >
+                <ExternalLink className="h-3 w-3" />
+                {shortHash(txHash)}
+              </a>
             )}
-          >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-            {!authenticated || !wallet ? "Connect" : status === "approving" ? "Approve" : status === "swapping" ? "Swap" : side === "buy" ? "Buy" : "Sell"}
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-[oklch(0.68_0.18_155)] text-[oklch(0.08_0.01_260)] text-sm font-bold hover:brightness-110 transition-all active:scale-[0.98]"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="p-4 lg:p-5">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.08)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">
+                  <ShieldCheck className="h-3 w-3" />
+                  Verified Route
+                </div>
+                <h3 className="mt-2 text-2xl font-bold text-foreground">{title}</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {walletAddress ? shortHash(walletAddress) : "Connect your wallet to trade"}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onClose}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Execution progress */}
+            {executing && (
+              <div className="mt-4 rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.72)] p-4 space-y-3">
+                {EXEC_STEPS.map((step, i) => {
+                  const done = i < currentStepIdx
+                  const active = i === currentStepIdx
+                  return (
+                    <div key={step.key} className="flex items-center gap-3">
+                      <div className={cn(
+                        "h-6 w-6 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold transition-all",
+                        done  ? "bg-[oklch(0.68_0.18_155)] text-[oklch(0.08_0.01_260)]" :
+                        active ? "border-2 border-[oklch(0.68_0.18_155)] text-[oklch(0.68_0.18_155)]" :
+                                 "border border-[oklch(0.22_0.015_255)] text-muted-foreground/40"
+                      )}>
+                        {done ? "✓" : active ? <Loader2 className="h-3 w-3 animate-spin" /> : i + 1}
+                      </div>
+                      <span className={cn(
+                        "text-sm font-medium",
+                        active ? "text-foreground" : done ? "text-[oklch(0.68_0.18_155)]" : "text-muted-foreground/40"
+                      )}>
+                        {step.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Amount input (hidden during execution) */}
+            {!executing && (
+              <>
+                <div className="mt-4 rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.72)] p-3.5">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                      You pay
+                    </label>
+                    <div className="flex items-center gap-1">
+                      {quickAmounts.map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          disabled={status === "quoting"}
+                          onClick={() => {
+                            setAmount(q)
+                            clearQuote()
+                          }}
+                          className={cn(
+                            "h-6 rounded-lg px-2 text-[10px] font-bold transition-all",
+                            amount === q
+                              ? "bg-[oklch(0.78_0.16_82/0.18)] text-[oklch(0.82_0.16_82)] border border-[oklch(0.78_0.16_82/0.35)]"
+                              : "border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {side === "buy" ? `$${q}` : q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={amount}
+                      onChange={(e) => { setAmount(e.target.value); clearQuote() }}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      disabled={status === "quoting"}
+                      className="h-12 min-w-0 flex-1 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] px-3 font-mono text-xl font-bold text-foreground outline-none focus:border-[oklch(0.78_0.16_82/0.45)] disabled:opacity-60"
+                    />
+                    <div className="flex h-12 min-w-[80px] items-center justify-center rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260)] px-3 font-mono text-sm font-bold text-foreground">
+                      {inputSymbol}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quote output */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className={cn(
+                    "rounded-xl border p-3 transition-colors",
+                    quote ? "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.05)]" : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.62)]"
+                  )}>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">You get</div>
+                    <div className={cn("mt-1 font-mono text-lg font-bold", quote ? "text-foreground" : "text-muted-foreground/30")}>
+                      {status === "quoting" ? <Loader2 className="h-4 w-4 animate-spin" /> : quote ? rawToHuman(quote.amountOutRaw, quote.tokenOut.decimals) : "—"}
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">{outputSymbol}</div>
+                  </div>
+                  <div className={cn(
+                    "rounded-xl border p-3 transition-colors",
+                    quote ? "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.62)]" : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.62)]"
+                  )}>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Minimum</div>
+                    <div className={cn("mt-1 font-mono text-lg font-bold", quote ? "text-foreground" : "text-muted-foreground/30")}>
+                      {status === "quoting" ? <Loader2 className="h-4 w-4 animate-spin" /> : quote ? rawToHuman(quote.amountOutMinimumRaw, quote.tokenOut.decimals) : "—"}
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">2% max slippage</div>
+                  </div>
+                </div>
+
+                {/* Quote details + staleness */}
+                {quote && (
+                  <div className={cn(
+                    "mt-3 flex items-center justify-between rounded-xl border p-3 text-[11px] transition-colors",
+                    quoteStale
+                      ? "border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.07)] text-[oklch(0.82_0.14_82)]"
+                      : "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.06)] text-[oklch(0.72_0.16_155)]"
+                  )}>
+                    <span>Fee {(quote.fee / 10_000).toFixed(2)}% · Spread {(quote.roundTripBps / 100).toFixed(1)}%</span>
+                    <span className="font-semibold">
+                      {quoteStale ? "Quote expired — refresh" : `${30 - quoteAge}s`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Hint when no quote yet */}
+                {!quote && status !== "quoting" && (
+                  <p className="mt-3 text-center text-[11px] text-muted-foreground/50">
+                    Get a quote to see how much you'll receive before confirming
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* Error */}
+            {error && (
+              <div className="mt-3 flex gap-2 rounded-xl border border-[oklch(0.60_0.18_25/0.36)] bg-[oklch(0.60_0.18_25/0.08)] p-3 text-sm text-[oklch(0.72_0.18_25)]">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Actions */}
+            {!executing && (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={getQuote}
+                  disabled={busy || !amount}
+                  className="flex h-12 items-center justify-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] text-sm font-bold text-foreground disabled:opacity-40 hover:border-[oklch(0.78_0.16_82/0.35)] hover:text-foreground transition-colors"
+                >
+                  {status === "quoting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  {quote ? (quoteStale ? "Refresh" : "Requote") : "Get Quote"}
+                </button>
+                <button
+                  type="button"
+                  onClick={executeTrade}
+                  disabled={busy || !amount}
+                  className={cn(
+                    "flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40",
+                    side === "buy"
+                      ? "bg-[oklch(0.68_0.18_155)] text-[oklch(0.08_0.01_260)] hover:brightness-110"
+                      : "bg-[oklch(0.78_0.16_82)] text-[oklch(0.08_0.01_260)] hover:brightness-110"
+                  )}
+                >
+                  <Wallet className="h-4 w-4" />
+                  {!authenticated || !wallet
+                    ? "Connect Wallet"
+                    : quote && !quoteStale
+                    ? `Confirm ${side === "buy" ? "Buy" : "Sell"}`
+                    : side === "buy" ? "Buy" : "Sell"}
+                </button>
+              </div>
+            )}
+
+            {executing && (
+              <div className="mt-4 flex h-12 items-center justify-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.13_0.012_260/0.5)] text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {status === "checking" ? "Checking your balance…" :
+                 status === "approving" ? "Waiting for approval…" :
+                 status === "swapping" ? "Submitting trade…" :
+                 "Waiting for confirmation…"}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

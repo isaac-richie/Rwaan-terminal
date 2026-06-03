@@ -860,8 +860,8 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
         note: "Ondo token list is unavailable right now, so Rawli cannot verify the sell route.",
       },
       copy: {
-        primary: "Route check unavailable",
-        secondary: "Rawli will not enable stock buys until token mapping and the two-way sell route are both verified.",
+        primary: "Checking availability",
+        secondary: "We're verifying this stock's trading route. Please check back shortly.",
       },
     };
   }
@@ -889,8 +889,8 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
         note: "This region is blocked for Ondo Global Markets.",
       },
       copy: {
-        primary: "Region blocked",
-        secondary: "Rawli will not route tokenized stock swaps in blocked jurisdictions.",
+        primary: "Not available in your region",
+        secondary: "This stock isn't available for trading in your region.",
       },
     };
   }
@@ -916,8 +916,8 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
         note: "No token contract means Rawli cannot verify an exit route yet.",
       },
       copy: {
-        primary: "Watch only",
-        secondary: "We can show quotes and analysis, but buy/sell stays locked until an Ondo token contract exists.",
+        primary: "Coming soon",
+        secondary: "You can track this stock's price, but trading isn't available yet.",
       },
     };
   }
@@ -946,8 +946,8 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
         note: "Rawli could not verify the sell route right now.",
       },
       copy: {
-        primary: "Route check unavailable",
-        secondary: "Buy and Sell stay locked until PancakeSwap quotes are reachable again.",
+        primary: "Temporarily unavailable",
+        secondary: "Trading is temporarily paused. Please try again in a moment.",
       },
     };
   }
@@ -973,8 +973,8 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
         note: "Sell is locked until a small round-trip quote returns at least 90% of the test input.",
       },
       copy: {
-        primary: "Liquidity not safe yet",
-        secondary: "Rawli found the Ondo token, but the PancakeSwap route is too thin or one-sided. Watch-only until liquidity improves.",
+        primary: "Low liquidity",
+        secondary: "This stock has low trading volume right now. Trading will unlock once liquidity improves.",
       },
     };
   }
@@ -1011,8 +1011,8 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
       note: "Live USDT sell route verified through PancakeSwap V3.",
     },
     copy: {
-      primary: "Tradable via PancakeSwap",
-      secondary: "Buy and Sell use BNB Chain USDT. Rawli checks the exit route before enabling this asset.",
+      primary: "Ready to trade",
+      secondary: "Buy and sell this stock using USDT. We verify both directions before enabling trading.",
     },
   };
 }
@@ -1048,8 +1048,8 @@ async function buildCatalogRouteHealth(asset: RwaAsset, region?: string): Promis
         note: "Ondo token list is unavailable right now, so Rawli cannot verify the sell route.",
       },
       copy: {
-        primary: "Route check unavailable",
-        secondary: "Rawli keeps this asset locked until token mapping and the exit route can be checked.",
+        primary: "Checking availability",
+        secondary: "We're verifying this stock's trading route. Please check back shortly.",
       },
     };
   }
@@ -1078,8 +1078,8 @@ async function buildCatalogRouteHealth(asset: RwaAsset, region?: string): Promis
         note: "This region is blocked for Ondo Global Markets.",
       },
       copy: {
-        primary: "Region blocked",
-        secondary: "Rawli will not route tokenized stock swaps in blocked jurisdictions.",
+        primary: "Not available in your region",
+        secondary: "This stock isn't available for trading in your region.",
       },
     };
   }
@@ -1105,8 +1105,8 @@ async function buildCatalogRouteHealth(asset: RwaAsset, region?: string): Promis
         note: "No token contract means Rawli cannot verify an exit route yet.",
       },
       copy: {
-        primary: "Watch only",
-        secondary: "We can show quotes and analysis, but buy/sell stays locked until an Ondo token contract exists.",
+        primary: "Coming soon",
+        secondary: "You can track this stock's price, but trading isn't available yet.",
       },
     };
   }
