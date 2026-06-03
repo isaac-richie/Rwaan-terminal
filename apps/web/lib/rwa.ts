@@ -52,14 +52,16 @@ export type RwaQuote = {
   fetchedAt: string
 }
 
+export type RegionEligibility = {
+  region: string
+  backed: { status: "available" | "blocked" | "unknown"; note: string }
+  ondo: { status: "eligible" | "qualified_investor_only" | "blocked" | "review"; note: string }
+}
+
 export type RwaAssetsResponse = {
   ok: true
   assets: RwaAsset[]
-  eligibility: {
-    region: string
-    backed: { status: string; note: string }
-    ondo: { status: string; note: string }
-  }
+  eligibility: RegionEligibility
   disclaimers: string[]
 }
 

@@ -30,8 +30,8 @@ type RwaAsset = {
     preferred: "ondo";
     chain: "BNB Chain";
     route: "PancakeSwap RWA";
-    backedStatus: "blocked_nigeria";
-    ondoStatus: "eligibility_review";
+    backedStatus: "available";  // xStocks/Backed is available in Nigeria (via Luno)
+    ondoStatus: "kyc_required"; // Ondo requires KYC but does NOT block Nigeria
   };
   trading: {
     enabled: false;
@@ -63,8 +63,8 @@ const PROVIDER_DEFAULTS = {
     preferred: "ondo" as const,
     chain: "BNB Chain" as const,
     route: "PancakeSwap RWA" as const,
-    backedStatus: "blocked_nigeria" as const,
-    ondoStatus: "eligibility_review" as const,
+    backedStatus: "available" as const,
+    ondoStatus: "kyc_required" as const,
   },
   trading: {
     enabled: false as const,
@@ -253,19 +253,50 @@ const assets: RwaAsset[] = [
   },
 ];
 
+// Ondo Finance prohibited jurisdictions (OFAC sanctioned + select securities law):
+// Afghanistan, Belarus, Canada, Cuba, North Korea, Iran, Libya, Myanmar, Russia,
+// Somalia, South Sudan, Sudan, Syria, United States (all territories), and
+// occupied Ukraine regions. EU/EEA, UK, HK, MY, SG, CH require qualified investor status.
+// Source: https://docs.ondo.finance/ondo-global-markets/eligibility
+const ONDO_PROHIBITED = new Set([
+  "AF","BY","CA","CU","KP","IR","LY","MM","RU","SO","SS","SD","SY","US",
+]);
+
+// Ondo jurisdictions that require professional/qualified investor status
+const ONDO_QUALIFIED_ONLY = new Set(["BR","EU","GB","HK","MY","SG","CH"]);
+
+// Backed/xStocks blocked jurisdictions:
+// US, EU/EEA, UK, Canada, Australia, Belgium — developed markets with heavy RWA scrutiny.
+// Nigeria is NOT blocked; Luno actively offers xStocks in Nigeria.
+// Source: https://docs.xstocks.fi/legal-and-compliance
+const BACKED_BLOCKED = new Set(["US","CA","AU","BE","GB"]);
+
 function regionEligibility(region?: string) {
-  const normalized = region?.toUpperCase() ?? "NG";
+  const normalized = region?.toUpperCase().trim() ?? "NG";
+
+  const ondoStatus =
+    ONDO_PROHIBITED.has(normalized) ? "blocked" :
+    ONDO_QUALIFIED_ONLY.has(normalized) ? "qualified_investor_only" :
+    "eligible";
+
+  const backedStatus =
+    BACKED_BLOCKED.has(normalized) ? "blocked" : "available";
+
   return {
     region: normalized,
     backed: {
-      status: normalized === "NG" ? "blocked" : "unknown",
-      note: normalized === "NG"
-        ? "Backed/xStocks lists Nigeria as non-serviceable. Do not route Nigerian users there."
-        : "Backed route requires jurisdiction review before enabling.",
+      status: backedStatus,
+      note: backedStatus === "blocked"
+        ? "xStocks/Backed is not available in your jurisdiction due to securities regulations."
+        : "xStocks (Backed Finance) is available in your region. Used by Luno in Nigeria.",
     },
     ondo: {
-      status: "review",
-      note: "Ondo-powered routing is the preferred candidate, but issuer eligibility must be confirmed before enabling swaps.",
+      status: ondoStatus,
+      note: ondoStatus === "blocked"
+        ? "Your jurisdiction is on Ondo's prohibited list (OFAC/sanctions)."
+        : ondoStatus === "qualified_investor_only"
+        ? "Ondo is available in your region but requires Professional/Qualified Investor status under local securities law."
+        : "Your region is eligible for Ondo Finance. KYC is required to complete onboarding.",
     },
   };
 }
@@ -333,8 +364,10 @@ export async function rwaRoutes(app: FastifyInstance): Promise<void> {
       eligibility: regionEligibility(query.data.region),
       disclaimers: [
         "Tokenized stock products are not direct shareholder ownership.",
-        "Backed/xStocks is blocked for Nigerian users in this catalog.",
-        "Rawli will enable buy routes only after provider eligibility and token contracts are verified.",
+        "Nigeria is eligible for both Ondo Finance and xStocks/Backed — no jurisdiction block applies.",
+        "Ondo Finance requires KYC onboarding. Prohibited regions include: US, Russia, Iran, North Korea, and other OFAC-sanctioned states.",
+        "xStocks (Backed Finance) is available in Nigeria and actively offered via Luno. Blocked regions include US, Canada, Australia, UK.",
+        "Buy routing will be enabled once provider KYC integration and token contracts are finalized.",
       ],
     };
   });

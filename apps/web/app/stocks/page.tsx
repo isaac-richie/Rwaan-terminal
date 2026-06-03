@@ -13,7 +13,7 @@ import { Footer } from "@/components/footer"
 import { cn } from "@/lib/utils"
 import {
   fetchRwaAssets, fetchRwaQuotes, fetchRelatedMarkets,
-  type RwaAsset, type RwaQuote, type RelatedMarket,
+  type RwaAsset, type RwaQuote, type RelatedMarket, type RegionEligibility,
 } from "@/lib/rwa"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -188,6 +188,7 @@ const SECTOR_GROUPS = ["All", "Big Tech", "AI & Chips", "Crypto Equities", "EV &
 export default function StocksPage() {
   const [assets, setAssets] = useState<RwaAsset[]>([])
   const [quotes, setQuotes] = useState<Record<string, RwaQuote>>({})
+  const [eligibility, setEligibility] = useState<RegionEligibility | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [activeSector, setActiveSector] = useState("All")
   const [search, setSearch] = useState("")
@@ -223,6 +224,7 @@ export default function StocksPage() {
       const quoteMap = await fetchRwaQuotes(catalog.assets.map((a) => a.quoteSymbol))
       setAssets(catalog.assets)
       setQuotes(quoteMap)
+      setEligibility(catalog.eligibility)
       setSelectedId((cur) => cur ?? catalog.assets[0]?.id ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Catalog unavailable")
@@ -287,15 +289,35 @@ export default function StocksPage() {
           {/* Stats strip */}
           <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
             {[
-              { label: "Assets", value: String(assets.length), icon: TrendingUp },
-              { label: "Route", value: "BNB / USDT", icon: Wallet },
-              { label: "Analysis", value: "Coming soon", icon: Brain },
-            ].map(({ label, value, icon: Icon }) => (
-              <div key={label} className="rounded-xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)] px-3 py-2.5">
+              { label: "Assets", value: assets.length > 0 ? String(assets.length) : "--", icon: TrendingUp },
+              {
+                label: "Ondo route",
+                value: eligibility?.ondo.status === "eligible" ? "✓ Eligible" :
+                       eligibility?.ondo.status === "blocked" ? "✗ Blocked" :
+                       eligibility?.ondo.status === "qualified_investor_only" ? "Qualified only" :
+                       "KYC required",
+                icon: Wallet,
+                green: eligibility?.ondo.status === "eligible",
+              },
+              {
+                label: "xStocks route",
+                value: eligibility?.backed.status === "available" ? "✓ Available" :
+                       eligibility?.backed.status === "blocked" ? "✗ Blocked" :
+                       "Checking…",
+                icon: Brain,
+                green: eligibility?.backed.status === "available",
+              },
+            ].map(({ label, value, icon: Icon, green }) => (
+              <div key={label} className={cn(
+                "rounded-xl border px-3 py-2.5",
+                green
+                  ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.06)]"
+                  : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)]"
+              )}>
                 <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
                   <Icon className="h-3 w-3" />{label}
                 </div>
-                <div className="mt-1.5 text-sm font-bold text-foreground">{value}</div>
+                <div className={cn("mt-1.5 text-sm font-bold", green ? "text-[oklch(0.68_0.18_155)]" : "text-foreground")}>{value}</div>
               </div>
             ))}
           </div>
@@ -563,11 +585,11 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive }:
           </button>
         </div>
 
-        {/* Disclaimer */}
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-[oklch(0.60_0.18_25/0.22)] bg-[oklch(0.60_0.18_25/0.06)] p-2.5">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[oklch(0.72_0.18_25)]" />
-          <p className="text-[11px] leading-4 text-[oklch(0.72_0.10_35)]">
-            Tokenized stock exposure is not direct shareholder ownership. Buy routing is disabled until Ondo eligibility is confirmed.
+        {/* Eligibility note */}
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-[oklch(0.68_0.18_155/0.22)] bg-[oklch(0.68_0.18_155/0.06)] p-2.5">
+          <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[oklch(0.68_0.18_155)]" />
+          <p className="text-[11px] leading-4 text-[oklch(0.72_0.10_155)]">
+            Nigeria is eligible for both Ondo and xStocks routes. No jurisdiction block applies. KYC integration is the final step before buy routing goes live.
           </p>
         </div>
       </div>
