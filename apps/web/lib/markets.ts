@@ -172,7 +172,7 @@ export function scheduleCategoryPrefetch() {
   // Wait 1.2s after initial load so we don't compete with the user's first view.
   // Covers every category in the bar so the first click on any of them is instant.
   setTimeout(() => {
-    const cats = ["Crypto", "Africa", "Sports", "Entertainment", "World", "Macro"]
+    const cats = ["Crypto", "Africa", "Sports", "Entertainment", "IPOs", "World", "Macro"]
     for (const cat of cats) {
       // Only prefetch if not already cached
       if (!getCachedMarkets(cat, 12, "trending", 0)) {

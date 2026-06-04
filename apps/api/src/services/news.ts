@@ -136,16 +136,20 @@ function buildSearchQueries(question: string, category?: string): string[] {
 
   // Category-aware third query
   const cat = (category ?? "").toLowerCase();
+  const text = `${cat} ${question} ${keywords}`.toLowerCase();
+  const year = new Date().getUTCFullYear();
   if (/politi|elect|president|senator|congress|vote/.test(cat)) {
-    queries.push(keywords + " 2025 polls forecast");
+    queries.push(`${keywords} ${year} polls forecast`);
+  } else if (/ipo|ipos|initial public offering|go public|public listing|direct listing|closing market cap/.test(text)) {
+    queries.push(`${keywords} IPO filing valuation underwriters ${year}`);
   } else if (/econ|financ|fed|rate|inflation/.test(cat)) {
-    queries.push(keywords + " 2025 forecast outlook");
+    queries.push(`${keywords} ${year} forecast outlook`);
   } else if (/sport/.test(cat)) {
     queries.push(keywords + " latest news update");
   } else if (/crypto|bitcoin|ethereum/.test(cat)) {
     queries.push(keywords + " price prediction analysis");
   } else {
-    queries.push(keywords + " latest update 2025");
+    queries.push(`${keywords} latest update ${year}`);
   }
 
   // Deduplicate and cap at 3

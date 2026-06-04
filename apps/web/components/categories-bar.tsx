@@ -9,6 +9,7 @@ import {
   ArrowDownUp,
   ChevronDown,
   MapPin,
+  Rocket,
   TrendingUp,
   Sparkles,
 } from "lucide-react"
@@ -30,6 +31,7 @@ const polymarketCategories: CategoryItem[] = [
   { id: "Africa", label: "Africa 🌍", icon: MapPin },
   { id: "Sports", label: "Sport", icon: Trophy },
   { id: "Entertainment", label: "Entertainment", icon: Sparkles },
+  { id: "IPOs", label: "IPOs", icon: Rocket },
   { id: "World", label: "World", icon: Globe },
   { id: "Macro", label: "Macro", icon: TrendingUp },
 ]

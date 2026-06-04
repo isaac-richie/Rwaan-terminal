@@ -95,6 +95,8 @@ type FeedGammaMarket = GammaMarketRaw & {
   feedBadges?: string[]
   feedCategory?: string
   cryptoAsset?: string
+  eventId?: string
+  eventTitle?: string
   smartScore?: number
 }
 
@@ -204,7 +206,6 @@ const categoryNeedles: Record<string, string[]> = {
     "dollar",
     "stock",
     "stocks",
-    "ipo",
     "earnings",
     "nasdaq",
     "s&p",
@@ -216,6 +217,30 @@ const categoryNeedles: Record<string, string[]> = {
     "kraken",
     "coinbase",
     "microstrategy",
+  ],
+  ipos: [
+    "ipo",
+    "ipos",
+    "public listing",
+    "go public",
+    "goes public",
+    "direct listing",
+    "market cap at market close on ipo day",
+    "closing market cap",
+    "pre-market",
+    "spacex ipo",
+    "openai ipo",
+    "anthropic ipo",
+    "stripe ipo",
+    "databricks ipo",
+    "discord ipo",
+    "kraken ipo",
+    "consensys ipo",
+    "perplexity ipo",
+    "strava ipo",
+    "okx ipo",
+    "fannie mae ipo",
+    "freddie mac ipo",
   ],
   politics: [
     "politics",
@@ -428,7 +453,6 @@ const categoryNeedles: Record<string, string[]> = {
     "dollar",
     "stock",
     "stocks",
-    "ipo",
     "earnings",
     "nasdaq",
     "s&p",
@@ -443,7 +467,7 @@ const categoryNeedles: Record<string, string[]> = {
   ],
 }
 
-const targetCategoryIds = ["crypto", "africa", "sports", "entertainment", "world", "macro"] as const
+const targetCategoryIds = ["crypto", "africa", "sports", "entertainment", "ipos", "world", "macro"] as const
 const targetCategoryNeedles = targetCategoryIds.flatMap((id) => categoryNeedles[id])
 const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> = {
   // Africa: broad sports/entertainment/world tags filtered by strict African identity needles.
@@ -456,9 +480,10 @@ const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> =
   crypto: ["21", "235", "101611", "1312"],
   sports: ["1"],
   entertainment: ["596", "100", "53"],
+  ipos: ["600"],
   // World folds News + Politics + Legal + Geopolitics into one cleaner lane.
   world: ["2", "144", "100344", "933", "1558", "1588", "757", "100265", "1396", "101970", "366"],
-  macro: ["120", "600", "370", "102000", "101250", "101247", "833"],
+  macro: ["120", "370", "102000", "101250", "101247", "833"],
 }
 const categoryExclusionNeedles: Record<string, string[]> = {
   entertainment: [
@@ -649,6 +674,10 @@ function isAfricaMarket(text: string): boolean {
   return categoryNeedles.africa.some((needle) => includesNeedle(text, needle.toLowerCase()))
 }
 
+function isIpoMarket(text: string): boolean {
+  return categoryNeedles.ipos.some((needle) => includesNeedle(text, needle.toLowerCase()))
+}
+
 function focusedMarketText(market: GammaMarketRaw): string {
   const marketTags = market.tags?.map((t) => t.label) ?? []
   return [
@@ -678,7 +707,7 @@ function shouldKeepAfricaMarket(event: GammaEventRaw, market: GammaMarketRaw): b
 }
 
 function detectTargetCategory(text: string): string | null {
-  const priority = ["crypto", "africa", "sports", "entertainment", "macro", "world"]
+  const priority = ["ipos", "crypto", "africa", "sports", "entertainment", "macro", "world"]
   for (const category of priority) {
     const needles = categoryNeedles[category]
     if (needles?.some((needle) => includesNeedle(text, needle.toLowerCase()))) return category
@@ -707,7 +736,9 @@ function qualityBadges(input: {
   const crypto = isCryptoMarket(input.text)
   const asset = crypto ? detectCryptoAsset(input.text) : null
   const africa = isAfricaMarket(input.text)
+  const ipo = isIpoMarket(input.text)
   if (asset) badges.push(asset)
+  if (ipo) badges.push("IPO")
   // Highest-priority combo badge
   if (quick && crypto) badges.push("24h Crypto")
   else if (quick) badges.push("Closes today")
@@ -734,6 +765,7 @@ function smartMarketScore(input: {
   const quick = isQuickSettle(input.endDate, input.now)
   const crypto = isCryptoMarket(input.text)
   const detectedCategory = detectTargetCategory(input.text)
+  const ipo = isIpoMarket(input.text)
   const hasVisual = Boolean(input.market.image || input.market.icon || input.event.image || input.event.icon)
   const hasTokens = parseTokenIds(input.market).length > 0
   const hours = hoursUntil(input.endDate, input.now)
@@ -751,6 +783,7 @@ function smartMarketScore(input: {
   const africa = isAfricaMarket(input.text)
   // Africa markets get a boost when browsing the Africa category
   const africaBoost = africa && input.normalizedCategory === "africa" ? 25 : 0
+  const ipoBoost = ipo && input.normalizedCategory === "ipos" ? 30 : ipo ? 8 : 0
   const categoryBoost = input.normalizedCategory !== "all" && input.normalizedCategory === detectedCategory ? 18 : 0
 
   return (
@@ -760,6 +793,7 @@ function smartMarketScore(input: {
     (crypto ? (input.normalizedCategory === "crypto" ? 26 : 16) : 0) +
     cryptoQuickBoost +
     africaBoost +
+    ipoBoost +
     categoryBoost +
     priceOpportunityScore(input.market) * 10 +
     (hasTokens ? 8 : 0) +
@@ -784,10 +818,36 @@ function pickUniqueMarkets(markets: FeedGammaMarket[], limit: number, used = new
   return selected
 }
 
+function ipoEventKey(market: FeedGammaMarket) {
+  return market.eventId ?? market.eventTitle ?? market.slug ?? market.question
+}
+
+function blendIpoMarkets(markets: FeedGammaMarket[], limit: number): FeedGammaMarket[] {
+  const sorted = [...markets].sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0))
+  const usedMarketKeys = new Set<string>()
+  const usedEventKeys = new Set<string>()
+  const selected: FeedGammaMarket[] = []
+  const diverseSlots = Math.max(4, Math.round(limit * 0.75))
+
+  for (const market of sorted) {
+    if (selected.length >= diverseSlots) break
+    const eventKey = ipoEventKey(market)
+    if (eventKey && usedEventKeys.has(eventKey)) continue
+    const marketKey = market.id ?? market.slug ?? market.conditionId ?? market.question
+    if (marketKey && usedMarketKeys.has(marketKey)) continue
+    if (eventKey) usedEventKeys.add(eventKey)
+    if (marketKey) usedMarketKeys.add(marketKey)
+    selected.push(market)
+  }
+
+  selected.push(...pickUniqueMarkets(sorted, limit - selected.length, usedMarketKeys))
+  return selected.sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0)).slice(0, limit)
+}
+
 function blendAllCategoryMarkets(markets: FeedGammaMarket[], limit: number): FeedGammaMarket[] {
   const used = new Set<string>()
   const sorted = [...markets].sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0))
-  const priority = ["crypto", "africa", "sports", "entertainment", "world", "macro"]
+  const priority = ["crypto", "africa", "sports", "entertainment", "ipos", "world", "macro"]
   const categorySlots = Math.min(priority.length, Math.max(5, Math.round(limit * 0.7)))
   const selected: FeedGammaMarket[] = []
 
@@ -1100,6 +1160,8 @@ export async function fetchPolymarketMarkets(
           liquidity: candidate.liquidity ?? event.liquidity ?? 0,
           endDate,
           tags: candidate.tags ?? event.tags,
+          eventId: event.id,
+          eventTitle: event.title,
         }
         enriched.feedCategory = detectTargetCategory(haystack) ?? normalizedCategory
         enriched.cryptoAsset = detectCryptoAsset(haystack) ?? undefined
@@ -1163,10 +1225,12 @@ export async function fetchPolymarketMarkets(
     }
 
     const finalMarkets = sortBy === "trending" && !search
-      ? normalizedCategory === "all"
+        ? normalizedCategory === "all"
         ? blendAllCategoryMarkets(filteredBySearch, limit)
         : normalizedCategory === "crypto"
         ? blendCryptoAssetMarkets(filteredBySearch, limit, now)
+        : normalizedCategory === "ipos"
+        ? blendIpoMarkets(filteredBySearch, limit)
         : blendSmartMarkets(filteredBySearch, limit, now)
       : filteredBySearch.slice(0, limit)
 

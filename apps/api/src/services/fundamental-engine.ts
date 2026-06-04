@@ -5,6 +5,7 @@ import type { PremiumNewsArticle } from "./news.js";
 export type MarketCategory =
   | "politics"
   | "economics"
+  | "ipos"
   | "sports"
   | "science_tech"
   | "legal"
@@ -39,6 +40,13 @@ export function detectMarketCategory(
   category?: string
 ): MarketCategory {
   const text = `${category ?? ""} ${question}`.toLowerCase();
+
+  if (
+    /(^|[^a-z0-9])(ipo|ipos)([^a-z0-9]|$)|initial public offering|go public|goes public|public listing|direct listing|s-1|registration statement|ipo day|closing market cap|market cap.*ipo|pre-market/.test(
+      text
+    )
+  )
+    return "ipos";
 
   if (
     /politi|elect|president|senator|congress|vote|ballot|democrat|republican|prime minister|parliament|govern/.test(
@@ -84,6 +92,7 @@ export function detectMarketCategory(
 const BASE_RATES: Record<MarketCategory, number> = {
   politics: 50,      // elections are definitionally uncertain for favorites
   economics: 58,     // analyst consensus is correct more often than not
+  ipos: 45,           // IPO timing and valuation markets often resolve below optimistic narrative
   sports: 50,        // high variance, home favorite bias small
   science_tech: 42,  // ambitious milestones typically run late/fail
   legal: 38,         // regulatory/legal challenges frequently rejected
@@ -97,6 +106,9 @@ const YES_SIGNALS = [
   "expected to", "likely to", "on track", "poised to", "ahead of", "beats",
   "exceeded", "surpassed", "record high", "bullish", "optimistic", "positive",
   "deals", "agreement", "signed", "granted", "clears", "green light",
+  "filed for ipo", "confidential ipo filing", "s-1", "registration statement",
+  "roadshow", "underwriter", "underwriters", "plans ipo", "preparing ipo",
+  "expects to list", "public listing", "nasdaq listing", "nyse listing",
 ];
 
 const NO_SIGNALS = [
@@ -104,6 +116,9 @@ const NO_SIGNALS = [
   "withdrawn", "cancelled", "delayed", "missed", "below expectations", "bearish",
   "pessimistic", "negative", "opposition", "vetoed", "suspended", "banned",
   "crisis", "downgrade", "warning", "concern", "risk", "doubt",
+  "delays ipo", "delayed ipo", "postpones ipo", "postponed ipo", "shelves ipo",
+  "shelved ipo", "staying private", "remain private", "market volatility",
+  "regulatory scrutiny", "sec investigation", "valuation cut", "down round",
 ];
 
 function scoreNewsSentiment(
@@ -137,6 +152,97 @@ function scoreNewsSentiment(
     yesScore: (yesHits / total) * 100,
     noScore: (noHits / total) * 100,
     sampleCount: articles.length,
+  };
+}
+
+function isNegativeIpoQuestion(question: string): boolean {
+  return /not\s+(ipo|go public|list)|won't\s+(ipo|go public|list)|will\s+.+\s+not\s+(ipo|go public|list)|no\s+ipo/.test(
+    question.toLowerCase()
+  );
+}
+
+function scoreIpoReadiness(
+  question: string,
+  articles: PremiumNewsArticle[]
+): FundamentalSignal {
+  const positiveNeedles = [
+    "filed for ipo",
+    "confidential ipo filing",
+    "s-1",
+    "registration statement",
+    "roadshow",
+    "underwriter",
+    "underwriters",
+    "plans ipo",
+    "preparing ipo",
+    "expects to list",
+    "public listing",
+    "nasdaq listing",
+    "nyse listing",
+    "valuation",
+    "secondary sale",
+  ];
+  const negativeNeedles = [
+    "delays ipo",
+    "delayed ipo",
+    "postpones ipo",
+    "postponed ipo",
+    "shelves ipo",
+    "shelved ipo",
+    "staying private",
+    "remain private",
+    "market volatility",
+    "regulatory scrutiny",
+    "sec investigation",
+    "valuation cut",
+    "down round",
+  ];
+
+  const corpus = articles
+    .map((article) => `${article.title} ${article.bodyText.slice(0, 2000)}`)
+    .join(" ")
+    .toLowerCase();
+
+  if (!corpus.trim()) {
+    return {
+      name: "IPO Readiness",
+      direction: "neutral",
+      weight: 0.18,
+      conviction: 0.10,
+      reason: "No recent IPO-specific news available — filing and listing readiness signal absent",
+    };
+  }
+
+  const positiveHits = positiveNeedles.reduce((sum, needle) => sum + (corpus.includes(needle) ? 1 : 0), 0);
+  const negativeHits = negativeNeedles.reduce((sum, needle) => sum + (corpus.includes(needle) ? 1 : 0), 0);
+  const net = positiveHits - negativeHits;
+
+  if (net === 0) {
+    return {
+      name: "IPO Readiness",
+      direction: "neutral",
+      weight: 0.18,
+      conviction: 0.22,
+      reason: "Recent coverage does not clearly confirm filing momentum or listing delay risk",
+    };
+  }
+
+  const inverseQuestion = isNegativeIpoQuestion(question);
+  const readinessSupportsIpo = net > 0;
+  const direction: "YES" | "NO" =
+    readinessSupportsIpo
+      ? inverseQuestion ? "NO" : "YES"
+      : inverseQuestion ? "YES" : "NO";
+  const conviction = Math.min(0.72, 0.34 + Math.abs(net) * 0.08);
+
+  return {
+    name: "IPO Readiness",
+    direction,
+    weight: 0.18,
+    conviction,
+    reason: readinessSupportsIpo
+      ? `IPO readiness indicators are present (${positiveHits} positive vs ${negativeHits} delay signals): filing/listing momentum supports ${inverseQuestion ? "NO on a no-IPO question" : "YES on an IPO question"}`
+      : `IPO delay indicators dominate (${negativeHits} delay vs ${positiveHits} readiness signals): timing risk supports ${inverseQuestion ? "YES on a no-IPO question" : "NO on an IPO question"}`,
   };
 }
 
@@ -279,6 +385,10 @@ export function computeFundamentalVerdict(
     conviction: sentimentConviction,
     reason: sentimentReason,
   });
+
+  if (category === "ipos") {
+    signals.push(scoreIpoReadiness(market.question, articles));
+  }
 
   // ── 4. Time Decay Signal (w: 0.12) ────────────────────────────────────────
   let daysToResolution: number | null = null;
@@ -458,6 +568,16 @@ export function buildCategoryFramework(
         `- Assess: analyst consensus vs crowd wisdom — where does Street disagree with the market?`,
         `- Key insight: economic data surprises drive rapid repricing; monitor real-time release calendar`,
         `- Contrast: what would have to be true for the market to be wrong?`,
+      ].join("\n");
+
+    case "ipos":
+      return [
+        `IPO ANALYSIS FRAMEWORK:`,
+        `- Evaluate: filing status, S-1/confidential submission signals, underwriter selection, and roadshow timing vs market implied probability (${impliedProbability}%)`,
+        `- Factor: private-market valuation marks, latest funding round, secondary sales, revenue growth, margin profile, and public comparable multiples`,
+        `- Assess: listing window quality — rates, equity risk appetite, sector multiples, recent IPO performance, and sponsor/investor pressure for liquidity`,
+        `- Key insight: IPO markets often overprice famous-company narratives while underweighting listing mechanics, valuation discipline, and delay risk`,
+        `- Contrast: what specific filing, valuation mark, or market-window signal would make the current Polymarket price wrong?`,
       ].join("\n");
 
     case "sports":
