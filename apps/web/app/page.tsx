@@ -6,6 +6,7 @@ import { Navbar } from "@/components/navbar"
 import { MarketHero } from "@/components/market-hero"
 import { CategoriesBar } from "@/components/categories-bar"
 import { MarketsGrid } from "@/components/markets-grid"
+import { EdgeFeed } from "@/components/edge-feed"
 import { Footer } from "@/components/footer"
 
 function HomeContent() {
@@ -62,6 +63,13 @@ function HomeContent() {
         <div className="pt-4 sm:pt-5">
           <MarketsGrid category={category} sortBy={sortBy} search={searchQuery} />
         </div>
+
+        {/* ── Edge Scanner / Market Intelligence ───────────────────── */}
+        {!searchQuery && (
+          <div className="mt-8 sm:mt-12 border-t border-[oklch(0.18_0.014_255)] pt-8">
+            <EdgeFeed limit={6} minEdge={0.08} />
+          </div>
+        )}
       </main>
 
       <Footer />

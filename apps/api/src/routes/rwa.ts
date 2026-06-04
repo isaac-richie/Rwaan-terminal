@@ -906,9 +906,12 @@ async function submitPancakeXOrder(input: {
 }
 
 async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null> {
-  const cacheKey = buildCacheKey("rwa:pancake:executable-route:v1", { address: token.address.toLowerCase() });
+  // v2: busts any stale null cached before PancakeSwapX support was added.
+  // Null results are intentionally NOT cached so newly listed tokens are
+  // discovered on the next health check without waiting for a TTL to expire.
+  const cacheKey = buildCacheKey("rwa:pancake:executable-route:v2", { address: token.address.toLowerCase() });
   const cached = await getJsonCacheEntry<RwaSafeRoute | null>(cacheKey);
-  if (cached) return cached.value;
+  if (cached?.value) return cached.value; // only return if a real route is cached
 
   const tokenAddress = token.address as Address;
   const tokenAsset = { symbol: token.symbol, address: tokenAddress, decimals: token.decimals };
@@ -982,7 +985,9 @@ async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null>
     .filter((candidate): candidate is RwaSafeRoute => Boolean(candidate))
     .sort((a, b) => b.roundTripBps - a.roundTripBps)[0] ?? null;
 
-  await setJsonCache(cacheKey, safe, 60, { staleTtlSeconds: 300 });
+  // Only cache successful routes — null means "no pool found yet", which we
+  // don't cache so newly listed tokens are picked up on the next check.
+  if (safe) await setJsonCache(cacheKey, safe, 60, { staleTtlSeconds: 300 });
   return safe;
 }
 
@@ -1169,26 +1174,26 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
       enabled: true,
       status: "enabled",
       note: safeRoute.lowLiquidity
-        ? "PancakeSwap returned a live buy quote, but liquidity is thin. Review the quote carefully."
+        ? "Low liquidity buy available — review the quote carefully."
         : safeRoute.kind === "pcsx"
-        ? "Live USDT buy route verified through PancakeSwapX."
+        ? "Live buy route verified."
         : "Live USDT buy route verified through PancakeSwap V3.",
     },
     sell: {
       enabled: true,
       status: "enabled",
       note: safeRoute.lowLiquidity
-        ? "PancakeSwap returned a live sell quote, but liquidity is thin. Review the quote carefully."
+        ? "Low liquidity sell available — review the quote carefully."
         : safeRoute.kind === "pcsx"
-        ? "Live USDT sell route verified through PancakeSwapX."
+        ? "Live sell route verified."
         : "Live USDT sell route verified through PancakeSwap V3.",
     },
     copy: {
       primary: safeRoute.lowLiquidity ? "Low liquidity" : "Ready to trade",
       secondary: safeRoute.lowLiquidity
-        ? "Tradable on PancakeSwap, but liquidity is thin and the quote can move sharply. Review the final quote before confirming."
+        ? "Low liquidity — quotes can move sharply. Review carefully before confirming."
         : safeRoute.kind === "pcsx"
-        ? "Buy and sell this stock using USDT. We verify both directions through PancakeSwapX before enabling trading."
+        ? "Buy and sell with full verification. Both directions confirmed before trading."
         : "Buy and sell this stock using USDT. We verify both directions before enabling trading.",
     },
   };
@@ -1309,7 +1314,7 @@ async function buildCatalogRouteHealth(asset: RwaAsset, region?: string): Promis
     },
     copy: {
       primary: "Checking route",
-      secondary: "This stock is mapped on BNB Chain. Rawli is verifying the live PancakeSwapX buy and sell route.",
+      secondary: "Verifying live buy and sell routes. Check back shortly.",
     },
   };
 }

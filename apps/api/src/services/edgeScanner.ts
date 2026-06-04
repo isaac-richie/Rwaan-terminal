@@ -24,8 +24,8 @@ import {
   deriveMarketAwareVerdict,
   runTechnicalAnalysis,
   type TechnicalAnalysis,
-  type MarketAwareVerdict,
 } from "./ta-engine.js";
+import { computeFundamentalVerdict } from "./fundamental-engine.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,8 +35,9 @@ export type EdgeHit = {
   category: string;
   slug: string;
   endDate: string | null;
-  symbol: string;
-  currentPrice: number;
+  engine: "ta" | "fundamental";  // which engine produced this edge
+  symbol: string | null;         // crypto symbol (null for fundamental)
+  currentPrice: number | null;   // live spot price (null for fundamental)
   direction: "YES" | "NO";
   confidence: number;
   modelProbability: number;
@@ -78,6 +79,7 @@ type GammaMarket = {
 type GammaEvent = {
   id?: string;
   title?: string;
+  category?: string;
   markets?: GammaMarket[];
 };
 
@@ -107,9 +109,20 @@ function marketImpliedYes(market: GammaMarket): number | null {
   return frac > 0.01 && frac < 0.99 ? frac : null;
 }
 
-// ─── Crypto tag IDs (same set the prewarm uses) ────────────────────────────
-
+// ─── Tag IDs — all categories the scanner covers ────────────────────────────
+// Crypto (TA engine): BTC, ETH, altcoins, DeFi
 const CRYPTO_TAG_IDS = ["21", "235", "101611", "1312"];
+// Non-crypto (fundamental engine): these categories produce questions the
+// fundamental verdict engine handles well — politics, tech, geopolitics, finance.
+const FUNDAMENTAL_TAG_IDS = [
+  "2", "144",                        // news / politics
+  "100265", "1396", "101970", "366", // geopolitics
+  "1401",                            // tech (AI, OpenAI, etc.)
+  "120", "600",                      // finance / IPOs
+  "439",                             // AI
+  "596", "100", "53",                // entertainment
+];
+const ALL_TAG_IDS = [...new Set([...CRYPTO_TAG_IDS, ...FUNDAMENTAL_TAG_IDS])];
 
 // ─── Scanner ────────────────────────────────────────────────────────────────
 
@@ -132,17 +145,20 @@ async function getTAForSymbol(symbol: string): Promise<TechnicalAnalysis | null>
 export async function scanForEdges(opts: {
   minAbsEdge?: number;
   maxResults?: number;
+  engines?: Array<"ta" | "fundamental">;
 } = {}): Promise<ScanResult> {
   const minAbsEdge = opts.minAbsEdge ?? 0.05;    // 5pt minimum to surface
   const maxResults = opts.maxResults ?? 20;
+  const engines = opts.engines ?? ["ta", "fundamental"];
   const errors: string[] = [];
   const scannedAt = new Date().toISOString();
 
-  // 1. Fetch active crypto events from Gamma (all crypto tags in one batch)
-  let allMarkets: Array<GammaMarket & { eventTitle?: string }> = [];
+  // 1. Fetch active events from Gamma across all covered tags
+  const tagIds = engines.includes("fundamental") ? ALL_TAG_IDS : CRYPTO_TAG_IDS;
+  let allMarkets: Array<GammaMarket & { eventTitle?: string; eventCategory?: string }> = [];
   try {
     const results = await Promise.allSettled(
-      CRYPTO_TAG_IDS.map((tagId) =>
+      tagIds.map((tagId) =>
         getGamma("/events", {
           tag_id: tagId,
           active: "true",
@@ -164,7 +180,7 @@ export async function scanForEdges(opts: {
           const id = String(market.id ?? "");
           if (!id || seenIds.has(id)) continue;
           seenIds.add(id);
-          allMarkets.push({ ...market, eventTitle: event.title });
+          allMarkets.push({ ...market, eventTitle: event.title, eventCategory: event.category });
         }
       }
     }
@@ -173,40 +189,53 @@ export async function scanForEdges(opts: {
     return { ok: false, scannedAt, marketsScanned: 0, symbolsAnalyzed: 0, edgeHits: [], errors };
   }
 
-  // 2. Filter to crypto price questions with valid market prices
-  type Candidate = {
-    market: GammaMarket & { eventTitle?: string };
+  // 2. Classify every market into a TA candidate or a fundamental candidate
+  type TaCandidate = {
+    kind: "ta";
+    market: GammaMarket & { eventTitle?: string; eventCategory?: string };
     symbol: string;
     marketYes: number;
     question: string;
     endDate: string | null;
   };
+  type FundCandidate = {
+    kind: "fundamental";
+    market: GammaMarket & { eventTitle?: string; eventCategory?: string };
+    marketYes: number;
+    question: string;
+    endDate: string | null;
+    category: string;
+  };
 
-  const candidates: Candidate[] = [];
+  const taCandidates: TaCandidate[] = [];
+  const fundCandidates: FundCandidate[] = [];
+
   for (const market of allMarkets) {
     const question = market.question ?? market.eventTitle ?? "";
-    const symbol = detectCryptoSymbol(question);
-    if (!symbol) continue;
-    const pq = classifyCryptoPriceQuestion(question);
-    if (!pq.isPriceQuestion) continue;
     const marketYes = marketImpliedYes(market);
     if (marketYes === null) continue;
-    // Skip markets near the extremes — no edge to find at 1% or 99%
+    // Skip extremes — no edge at 1% or 99%
     if (marketYes < 0.05 || marketYes > 0.95) continue;
-    candidates.push({
-      market,
-      symbol,
-      marketYes,
-      question,
-      endDate: market.endDate ?? market.end_date_iso ?? null,
-    });
+    const endDate = market.endDate ?? market.end_date_iso ?? null;
+    const category = market.category ?? market.eventCategory ?? "General";
+
+    const symbol = detectCryptoSymbol(question);
+    if (symbol && engines.includes("ta")) {
+      const pq = classifyCryptoPriceQuestion(question);
+      if (pq.isPriceQuestion) {
+        taCandidates.push({ kind: "ta", market, symbol, marketYes, question, endDate });
+        continue; // TA takes priority
+      }
+    }
+    // Everything else → fundamental (if enabled)
+    if (engines.includes("fundamental")) {
+      fundCandidates.push({ kind: "fundamental", market, marketYes, question, endDate, category });
+    }
   }
 
-  // 3. Deduplicate TA runs per symbol
-  const uniqueSymbols = [...new Set(candidates.map((c) => c.symbol))];
+  // 3. Run TA engine (deduplicated per symbol)
+  const uniqueSymbols = [...new Set(taCandidates.map((c) => c.symbol))];
   const taResults = new Map<string, TechnicalAnalysis | null>();
-
-  // Run TA in parallel (max 6 concurrent to avoid Binance rate limits)
   const CONCURRENCY = 6;
   for (let i = 0; i < uniqueSymbols.length; i += CONCURRENCY) {
     const batch = uniqueSymbols.slice(i, i + CONCURRENCY);
@@ -217,63 +246,106 @@ export async function scanForEdges(opts: {
       })
     );
     for (const r of results) {
-      if (r.status === "rejected") {
-        errors.push(`TA batch error: ${r.reason?.message ?? "unknown"}`);
-      }
+      if (r.status === "rejected") errors.push(`TA batch error: ${r.reason?.message ?? "unknown"}`);
     }
   }
 
-  // 4. Derive verdicts and compute edges
+  // 4. Compute edges — TA path
   const hits: EdgeHit[] = [];
-  for (const candidate of candidates) {
-    const ta = taResults.get(candidate.symbol);
+  for (const c of taCandidates) {
+    const ta = taResults.get(c.symbol);
     if (!ta) continue;
-
     try {
-      const verdict = deriveMarketAwareVerdict(
-        ta,
-        candidate.question,
-        candidate.endDate ?? undefined,
-        candidate.marketYes
-      );
-      if (!verdict.taRelevant) continue;
-      if (verdict.edge === null || verdict.marketProbability === null) continue;
+      const v = deriveMarketAwareVerdict(ta, c.question, c.endDate ?? undefined, c.marketYes);
+      if (!v.taRelevant || v.edge === null || v.marketProbability === null) continue;
+      const absEdge = Math.abs(v.edge);
+      if (absEdge < minAbsEdge) continue;
+      hits.push({
+        marketId: String(c.market.id ?? ""),
+        question: c.question,
+        category: c.market.category ?? c.market.eventCategory ?? "Crypto",
+        slug: c.market.slug ?? "",
+        endDate: c.endDate,
+        engine: "ta",
+        symbol: c.symbol,
+        currentPrice: ta.currentPrice,
+        direction: v.verdict.direction,
+        confidence: v.verdict.confidence,
+        modelProbability: v.modelProbability,
+        marketProbability: v.marketProbability,
+        blendedProbability: v.probability,
+        edge: v.edge,
+        absEdge,
+        signalAgreement: v.verdict.signalAgreement,
+        netScore: v.verdict.netScore,
+        regime: ta.regime,
+        mappingNote: v.mappingNote,
+      });
+    } catch (err: any) {
+      errors.push(`TA verdict failed: "${c.question.slice(0, 40)}": ${err?.message ?? "unknown"}`);
+    }
+  }
 
-      const absEdge = Math.abs(verdict.edge);
+  // 5. Compute edges — Fundamental path (lightweight: no news fetch, just market data scoring)
+  //    The fundamental engine computes an implied probability from the question structure,
+  //    category, time-to-resolution, and market liquidity. We compare that to the market price.
+  const FUND_BATCH_SIZE = 40; // cap to keep scan fast
+  const fundBatch = fundCandidates.slice(0, FUND_BATCH_SIZE);
+  for (const c of fundBatch) {
+    try {
+      const marketObj = {
+        id: String(c.market.id ?? ""),
+        question: c.question,
+        category: c.category,
+        endDate: c.endDate ?? undefined,
+        outcomes: (() => {
+          const outcomes = parseArray(c.market.outcomes);
+          const prices = parseArray(c.market.outcomePrices ?? c.market.outcome_prices).map(Number);
+          return outcomes.map((name, i) => ({ name, price: prices[i] ?? 0.5 }));
+        })(),
+      };
+      const fv = computeFundamentalVerdict(marketObj, []);
+      if (!fv) continue;
+
+      // Compute implied probability from fundamental signals
+      const fundPYes = Math.min(0.95, Math.max(0.05, 0.5 + fv.netScore / 200));
+      const edge = fundPYes - c.marketYes;
+      const absEdge = Math.abs(edge);
       if (absEdge < minAbsEdge) continue;
 
       hits.push({
-        marketId: String(candidate.market.id ?? ""),
-        question: candidate.question,
-        category: candidate.market.category ?? "Crypto",
-        slug: candidate.market.slug ?? "",
-        endDate: candidate.endDate,
-        symbol: candidate.symbol,
-        currentPrice: ta.currentPrice,
-        direction: verdict.verdict.direction,
-        confidence: verdict.verdict.confidence,
-        modelProbability: verdict.modelProbability,
-        marketProbability: verdict.marketProbability,
-        blendedProbability: verdict.probability,
-        edge: verdict.edge,
+        marketId: String(c.market.id ?? ""),
+        question: c.question,
+        category: c.category,
+        slug: c.market.slug ?? "",
+        endDate: c.endDate,
+        engine: "fundamental",
+        symbol: null,
+        currentPrice: null,
+        direction: fv.direction,
+        confidence: fv.confidence,
+        modelProbability: fundPYes,
+        marketProbability: c.marketYes,
+        blendedProbability: fundPYes, // no blend for fundamental (no market-prior merge yet)
+        edge,
         absEdge,
-        signalAgreement: verdict.verdict.signalAgreement,
-        netScore: verdict.verdict.netScore,
-        regime: ta.regime,
-        mappingNote: verdict.mappingNote,
+        signalAgreement: fv.signals.length > 0 ? (fv.signals.filter((s) => s.direction === fv.direction).length / fv.signals.length) * 100 : 0,
+        netScore: fv.netScore,
+        regime: fv.category ?? "general",
+        mappingNote: fv.verdictRationale ?? "",
       });
     } catch (err: any) {
-      errors.push(`Verdict failed for "${candidate.question.slice(0, 50)}": ${err?.message ?? "unknown"}`);
+      errors.push(`Fund verdict failed: "${c.question.slice(0, 40)}": ${err?.message ?? "unknown"}`);
     }
   }
 
-  // 5. Sort by absolute edge descending
+  // 6. Sort by absolute edge descending
   hits.sort((a, b) => b.absEdge - a.absEdge);
 
   return {
     ok: true,
     scannedAt,
-    marketsScanned: candidates.length,
+    marketsScanned: taCandidates.length + fundBatch.length,
     symbolsAnalyzed: taResults.size,
     edgeHits: hits.slice(0, maxResults),
     errors,
