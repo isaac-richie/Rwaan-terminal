@@ -10,12 +10,14 @@ import {
   BarChart3,
   Brain,
   Coins,
+  Activity,
   ArrowUpRight,
   TrendingUp,
   Lock,
   ChevronDown,
   ChevronRight,
   Globe2,
+  Link2,
   Send,
 } from "lucide-react"
 
@@ -37,6 +39,24 @@ const SOCIAL_LINKS = [
     label: "Website",
     href: process.env.NEXT_PUBLIC_WEBSITE_URL ?? "https://www.rawlianalytics.io",
     icon: Globe2,
+  },
+]
+
+const TRUST_SIGNALS = [
+  {
+    label: "Live",
+    icon: Activity,
+    tone: "text-[oklch(0.72_0.18_155)] border-[oklch(0.68_0.18_155/0.34)] bg-[oklch(0.68_0.18_155/0.09)]",
+  },
+  {
+    label: "Non-custodial",
+    icon: Lock,
+    tone: "text-[oklch(0.84_0.16_82)] border-[oklch(0.78_0.16_82/0.34)] bg-[oklch(0.78_0.16_82/0.10)]",
+  },
+  {
+    label: "On-chain",
+    icon: Link2,
+    tone: "text-[oklch(0.72_0.14_245)] border-[oklch(0.62_0.16_245/0.34)] bg-[oklch(0.62_0.16_245/0.10)]",
   },
 ]
 
@@ -559,11 +579,16 @@ export function Footer() {
                   Professional prediction market terminal — live market feed, AI-powered intelligence, non-custodial order execution, and BNB-native funding.
                 </p>
 
-                <div className="flex items-center gap-1.5 pt-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
-                  <span className="text-[10px] font-mono font-semibold text-muted-foreground/40 uppercase tracking-widest">
-                    Live · Non-custodial · On-chain
-                  </span>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {TRUST_SIGNALS.map(({ label, icon: Icon, tone }) => (
+                    <span
+                      key={label}
+                      className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-bold uppercase tracking-[0.14em] ${tone}`}
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      {label}
+                    </span>
+                  ))}
                 </div>
               </div>
 
@@ -635,9 +660,9 @@ export function Footer() {
                       rel="noreferrer"
                       aria-label={label}
                       title={label}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[oklch(0.20_0.014_255/0.72)] bg-[oklch(0.10_0.012_260/0.72)] text-muted-foreground/45 transition-colors hover:border-[oklch(0.78_0.16_82/0.40)] hover:text-[oklch(0.82_0.16_82)]"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[oklch(0.30_0.018_255/0.82)] bg-[oklch(0.145_0.014_260/0.92)] text-[oklch(0.78_0.04_90)] shadow-[0_0_0_1px_oklch(1_0_0/0.02)] transition-all hover:border-[oklch(0.78_0.16_82/0.55)] hover:bg-[oklch(0.78_0.16_82/0.10)] hover:text-[oklch(0.86_0.16_82)]"
                     >
-                      <Icon className="h-3.5 w-3.5" />
+                      <Icon className="h-4 w-4" />
                     </a>
                   ))}
                 </div>

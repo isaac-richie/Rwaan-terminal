@@ -892,28 +892,6 @@ export default function StocksPage() {
         </div>
       </main>
 
-      {/* ── Mobile: sticky bottom bar (sits above mobile nav) ────────── */}
-      {selectedAsset && (
-        <div className="lg:hidden fixed bottom-16 sm:bottom-0 inset-x-0 z-40 glass-surface border-t border-[oklch(0.28_0.016_255/0.55)]">
-          <div className="flex items-center gap-3 px-4 py-3 max-w-7xl mx-auto">
-            <AssetMark asset={selectedAsset} size="sm" />
-            <div className="flex-1 min-w-0">
-              <div className="font-mono text-sm font-bold text-foreground">{selectedAsset.displaySymbol}</div>
-              <div className={cn("text-[11px] font-bold tabular-nums", positive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.62_0.18_25)]")}>
-                {formatMoney(selectedQuote?.price)}{selectedQuote?.changePct != null ? ` · ${formatPct(selectedQuote.changePct)}` : ""}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDetailOpen(true)}
-              className="h-10 px-5 rounded-xl bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] text-sm font-bold active:scale-95 transition-transform shadow-[0_4px_16px_oklch(0.78_0.16_82/0.30)]"
-            >
-              View
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── Mobile: detail sheet ──────────────────────────────────────── */}
       {detailOpen && selectedAsset && (
         <div className="lg:hidden fixed inset-0 z-50 flex flex-col">
@@ -1072,33 +1050,13 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
             {route?.copy.secondary ?? "We verify buy and sell availability before enabling trading for each stock."}
           </p>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-lg border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.09_0.01_260/0.5)] p-2.5">
-              <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Token</div>
-              <div className="mt-1 truncate text-xs font-semibold text-foreground">{route?.token.symbol ?? "Not mapped"}</div>
-            </div>
-            <div className="rounded-lg border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.09_0.01_260/0.5)] p-2.5">
-              <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Paired With</div>
-              <div className="mt-1 text-xs font-semibold text-foreground">{route?.settlementAsset.symbol ?? "USDT"}</div>
-            </div>
-          </div>
 
           {route?.dex ? (
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-2">
               <div className="rounded-lg border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.09_0.01_260/0.5)] p-2.5">
-                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Exchange</div>
-                <div className="mt-1 text-xs font-semibold text-foreground">{route.dex.venue}</div>
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Efficiency</div>
+                <div className="mt-1 text-xs font-semibold text-[oklch(0.68_0.18_155)]">{(route.dex.roundTripBps / 100).toFixed(1)}% round-trip</div>
               </div>
-              <div className="rounded-lg border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.09_0.01_260/0.5)] p-2.5">
-                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Spread</div>
-                <div className="mt-1 text-xs font-semibold text-[oklch(0.68_0.18_155)]">{(route.dex.roundTripBps / 100).toFixed(1)}%</div>
-              </div>
-            </div>
-          ) : null}
-
-          {route?.token.address ? (
-            <div className="mt-2 truncate rounded-lg border border-[oklch(0.22_0.015_255/0.42)] bg-[oklch(0.07_0.01_260/0.62)] px-2.5 py-2 font-mono text-[10px] text-muted-foreground">
-              {route.token.address}
             </div>
           ) : null}
         </div>
@@ -1161,13 +1119,13 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-[oklch(0.78_0.16_82/0.22)] bg-[oklch(0.78_0.16_82/0.06)] p-2.5">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[oklch(0.82_0.16_82)]" />
           <p className="text-[11px] leading-4 text-[oklch(0.78_0.12_82)]">
-            Buying is only enabled once we confirm you can also sell. Your trade is protected end to end.
+            Protected end to end. Both directions verified before trading.
           </p>
         </div>
       </div>
 
-      {/* Related prediction markets */}
-      {(relatedMarkets.length > 0 || relatedLoading) && (
+      {/* Related prediction markets — disabled: search is returning unrelated results */}
+      {false && (relatedMarkets.length > 0 || relatedLoading) && (
         <div className="rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.82)] p-4">
           <div className="flex items-center justify-between gap-2 mb-3">
             <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
@@ -1569,11 +1527,10 @@ function RwaTradeModal({
                     "rounded-xl border p-3 transition-colors",
                     quote ? "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.05)]" : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.62)]"
                   )}>
-                    <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">You get</div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Receive</div>
                     <div className={cn("mt-1 font-mono text-lg font-bold", quote ? "text-foreground" : "text-muted-foreground/30")}>
                       {status === "quoting" ? <Loader2 className="h-4 w-4 animate-spin" /> : quote ? rawToHuman(quote.amountOutRaw, quote.tokenOut.decimals) : "—"}
                     </div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">{outputSymbol}</div>
                   </div>
                   <div className={cn(
                     "rounded-xl border p-3 transition-colors",
@@ -1599,8 +1556,8 @@ function RwaTradeModal({
                       {quote.lowLiquidity
                         ? "Low liquidity"
                         : quote.execution.kind === "pcsx"
-                        ? `${quote.venue} signed order`
-                        : `Fee ${(quote.fee / 10_000).toFixed(2)}%`} · Two-way {(quote.roundTripBps / 100).toFixed(1)}%
+                        ? `${quote.venue} order`
+                        : `Fee ${(quote.fee / 10_000).toFixed(2)}%`} · {(quote.roundTripBps / 100).toFixed(1)}% efficiency
                     </span>
                     <span className="font-semibold">
                       {quoteStale ? "Quote expired — refresh" : `${30 - quoteAge}s`}
@@ -1608,12 +1565,6 @@ function RwaTradeModal({
                   </div>
                 )}
 
-                {/* Hint when no quote yet */}
-                {!quote && status !== "quoting" && (
-                  <p className="mt-3 text-center text-[11px] text-muted-foreground/50">
-                    Get a quote to see how much you'll receive before confirming
-                  </p>
-                )}
               </>
             )}
 
