@@ -130,6 +130,24 @@ describe("api routes", () => {
     expect(res.json().error).toBe("invalid_quote_payload");
   });
 
+  it("bridge quote rejects non-positive base-unit amounts locally", async () => {
+    const app = buildServer();
+    const res = await app.inject({
+      method: "POST",
+      url: "/bridge/quote",
+      payload: {
+        fromAmountBaseUnit: "-1",
+        fromChainId: "56",
+        fromTokenAddress: "0x0000000000000000000000000000000000000000",
+        recipientAddress: "0x0000000000000000000000000000000000000001",
+        toChainId: "137",
+        toTokenAddress: "0x0000000000000000000000000000000000000000"
+      }
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("invalid_quote_payload");
+  });
+
   it("funding quote is restricted to BNB Smart Chain", async () => {
     const app = buildServer();
     const res = await app.inject({
@@ -138,6 +156,24 @@ describe("api routes", () => {
       payload: {
         fromAmountBaseUnit: "1000000",
         fromChainId: "137",
+        fromTokenAddress: "0x0000000000000000000000000000000000000000",
+        recipientAddress: "0x0000000000000000000000000000000000000001",
+        toChainId: "137",
+        toTokenAddress: "0x0000000000000000000000000000000000000000"
+      }
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("invalid_bnb_quote_payload");
+  });
+
+  it("funding quote rejects zero base-unit amounts locally", async () => {
+    const app = buildServer();
+    const res = await app.inject({
+      method: "POST",
+      url: "/funding/quote",
+      payload: {
+        fromAmountBaseUnit: "0",
+        fromChainId: "56",
         fromTokenAddress: "0x0000000000000000000000000000000000000000",
         recipientAddress: "0x0000000000000000000000000000000000000001",
         toChainId: "137",
@@ -157,6 +193,22 @@ describe("api routes", () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe("invalid_deposit_address_payload");
+  });
+
+  it("order validation rejects pathological order sizes locally", async () => {
+    const app = buildServer();
+    const res = await app.inject({
+      method: "POST",
+      url: "/order/validate",
+      payload: {
+        price: 0.5,
+        size: 1e100,
+        tokenId: "123",
+        side: "buy"
+      }
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("invalid_payload");
   });
 
   it("normalizes funding status into a bridge phase", () => {

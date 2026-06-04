@@ -4,8 +4,8 @@ import { fetchPolymarketMarkets, type PolymarketMarket } from "./polymarket"
 // ─── Client-side cache ──────────────────────────────────────────────────────
 // Prevents shimmer flash when navigating back to '/'. Data is returned instantly
 // from cache and a background revalidation refreshes it for the next visit.
-const CACHE_TTL_MS = 30_000 // 30s — fresh enough, avoids redundant fetches
-const STALE_TTL_MS = 5 * 60_000 // 5min — serve stale while revalidating (category switch = instant)
+const CACHE_TTL_MS = 2 * 60_000  // 2 min fresh — tab-switch / back-nav is instant
+const STALE_TTL_MS = 20 * 60_000 // 20 min stale — background refresh; never shows spinner
 
 type CacheEntry = {
   data: PolymarketMarket[]
@@ -13,6 +13,9 @@ type CacheEntry = {
 }
 
 const marketCache = new Map<string, CacheEntry>()
+// Deduplicates simultaneous identical fetches (e.g. MarketsGrid + MobileTicker
+// + TrendingHeader all mounting at once with the same params).
+const inFlightRequests = new Map<string, Promise<PolymarketMarket[]>>()
 
 function visibleMarketFeedFailure(
   includeKalshi: boolean,
@@ -129,37 +132,46 @@ export async function fetchMarkets(
     return cached.data
   }
 
-  const includeKalshi = (process.env.NEXT_PUBLIC_ENABLE_KALSHI ?? "false") === "true"
-  const requests = [
-    fetchPolymarketMarkets(category, limit, sortBy, offset, search),
-    includeKalshi ? fetchKalshiMarkets(category ?? "all", limit, sortBy, offset, search) : Promise.resolve([])
-  ]
+  // Deduplicate: if this exact request is already in-flight (e.g. two components
+  // mounting simultaneously with the same params), reuse the same promise.
+  const existing = inFlightRequests.get(key)
+  if (existing) return existing
 
-  const [polyResult, kalshiResult] = await Promise.allSettled(requests)
-  const feedFailure = visibleMarketFeedFailure(includeKalshi, polyResult, kalshiResult)
-  if (feedFailure) {
-    throw marketFeedError(feedFailure)
-  }
-  const poly = polyResult.status === "fulfilled" ? polyResult.value : []
-  const kalshi = kalshiResult.status === "fulfilled" ? kalshiResult.value : []
+  const fetchPromise = (async () => {
+    const includeKalshi = (process.env.NEXT_PUBLIC_ENABLE_KALSHI ?? "false") === "true"
+    const requests = [
+      fetchPolymarketMarkets(category, limit, sortBy, offset, search),
+      includeKalshi ? fetchKalshiMarkets(category ?? "all", limit, sortBy, offset, search) : Promise.resolve([])
+    ]
 
-  const merged = dedupeMarkets([...poly, ...kalshi])
-  if (sortBy === "volume") {
-    merged.sort((a, b) => volumeToNumber(b.volume) - volumeToNumber(a.volume))
-  } else if (sortBy === "newest") {
-    merged.sort((a, b) => timeToNumber(b.createdAt) - timeToNumber(a.createdAt))
-  } else if (sortBy === "daily") {
-    merged.sort((a, b) => volumeToNumber(b.liquidity) - volumeToNumber(a.liquidity))
-  } else if (sortBy === "ending") {
-    merged.sort((a, b) => timeToNumber(a.endDate) - timeToNumber(b.endDate))
-  }
+    const [polyResult, kalshiResult] = await Promise.allSettled(requests)
+    const feedFailure = visibleMarketFeedFailure(includeKalshi, polyResult, kalshiResult)
+    if (feedFailure) {
+      throw marketFeedError(feedFailure)
+    }
+    const poly = polyResult.status === "fulfilled" ? polyResult.value : []
+    const kalshi = kalshiResult.status === "fulfilled" ? kalshiResult.value : []
 
-  const result = merged.slice(0, limit)
+    const merged = dedupeMarkets([...poly, ...kalshi])
+    if (sortBy === "volume") {
+      merged.sort((a, b) => volumeToNumber(b.volume) - volumeToNumber(a.volume))
+    } else if (sortBy === "newest") {
+      merged.sort((a, b) => timeToNumber(b.createdAt) - timeToNumber(a.createdAt))
+    } else if (sortBy === "daily") {
+      merged.sort((a, b) => volumeToNumber(b.liquidity) - volumeToNumber(a.liquidity))
+    } else if (sortBy === "ending") {
+      merged.sort((a, b) => timeToNumber(a.endDate) - timeToNumber(b.endDate))
+    }
 
-  // Store in module-level cache
-  marketCache.set(key, { data: result, fetchedAt: Date.now() })
+    const result = merged.slice(0, limit)
+    marketCache.set(key, { data: result, fetchedAt: Date.now() })
+    return result
+  })()
 
-  return result
+  inFlightRequests.set(key, fetchPromise)
+  fetchPromise.finally(() => inFlightRequests.delete(key))
+
+  return fetchPromise
 }
 
 // ─── Background prefetch ───────────────────────────────────────────────────

@@ -4,10 +4,18 @@ import { getGamma } from "../services/polymarket.js";
 import { buildCacheKey, getJsonCache, getJsonCacheEntry, setJsonCache } from "../services/cache.js";
 
 const gammaQuerySchema = z.record(z.string()).default({});
-const MARKET_CACHE_TTL_SECONDS = 60;
-const EVENT_CACHE_TTL_SECONDS = 120;
-const FEED_STALE_TTL_SECONDS = 15 * 60;
-const FEED_PREWARM_INTERVAL_MS = 60_000;
+// Serve fresh data for 3/5 min; honour stale data for 1 hour while revalidating.
+// Prewarm runs every 2 min — well inside the fresh window, so it only re-fetches
+// when data actually expires rather than hammering Polymarket every 60 s.
+const MARKET_CACHE_TTL_SECONDS = 180;  // 3 min fresh
+const EVENT_CACHE_TTL_SECONDS  = 300;  // 5 min fresh
+const FEED_STALE_TTL_SECONDS   = 60 * 60; // 1 h stale-while-revalidate
+const FEED_PREWARM_INTERVAL_MS = 120_000; // prewarm every 2 min
+
+// Browser / CDN cache headers for gamma feed responses.
+// max-age=60 lets browsers serve from their local cache for 60 s;
+// stale-while-revalidate=3600 lets CDN edges serve stale while fetching fresh.
+const FEED_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=3600";
 
 // Union of every tag ID the web client requests across all categories.
 // Keep in sync with `categoryFeedTagIds` + `FAST_ALL_TAG_IDS` in
@@ -15,22 +23,20 @@ const FEED_PREWARM_INTERVAL_MS = 60_000;
 const PREWARM_TAG_IDS = [
   // crypto
   "21", "235", "101611", "1312",
-  // tech / AI
-  "1401", "439", "537", "103303", "101604",
-  // finance / macro
-  "120", "600", "370", "102000", "101250", "101247", "833",
-  // politics / legal
-  "100344", "933", "1558", "1588", "757",
-  // news
+  // macro
+  "120", "370", "102000", "101250", "101247", "833",
+  // IPOs
+  "600",
+  // world: news + politics + legal + geopolitics
   "2", "144",
-  // entertainment
-  "596", "100", "53",
+  "100344", "933", "1558", "1588", "757",
+  "100265", "1396", "101970", "366",
   // sports
   "1",
-  // africa (AFCON + soccer + world cup + Egypt PL)
-  "102974", "102969", "100350", "102350", "102232", "104397",
-  // geopolitics
-  "100265", "1396", "101970", "366",
+  // entertainment
+  "596", "100", "53",
+  // africa: AFCON/Egypt PL plus broad sports tags filtered client-side by African identity
+  "102974", "102969", "104397", "100350", "102350", "102232",
 ];
 
 // CRITICAL: these params must byte-for-byte match what the web client sends for a
@@ -216,10 +222,11 @@ function prewarmGammaFeeds(app: FastifyInstance) {
   if (process.env.NODE_ENV === "test" || process.env.RAWLI_DISABLE_GAMMA_PREWARM === "true") return;
 
   const refresh = () => {
-    // Per-tag event feeds (every category switch hits one of these cache keys)
+    // Per-tag event feeds — use getCachedOrRefresh so we only hit upstream
+    // when the entry is actually stale, not on every prewarm tick.
     const eventRefreshes = FEED_PREWARM_QUERIES.map((query) => {
       const cacheKey = buildCacheKey("gamma:events", query);
-      return refreshCacheOnce(
+      return getCachedOrRefresh(
         cacheKey,
         async () => compactGammaEvents(await getGamma("/events", withoutInternalQuery(query))),
         EVENT_CACHE_TTL_SECONDS,
@@ -228,7 +235,7 @@ function prewarmGammaFeeds(app: FastifyInstance) {
     });
 
     // The default "all" feed loads through the Gamma markets index.
-    const allFeedRefresh = refreshCacheOnce(
+    const allFeedRefresh = getCachedOrRefresh(
       buildCacheKey("gamma:markets", ALL_FEED_MARKETS_QUERY),
       () => getGamma("/markets", ALL_FEED_MARKETS_QUERY),
       MARKET_CACHE_TTL_SECONDS,
@@ -252,7 +259,8 @@ function prewarmGammaFeeds(app: FastifyInstance) {
 export async function gammaRoutes(app: FastifyInstance): Promise<void> {
   prewarmGammaFeeds(app);
 
-  app.get("/gamma/markets", async (req) => {
+  app.get("/gamma/markets", async (req, reply) => {
+    reply.header("Cache-Control", FEED_CACHE_CONTROL);
     const query = gammaQuerySchema.parse(req.query ?? {});
     const cacheKey = buildCacheKey("gamma:markets", query);
     return getCachedOrRefresh(
@@ -263,7 +271,8 @@ export async function gammaRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  app.get("/gamma/events", async (req) => {
+  app.get("/gamma/events", async (req, reply) => {
+    reply.header("Cache-Control", FEED_CACHE_CONTROL);
     const query = gammaQuerySchema.parse(req.query ?? {});
     const cacheKey = buildCacheKey("gamma:events", query);
     return getCachedOrRefresh(
@@ -279,7 +288,8 @@ export async function gammaRoutes(app: FastifyInstance): Promise<void> {
 
   // Batch endpoint: fetch multiple tag_ids in a single request, merge server-side.
   // Eliminates N parallel requests from the frontend per category switch.
-  app.get("/gamma/events/batch", async (req) => {
+  app.get("/gamma/events/batch", async (req, reply) => {
+    reply.header("Cache-Control", FEED_CACHE_CONTROL);
     const query = gammaQuerySchema.parse(req.query ?? {});
     const tagIdsRaw = query.tag_ids ?? "";
     const tagIds = tagIdsRaw.split(",").map((s: string) => s.trim()).filter(Boolean);
@@ -318,7 +328,8 @@ export async function gammaRoutes(app: FastifyInstance): Promise<void> {
     return Array.from(mergedEvents.values());
   });
 
-  app.get("/gamma/tags", async (req) => {
+  app.get("/gamma/tags", async (req, reply) => {
+    reply.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
     const query = gammaQuerySchema.parse(req.query ?? {});
     const cacheKey = buildCacheKey("gamma:tags", query);
     const cached = await getJsonCache(cacheKey);

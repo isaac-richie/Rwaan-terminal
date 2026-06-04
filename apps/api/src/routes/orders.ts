@@ -3,9 +3,11 @@ import { z } from "zod";
 import { getClobPublic } from "../services/polymarket.js";
 import { parseBookLevels } from "../services/tradePreview.js";
 
+const MAX_VALIDATION_ORDER_SIZE = 1_000_000;
+
 const validateSchema = z.object({
   price: z.number().min(0.01).max(0.99),
-  size: z.number().positive(),
+  size: z.number().finite().positive().max(MAX_VALIDATION_ORDER_SIZE),
   tokenId: z.string().min(1),
   side: z.enum(["buy", "sell"])
 });

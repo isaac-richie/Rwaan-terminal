@@ -3,9 +3,12 @@ import { z } from "zod";
 import { getSupportedAssets, getStatus, postDeposit, postQuote, postWithdraw } from "../services/polymarket.js";
 
 const evmAddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Expected an EVM address");
+const positiveBaseUnitSchema = z.string().regex(/^\d+$/).refine((value) => BigInt(value) > 0n, {
+  message: "Expected a positive base-unit amount",
+});
 
 const quoteSchema = z.object({
-  fromAmountBaseUnit: z.string().min(1),
+  fromAmountBaseUnit: positiveBaseUnitSchema,
   fromChainId: z.string().min(1),
   fromTokenAddress: z.string().min(1),
   recipientAddress: evmAddressSchema,

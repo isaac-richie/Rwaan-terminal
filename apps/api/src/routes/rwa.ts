@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { createPublicClient, fallback, formatUnits, http, parseAbi, parseUnits, type Address } from "viem";
+import { createPublicClient, fallback, formatUnits, http, isAddress, parseAbi, parseUnits, type Address } from "viem";
 import { bsc } from "viem/chains";
 import { z } from "zod";
 import { config } from "../config.js";
@@ -60,6 +60,17 @@ const PANCAKEX_ROUTE_USER = "0x1111111111111111111111111111111111111111" as Addr
 const DEFAULT_SLIPPAGE_BPS = 200;
 const ROUTE_TEST_USDT_RAW = parseUnits("10", BSC_USDT.decimals);
 const MIN_ROUND_TRIP_BPS = 9000;
+
+// ─── Platform fee ─────────────────────────────────────────────────────────────
+// 0.5% fee on every stock buy/sell, collected in the input token before the
+// swap executes. Buys collect USDT; sells collect the tokenized stock being sold.
+// Set RAWLI_FEE_RECEIVER_ADDRESS to enable. If unset/invalid, fee collection is
+// skipped, which is useful for local dev/testing.
+const PLATFORM_FEE_BPS = 50; // 50 bps = 0.5%
+const RAWLI_FEE_RECEIVER_ENV = process.env.RAWLI_FEE_RECEIVER_ADDRESS?.trim() ?? "";
+const RAWLI_FEE_RECEIVER = RAWLI_FEE_RECEIVER_ENV && isAddress(RAWLI_FEE_RECEIVER_ENV)
+  ? (RAWLI_FEE_RECEIVER_ENV as Address)
+  : null;
 
 const bscClient = createPublicClient({
   chain: bsc,
@@ -1336,13 +1347,27 @@ async function buildSwapQuote(
   const amountInRaw = parseUnits(amount, tokenIn.decimals);
   if (amountInRaw <= 0n) return null;
 
+  // Platform fee: 0.5% of input, collected before the swap. For buys the input
+  // is USDT; for sells the input is the tokenized stock.
+  const feeEnabled = Boolean(RAWLI_FEE_RECEIVER);
+  const feeRaw = feeEnabled ? (amountInRaw * BigInt(PLATFORM_FEE_BPS)) / 10_000n : 0n;
+  const swapAmountInRaw = amountInRaw - feeRaw; // amount actually sent to DEX
+  if (swapAmountInRaw <= 0n) return null;
+  const platformFee = feeEnabled ? {
+    bps: PLATFORM_FEE_BPS,
+    amountRaw: feeRaw.toString(),
+    amountHuman: formatUnits(feeRaw, tokenIn.decimals),
+    receiver: RAWLI_FEE_RECEIVER,
+    token: { symbol: tokenIn.symbol, address: tokenIn.address, decimals: tokenIn.decimals },
+  } : null;
+
   if (route.kind === "pcsx") {
     const orderSwapper = swapper ?? ZERO_ADDRESS;
     const orderRecipient = recipient ?? orderSwapper;
     const quoted = await quotePancakeXExactInput(
       tokenIn,
       tokenOut,
-      amountInRaw,
+      swapAmountInRaw,   // post-fee amount sent to DEX
       slippageBps,
       orderSwapper,
       orderRecipient
@@ -1362,6 +1387,7 @@ async function buildSwapQuote(
       slippageBps,
       roundTripBps: route.roundTripBps,
       lowLiquidity: route.lowLiquidity,
+      platformFee,       // null when fee receiver not configured
       tokenIn: {
         symbol: tokenIn.symbol,
         address: tokenIn.address,
@@ -1372,8 +1398,10 @@ async function buildSwapQuote(
         address: tokenOut.address,
         decimals: tokenOut.decimals,
       },
-      amountInRaw: amountInRaw.toString(),
+      amountInRaw: amountInRaw.toString(),           // total user pays (incl. fee)
       amountInHuman: formatUnits(amountInRaw, tokenIn.decimals),
+      swapAmountInRaw: swapAmountInRaw.toString(),   // amount actually swapped
+      swapAmountInHuman: formatUnits(swapAmountInRaw, tokenIn.decimals),
       amountOutRaw: quoted.amountOut.toString(),
       amountOutHuman: formatUnits(quoted.amountOut, tokenOut.decimals),
       amountOutMinimumRaw: quoted.amountOutMinimum.toString(),
@@ -1396,7 +1424,7 @@ async function buildSwapQuote(
     };
   }
 
-  const quoted = await quotePancakeExactInput(tokenIn.address, tokenOut.address, amountInRaw, route.fee);
+  const quoted = await quotePancakeExactInput(tokenIn.address, tokenOut.address, swapAmountInRaw, route.fee);
   const amountOutMinimumRaw = (quoted.amountOut * BigInt(10_000 - slippageBps)) / 10_000n;
 
   return {
@@ -1413,6 +1441,7 @@ async function buildSwapQuote(
     slippageBps,
     roundTripBps: route.roundTripBps,
     lowLiquidity: route.lowLiquidity,
+    platformFee,         // null when fee receiver not configured
     tokenIn: {
       symbol: tokenIn.symbol,
       address: tokenIn.address,
@@ -1423,8 +1452,10 @@ async function buildSwapQuote(
       address: tokenOut.address,
       decimals: tokenOut.decimals,
     },
-    amountInRaw: amountInRaw.toString(),
+    amountInRaw: amountInRaw.toString(),           // total user pays (incl. fee)
     amountInHuman: formatUnits(amountInRaw, tokenIn.decimals),
+    swapAmountInRaw: swapAmountInRaw.toString(),   // amount actually swapped
+    swapAmountInHuman: formatUnits(swapAmountInRaw, tokenIn.decimals),
     amountOutRaw: quoted.amountOut.toString(),
     amountOutHuman: formatUnits(quoted.amountOut, tokenOut.decimals),
     amountOutMinimumRaw: amountOutMinimumRaw.toString(),

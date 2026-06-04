@@ -48,10 +48,17 @@ export default function Providers({ children }: { children: ReactNode }) {
           theme: "dark",
           accentColor: "#f0b90b",
           logo: RawliPrivyLogo,
+          // ethereum-only suppresses Solana wallet connectors and their
+          // large SDK chunks (@solana-program/token etc.)
           walletChainType: "ethereum-only",
+          // Show only the most-used wallets to reduce WalletConnect explorer
+          // prefetch surface area on first mount.
+          walletList: ["metamask", "coinbase_wallet", "wallet_connect", "rainbow"],
         },
         embeddedWallets: {
           ethereum: {
+            // Only create an embedded wallet when the user explicitly logs in
+            // without an external wallet — avoids a round-trip on first render.
             createOnLogin: "users-without-wallets",
           },
         },

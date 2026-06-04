@@ -10,6 +10,7 @@ import {
   ArrowDownUp,
   ArrowUpRight,
   Briefcase,
+  Building2,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
@@ -63,7 +64,7 @@ import { cn } from "@/lib/utils";
 
 const PRIVY_ENABLED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
 
-type PortfolioTab = "positions" | "orders" | "closed";
+type PortfolioTab = "positions" | "orders" | "closed" | "stocks";
 
 function valueOf(...values: any[]) {
   for (const value of values) {
@@ -306,10 +307,10 @@ function BalanceBar({ liquid, inPositions, claimable, locked, total }: {
         <div className="h-full rounded-r-full bg-[oklch(0.55_0.10_260/0.50)]" style={{ width: `${lockPct}%` }} />
       </div>
       <div className="mt-2.5 flex items-center gap-4 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.68_0.18_155/0.75)]" />Liquid</span>
+        <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.68_0.18_155/0.75)]" />Available</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.78_0.16_82/0.70)]" />In positions</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.70_0.11_210/0.70)]" />Claimable</span>
-        <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.55_0.10_260/0.50)]" />Locked orders</span>
+        <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-[oklch(0.55_0.10_260/0.50)]" />Reserved</span>
       </div>
     </div>
   );
@@ -335,18 +336,18 @@ function BalanceLedgerCard({
 
   const statusTone = allowanceNeedsApproval ? "gold" : collateralError ? "red" : healthyBalanceRoute ? "green" : "muted";
   const statusMessage = missingTradingWallet
-    ? "Connect wallet to load pUSD balance."
-    : allowanceNeedsApproval ? "pUSD funded — approve trading permissions before the next order."
+    ? "Connect your wallet to see your balance."
+    : allowanceNeedsApproval ? "Funds loaded — enable trading to place your next order."
     : collateralError ? collateralError
-    : awaitingBalance ? "Prepare the trading session to sync live pUSD balance."
-    : "Live pUSD synced for this trading wallet.";
+    : awaitingBalance ? "Sync your account to see your balance."
+    : "All good — your account is up to date.";
 
   return (
     <div className="surface-card rounded-2xl p-5 sm:p-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <CircleDollarSign className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Funds breakdown</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Your Funds</span>
         </div>
         <Button
           type="button"
@@ -360,18 +361,19 @@ function BalanceLedgerCard({
         </Button>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
         {[
-          { label: "pUSD balance", value: collateralLoading ? "Syncing…" : formatPusd(pUsdBalance), sub: "Polygon wallet" },
-          { label: "Available", value: collateralLoading ? "Syncing…" : formatPusd(liquidPusd), sub: "After resting orders" },
-          { label: "In positions", value: formatPortfolioMoney(inPositions), sub: "Open share value" },
-          { label: "Claimable", value: formatPortfolioMoney(claimableValue), sub: claimableValue > 0 ? "Settled winnings" : "None pending", blue: true },
-          { label: "Locked", value: formatPortfolioMoney(lockedOrdersValue), sub: openOrdersCount ? `${openOrdersCount} order${openOrdersCount !== 1 ? "s" : ""}` : clobReady ? "None resting" : "Needs CLOB", gold: true },
+          { label: "Balance", value: collateralLoading ? "Syncing…" : formatPusd(pUsdBalance), sub: "Trading wallet" },
+          { label: "Available", value: collateralLoading ? "Syncing…" : formatPusd(liquidPusd), sub: "Ready to use" },
+          { label: "In Positions", value: formatPortfolioMoney(inPositions), sub: "Open share value" },
+          { label: "Claimable", value: formatPortfolioMoney(claimableValue), sub: claimableValue > 0 ? "Ready to claim" : "None pending", blue: true },
+          { label: "Reserved", value: formatPortfolioMoney(lockedOrdersValue), sub: openOrdersCount ? `${openOrdersCount} open order${openOrdersCount !== 1 ? "s" : ""}` : clobReady ? "No open orders" : "Session needed", gold: true, span2: true },
         ].map((item) => (
           <div
             key={item.label}
             className={cn(
-              "rounded-2xl border p-4",
+              "rounded-xl sm:rounded-2xl border p-3 sm:p-4",
+              (item as any).span2 && "col-span-2 lg:col-span-1",
               (item as any).blue
                 ? "border-[oklch(0.70_0.11_210/0.24)] bg-[oklch(0.70_0.11_210/0.07)]"
                 : (item as any).gold
@@ -379,8 +381,8 @@ function BalanceLedgerCard({
                 : "border-[oklch(0.20_0.014_255)] bg-[oklch(0.12_0.012_260/0.65)]"
             )}
           >
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
-            <div className="mt-3 font-mono text-xl font-bold text-foreground">{item.value}</div>
+            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.14em] sm:tracking-[0.16em] text-muted-foreground">{item.label}</div>
+            <div className="mt-2 sm:mt-3 font-mono text-lg sm:text-xl font-bold text-foreground">{item.value}</div>
             <div className="mt-1 text-[10px] text-muted-foreground">{item.sub}</div>
           </div>
         ))}
@@ -450,11 +452,10 @@ function ClaimableSettlementsCard({
             <CircleDollarSign className="h-5 w-5 text-[oklch(0.76_0.13_210)]" />
           </div>
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.76_0.13_210)]">Claimable settlements</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.76_0.13_210)]">Winnings to Claim</div>
             <div className="mt-1 text-xl font-bold tracking-tight text-foreground sm:text-2xl">{formatPortfolioMoney(total)}</div>
             <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
-              Settled winning shares are still position tokens until claimed. Claiming converts them into pUSD.
-              {relayedMode ? " This account will use Rawli's deposit-wallet relayer." : ""}
+              Your settled positions have won. Click Claim to convert them to your trading balance.
             </p>
           </div>
         </div>
@@ -485,13 +486,7 @@ function ClaimableSettlementsCard({
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   <span>{group.outcome}</span>
                   <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
-                  <span>{formatPortfolioNumber(group.size)} sh</span>
-                  {group.negRisk && (
-                    <>
-                      <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
-                      <span>Neg risk</span>
-                    </>
-                  )}
+                  <span>{formatPortfolioNumber(group.size)} shares</span>
                 </div>
               </div>
 
@@ -660,41 +655,41 @@ function PortfolioContent() {
   const timelineItems = useMemo<TimelineItemData[]>(() => {
     const items: TimelineItemData[] = [];
     if (tradingWalletAddress) {
-      items.push({ id: "trading-wallet", title: "Trading wallet resolved",
-        detail: `${tradingProfile.profile?.tradingWalletKind === "deposit" ? "Polymarket deposit" : "Trading"} wallet ${shortAddress(tradingWalletAddress)} attached.`,
+      items.push({ id: "trading-wallet", title: "Wallet connected",
+        detail: `Trading account ${shortAddress(tradingWalletAddress)} is active.`,
         meta: "Wallet", tone: "green", icon: ShieldCheck });
     } else {
-      items.push({ id: "trading-wallet-pending", title: "Trading wallet pending",
-        detail: "Connect your wallet so Rawli can resolve the Polymarket trading wallet.",
+      items.push({ id: "trading-wallet-pending", title: "Wallet not connected",
+        detail: "Connect your wallet to load your portfolio and start trading.",
         meta: "Wallet", tone: "gold", icon: Wallet });
     }
     if (collateral) {
-      items.push({ id: "collateral", title: "pUSD balance synced",
-        detail: `${formatPusd(pUsdBalance)} pUSD on Polygon.`,
+      items.push({ id: "collateral", title: "Balance synced",
+        detail: `${formatPusd(pUsdBalance)} available in your trading account.`,
         meta: "Funds", tone: spendablePusd && spendablePusd > 0 ? "green" : "gold", icon: CircleDollarSign });
     } else if (walletAddress) {
-      items.push({ id: "collateral-pending", title: "pUSD not loaded",
-        detail: readiness.loading ? "Reading Polygon collateral…" : readiness.error ?? "Prepare trading route to load collateral.",
+      items.push({ id: "collateral-pending", title: "Balance not loaded",
+        detail: readiness.loading ? "Loading your balance…" : readiness.error ?? "Sync your account to load your balance.",
         meta: "Funds", tone: readiness.error ? "red" : "gold", icon: CircleDollarSign });
     }
     if (fundingStatus.latest) {
       items.push({ id: `bridge-${fundingStatus.latest.txHash ?? fundingStatus.latest.createdTimeMs ?? "latest"}`,
-        title: `Bridge ${fundingStatus.label.toLowerCase()}`,
+        title: `Deposit ${fundingStatus.label.toLowerCase()}`,
         detail: `${fundingStatus.message}${fundingStatus.latest.txHash ? ` · ${shortHash(fundingStatus.latest.txHash)}` : ""}`,
         meta: formatTime(fundingStatus.latest.createdTimeMs),
         tone: fundingStatus.phase === "failed" ? "red" : fundingStatus.phase === "completed" ? "green" : "gold",
         icon: fundingStatus.phase === "completed" ? CheckCircle2 : Send });
     } else if (depositAddress) {
-      items.push({ id: "bridge-waiting", title: "Bridge route ready",
-        detail: `Deposit ${shortAddress(depositAddress)} is ready for BNB Chain funding.`,
+      items.push({ id: "bridge-waiting", title: "Ready to receive funds",
+        detail: `Your deposit address is set up and ready to receive.`,
         meta: "Funding", tone: "muted", icon: Send });
     }
     if (clobSession.status === "ready") {
       items.push({ id: "open-orders",
-        title: clobSession.openOrders.length ? "Resting orders synced" : "No resting orders",
+        title: clobSession.openOrders.length ? "Open orders loaded" : "No open orders",
         detail: clobSession.openOrders.length
-          ? `${clobSession.openOrders.length} order${clobSession.openOrders.length !== 1 ? "s" : ""}. Locked value ${formatPortfolioMoney(openOrderSummary.totalValue)}.`
-          : "CLOB session ready — no GTC/GTD orders resting.",
+          ? `${clobSession.openOrders.length} active order${clobSession.openOrders.length !== 1 ? "s" : ""}. ${formatPortfolioMoney(openOrderSummary.totalValue)} reserved.`
+          : "Session active — no orders pending.",
         meta: "Orders", tone: clobSession.openOrders.length ? "gold" : "green", icon: Lock });
     }
     trades.slice(0, 6).forEach((trade: any, i: number) => {
@@ -775,10 +770,10 @@ function PortfolioContent() {
     if (!result) return;
     toast.success("Claim submitted", {
       description: result.relayed
-        ? "Rawli relayed the deposit-wallet redemption. Balance will refresh after confirmation."
+        ? "Your winnings are being converted. Your balance will update shortly."
         : result.txHash
-        ? `Redeem tx ${shortHash(result.txHash)} confirmed.`
-        : "Settled winnings are being converted to pUSD.",
+        ? `Transaction ${shortHash(result.txHash)} confirmed.`
+        : "Your winnings are being converted to your balance.",
     });
   };
 
@@ -969,8 +964,8 @@ function PortfolioContent() {
                   <Wallet className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-foreground">Connect wallet to load portfolio</div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">Rawli resolves your trading wallet and pulls live positions from Polymarket.</div>
+                  <div className="text-sm font-semibold text-foreground">Connect your wallet to see your portfolio</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">View your open positions, track P&L, and manage trades from one place.</div>
                 </div>
               </div>
               <Button
@@ -985,24 +980,24 @@ function PortfolioContent() {
         )}
 
         {/* ── Top stats strip ─────────────────────────────── */}
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
           {[
-            { label: "Trade route", value: tradingWalletAddress ? "Ready" : "Pending", icon: ShieldCheck, tone: tradingWalletAddress ? "positive" : "gold" as const },
-            { label: "Open positions", value: data ? String(openPositions.length) : "—", icon: Layers3, tone: "gold" as const },
-            { label: "Closed positions", value: data ? String(closedPositions.length) : "—", icon: CheckCircle2, tone: stats.realizedPositive ? "positive" as const : "negative" as const },
+            { label: "Status", value: tradingWalletAddress ? "Active" : "—", icon: ShieldCheck, tone: tradingWalletAddress ? "positive" : "gold" as const },
+            { label: "Open", value: data ? String(openPositions.length) : "—", icon: Layers3, tone: "gold" as const },
+            { label: "Closed", value: data ? String(closedPositions.length) : "—", icon: CheckCircle2, tone: stats.realizedPositive ? "positive" as const : "negative" as const },
             { label: "Claimable", value: data ? formatPortfolioMoney(claimableValue) : "—", icon: CircleDollarSign, tone: claimableValue > 0 ? "positive" as const : "gold" as const },
             { label: "Avg P/L", value: data ? formatPercent(stats.avgPnlPercent) : "—", icon: stats.avgPnlPercent >= 0 ? TrendingUp : TrendingDown, tone: stats.avgPnlPercent >= 0 ? "positive" as const : "negative" as const },
           ].map(({ label, value, icon: Icon, tone }) => (
-            <div key={label} className="surface-card rounded-2xl p-3 sm:p-4">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
-                <Icon className={cn("h-3.5 w-3.5",
+            <div key={label} className="surface-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.16em] text-muted-foreground truncate">{label}</span>
+                <Icon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0",
                   tone === "positive" && "text-[oklch(0.68_0.18_155)]",
                   tone === "negative" && "text-[oklch(0.60_0.18_25)]",
                   tone === "gold" && "text-[oklch(0.78_0.16_82)]",
                 )} />
               </div>
-              <div className="mt-3 text-xl font-bold tracking-tight text-foreground">{value}</div>
+              <div className="mt-2 text-base sm:text-xl font-bold tracking-tight text-foreground truncate">{value}</div>
             </div>
           ))}
         </div>
@@ -1040,22 +1035,24 @@ function PortfolioContent() {
 
         {/* ── Tabs ────────────────────────────────────────── */}
         <div className="mt-5 sm:mt-8 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="no-scrollbar overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-            <div className="flex w-max min-w-full gap-0.5 sm:gap-1 rounded-xl sm:rounded-2xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.10_0.012_260/0.65)] p-0.5 sm:p-1">
-              <TabButton active={activeTab === "positions"} count={openPositions.length} onClick={() => setActiveTab("positions")}>
-                Positions
-              </TabButton>
-              <TabButton active={activeTab === "orders"} count={clobSession.openOrders.length} onClick={() => setActiveTab("orders")}>
-                Orders
-              </TabButton>
-              <TabButton active={activeTab === "closed"} count={closedPositions.length} onClick={() => setActiveTab("closed")}>
-                Closed
-              </TabButton>
-            </div>
+          <div className="grid grid-cols-4 gap-0.5 sm:gap-1 rounded-xl sm:rounded-2xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.10_0.012_260/0.65)] p-0.5 sm:p-1">
+            <TabButton active={activeTab === "positions"} count={openPositions.length} onClick={() => setActiveTab("positions")}>
+              <span className="sm:hidden">Open</span>
+              <span className="hidden sm:inline">Positions</span>
+            </TabButton>
+            <TabButton active={activeTab === "orders"} count={clobSession.openOrders.length} onClick={() => setActiveTab("orders")}>
+              Orders
+            </TabButton>
+            <TabButton active={activeTab === "closed"} count={closedPositions.length} onClick={() => setActiveTab("closed")}>
+              Closed
+            </TabButton>
+            <TabButton active={activeTab === "stocks"} onClick={() => setActiveTab("stocks")}>
+              Stocks
+            </TabButton>
           </div>
           <div className="hidden sm:flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
             <Clock3 className="h-3 w-3" />
-            {portfolio.loading ? "Syncing…" : "Live · Polymarket API"}
+            {portfolio.loading ? "Syncing…" : "Live data"}
           </div>
         </div>
 
@@ -1228,8 +1225,8 @@ function PortfolioContent() {
           <div className="mt-4">
             {clobSession.status !== "ready" ? (
               <EmptyState
-                title="Prepare session to load orders"
-                description="Resting GTC/GTD orders require an authenticated Polymarket CLOB session."
+                title="Load your session to see orders"
+                description="Connect your trading session to view and manage your open orders."
                 action={
                   <Button
                     onClick={() => void clobSession.prepareSession()}
@@ -1237,22 +1234,22 @@ function PortfolioContent() {
                     className="rounded-xl bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] hover:bg-[oklch(0.83_0.16_82)]"
                   >
                     {clobSession.status === "preparing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                    Prepare CLOB session
+                    Load Orders
                   </Button>
                 }
               />
             ) : clobSession.openOrdersStatus === "loading" ? (
               <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
                 <Loader2 className="h-6 w-6 animate-spin text-[oklch(0.78_0.16_82)]" />
-                <span className="text-sm">Loading authenticated orders…</span>
+                <span className="text-sm">Loading orders…</span>
               </div>
             ) : clobSession.openOrders.length ? (
               <div className="surface-card overflow-hidden rounded-2xl">
                 <div className="flex items-center justify-between border-b border-[oklch(0.18_0.014_255)] px-5 py-4">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Resting orders</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Open Orders</span>
                     <div className="mt-1 text-base font-semibold text-foreground">
-                      {clobSession.openOrders.length} order{clobSession.openOrders.length !== 1 ? "s" : ""} on book
+                      {clobSession.openOrders.length} active order{clobSession.openOrders.length !== 1 ? "s" : ""}
                     </div>
                   </div>
                   <button
@@ -1297,7 +1294,7 @@ function PortfolioContent() {
 
                           <div className="flex shrink-0 flex-col items-end gap-1">
                             <div className="font-mono text-base font-bold text-foreground">{formatPortfolioMoney(notional)}</div>
-                            <div className="text-[10px] text-muted-foreground">{side === "BUY" ? "pUSD reserved" : "shares reserved"}</div>
+                            <div className="text-[10px] text-muted-foreground">{side === "BUY" ? "reserved" : "shares on offer"}</div>
                           </div>
                         </div>
 
@@ -1330,8 +1327,8 @@ function PortfolioContent() {
               </div>
             ) : (
               <EmptyState
-                title="No resting orders"
-                description="No active GTC or GTD orders on the Polymarket book for this session."
+                title="No open orders"
+                description="You don't have any active orders right now."
                 action={
                   <button
                     onClick={() => void clobSession.refreshOpenOrders()}
@@ -1397,6 +1394,67 @@ function PortfolioContent() {
                 title="No closed positions"
                 description="Resolved markets and completed position history will appear here once trades settle."
               />
+            )}
+          </div>
+        )}
+
+        {/* ── Stocks tab ──────────────────────────────────── */}
+        {activeTab === "stocks" && (
+          <div className="mt-4 space-y-4">
+            {/* Hero card */}
+            <div className="surface-card rounded-2xl p-5 sm:p-6 border border-[oklch(0.78_0.16_82/0.18)] bg-[oklch(0.78_0.16_82/0.04)]">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[oklch(0.78_0.16_82/0.28)] bg-[oklch(0.78_0.16_82/0.10)]">
+                  <Building2 className="h-5 w-5 text-[oklch(0.82_0.16_82)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.82_0.16_82)]">Stock Holdings</div>
+                  <h2 className="mt-0.5 text-lg font-bold text-foreground">Your stocks live on BNB Chain</h2>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground max-w-lg">
+                    When you buy stocks on Rawli, you receive token representations (e.g. NVDAon, AAPLon) held directly in your wallet. Your holdings are always yours — check them any time on the Stocks page.
+                  </p>
+                </div>
+                <Link
+                  href="/stocks"
+                  className="shrink-0 flex h-11 sm:h-9 items-center gap-2 rounded-xl bg-[oklch(0.78_0.16_82)] px-5 sm:px-4 text-sm sm:text-xs font-bold text-[oklch(0.10_0.012_260)] hover:bg-[oklch(0.83_0.16_82)] transition-colors"
+                >
+                  <Building2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                  Go to Stocks
+                </Link>
+              </div>
+            </div>
+
+            {/* How it works */}
+            <div className="surface-card rounded-2xl p-5 sm:p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Layers3 className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">How Stock Trading Works</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  { step: "1", title: "Browse stocks", desc: "Find US stocks and ETFs with live prices on the Stocks page.", color: "oklch(0.78 0.16 82)" },
+                  { step: "2", title: "Buy with USDT", desc: "Pay with USDT in your wallet. Tokens are delivered directly to you.", color: "oklch(0.68 0.18 155)" },
+                  { step: "3", title: "Sell anytime", desc: "Sell back to USDT whenever you want. Prices track the real market.", color: "oklch(0.72 0.16 250)" },
+                ].map(({ step, title, desc, color }) => (
+                  <div key={step} className="rounded-xl border border-[oklch(0.20_0.014_255)] bg-[oklch(0.11_0.012_260/0.6)] p-4">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold mb-3" style={{ background: `${color}/0.15`, color, border: `1px solid ${color}/0.30` }}>
+                      {step}
+                    </div>
+                    <div className="text-sm font-semibold text-foreground">{title}</div>
+                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Wallet note */}
+            {walletAddress && (
+              <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.5)] px-4 py-3 flex items-center gap-3">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-[oklch(0.68_0.18_155)]" />
+                <p className="text-xs text-muted-foreground">
+                  Your stock tokens are held at <span className="font-mono text-foreground">{walletAddress.slice(0, 8)}…{walletAddress.slice(-6)}</span> on BNB Chain. Connect a BNB wallet to the Stocks page to view and trade them.
+                </p>
+              </div>
             )}
           </div>
         )}

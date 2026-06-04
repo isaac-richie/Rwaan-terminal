@@ -284,7 +284,7 @@ export default function PointsPage() {
             Edge compounds over time.
           </h1>
           <p className="mt-2 sm:mt-3 max-w-xl text-[13px] sm:text-sm leading-relaxed text-muted-foreground">
-            Trade smart, unlock intelligence, refer traders — every action earns points toward governance-token rewards.
+            Trade smart, unlock intelligence, refer traders — every action earns you points and future rewards.
           </p>
         </section>
 
@@ -538,7 +538,7 @@ export default function PointsPage() {
 
             <div className="flex items-center justify-center gap-2 border-t border-[oklch(0.18_0.014_255)] py-3 text-[11px] text-muted-foreground">
               <Lock className="h-3 w-3" />
-              Rankings inform future governance-token rewards
+              Rankings unlock future rewards
             </div>
           </div>
         </section>
@@ -689,7 +689,7 @@ export default function PointsPage() {
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.20em] text-[oklch(0.82_0.16_82)]">Start earning</div>
               <h2 className="mt-2 text-xl font-bold text-foreground">Pre-season trades count retroactively.</h2>
-              <p className="mt-1.5 text-[12px] text-muted-foreground">Every trade before Season 1 launches counts toward founding points and the governance-token snapshot.</p>
+              <p className="mt-1.5 text-[12px] text-muted-foreground">Every trade before Season 1 launches counts toward founding points and early rewards.</p>
             </div>
             <a
               href="/"

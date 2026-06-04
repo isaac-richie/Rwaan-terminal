@@ -450,12 +450,6 @@ function PrivyDesktopWallet() {
 
   return (
     <div className="relative flex items-center gap-2" data-wallet-menu ref={walletMenuRef}>
-      {/* BNB Chain pill */}
-      <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[oklch(0.15_0.014_255/0.8)] border border-[oklch(0.22_0.015_255/0.6)]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
-        <span className="text-[10px] font-semibold text-muted-foreground">BNB Chain</span>
-      </div>
-
       {/* Connected wallet button */}
       <div className="relative">
         <button
@@ -484,7 +478,7 @@ function PrivyDesktopWallet() {
               />
               <div>
                 <p className="text-[11px] font-mono font-semibold text-foreground">{shortAddress}</p>
-                <p className="text-[9px] text-muted-foreground mt-0.5">BNB Chain · Privy</p>
+                <p className="text-[9px] text-muted-foreground mt-0.5">Connected</p>
               </div>
             </div>
 
@@ -953,9 +947,6 @@ export function Navbar() {
                 <span className="text-foreground">Rawli</span>{" "}
                 <span className="text-[oklch(0.82_0.16_82)]">Analytics</span>
               </div>
-              <div className="hidden sm:block text-[9px] uppercase tracking-[0.22em] text-muted-foreground/70 mt-[3px]">
-                prediction terminal
-              </div>
             </div>
           </Link>
 
@@ -981,12 +972,6 @@ export function Navbar() {
               ⌘K
             </kbd>
           </button>
-
-          {/* Live status dot (desktop) */}
-          <div className="hidden lg:flex items-center gap-1.5">
-            <Activity className="w-3 h-3 text-[oklch(0.68_0.18_155)]" />
-            <span className="text-[10px] font-semibold text-[oklch(0.68_0.18_155/0.8)]">Live</span>
-          </div>
 
           {privyEnabled ? <NavbarNotifications /> : null}
           {privyEnabled ? <NavbarBalanceBreakdown /> : null}

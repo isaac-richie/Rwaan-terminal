@@ -16,31 +16,33 @@ export function MobileNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 sm:hidden border-t border-[oklch(0.18_0.014_255/0.6)] bg-[oklch(0.09_0.011_260)] pb-safe-bottom shadow-[0_-12px_34px_oklch(0_0_0/0.42)]">
-      <div className="flex items-stretch h-16">
+    <nav className="fixed bottom-0 inset-x-0 z-50 sm:hidden border-t border-[oklch(0.18_0.014_255/0.32)] bg-[oklch(0.08_0.008_260)] pb-safe-bottom">
+      <div className="flex items-stretch h-14">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href
           return (
             <Link
               key={label}
               href={href}
+              title={label}
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wide transition-all duration-200",
+                "group flex flex-1 items-center justify-center transition-all duration-300",
                 active
                   ? "text-[oklch(0.78_0.16_82)]"
-                  : "text-[oklch(0.42_0.01_90)] hover:text-foreground",
+                  : "text-[oklch(0.48_0.01_260)] hover:text-[oklch(0.58_0.01_260)]",
               )}
             >
-              <div className={cn(
-                "relative flex items-center justify-center w-10 h-6 rounded-full transition-all duration-200",
-                active ? "bg-[oklch(0.78_0.16_82/0.14)]" : ""
-              )}>
+              {/* Icon with glow effect on active */}
+              <div className="relative flex items-center justify-center">
                 <Icon className={cn(
-                  "h-[18px] w-[18px] transition-all duration-200",
-                  active ? "text-[oklch(0.80_0.16_82)] scale-110" : "text-[oklch(0.42_0.01_90)]",
+                  "h-5 w-5 transition-all duration-300",
+                  active && "drop-shadow-[0_0_8px_oklch(0.78_0.16_82/0.4)]"
                 )} />
+                {/* Bottom underline indicator for active */}
+                {active && (
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[oklch(0.78_0.16_82)] mt-2 transition-all duration-300" />
+                )}
               </div>
-              {label}
             </Link>
           )
         })}

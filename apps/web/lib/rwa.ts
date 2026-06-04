@@ -135,14 +135,23 @@ export type RwaSwapQuote = {
     address: string
     decimals: number
   }
-  amountInRaw: string
+  amountInRaw: string          // total user pays (including platform fee)
   amountInHuman: string
+  swapAmountInRaw?: string     // amount sent to DEX (after fee deduction)
+  swapAmountInHuman?: string
   amountOutRaw: string
   amountOutHuman: string
   amountOutMinimumRaw: string
   amountOutMinimumHuman: string
   gasEstimate: string
   generatedAt: string
+  platformFee?: {
+    bps: number
+    amountRaw: string
+    amountHuman: string
+    receiver: string
+    token: { symbol: string; address: string; decimals: number }
+  } | null
   execution:
     | { kind: "v3" }
     | {

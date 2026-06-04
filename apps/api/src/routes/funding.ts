@@ -5,9 +5,12 @@ import { normalizeFundingStatus } from "../services/fundingStatus.js";
 
 const BNB_CHAIN_ID = "56";
 const evmAddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Expected an EVM address");
+const positiveBaseUnitSchema = z.string().regex(/^\d+$/).refine((value) => BigInt(value) > 0n, {
+  message: "Expected a positive base-unit amount",
+});
 
 const bnbQuoteSchema = z.object({
-  fromAmountBaseUnit: z.string().min(1),
+  fromAmountBaseUnit: positiveBaseUnitSchema,
   fromChainId: z.literal(BNB_CHAIN_ID),
   fromTokenAddress: z.string().min(1),
   recipientAddress: evmAddressSchema,

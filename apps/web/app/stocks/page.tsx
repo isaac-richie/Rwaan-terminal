@@ -16,6 +16,7 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { cn } from "@/lib/utils"
 import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet"
+import { usePremiumAnalysis } from "@/hooks/use-premium-analysis"
 import { friendlyErrorMessage } from "@/lib/friendly-errors"
 import {
   fetchRwaAssets, fetchRwaQuotes, fetchRelatedMarkets, fetchRwaRouteHealth, fetchRwaSwapQuote, submitRwaSwapOrder,
@@ -105,6 +106,7 @@ const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function allowance(address owner,address spender) view returns (uint256)",
   "function approve(address spender,uint256 amount) returns (bool)",
+  "function transfer(address to,uint256 amount) returns (bool)",
 ]
 
 const PANCAKE_V3_ROUTER_ABI = [
@@ -941,6 +943,179 @@ export default function StocksPage() {
   )
 }
 
+// ─── Stock AI Analysis Section ────────────────────────────────────────────────
+function StockAnalysisSection({ asset, quote }: { asset: RwaAsset; quote?: RwaQuote }) {
+  const { login } = usePrivy()
+  const { wallet, authenticated } = useActivePrivyWallet()
+  const marketId = `stock:${asset.displaySymbol}`
+  const { status, analysis, unlockAnalysis } = usePremiumAnalysis(marketId)
+  const walletConnected = Boolean(authenticated && wallet)
+
+  const marketObject = {
+    id: marketId,
+    question: `What is the outlook for ${asset.name} (${asset.displaySymbol}) stock? Is it bullish or bearish right now?`,
+    category: "Stocks",
+    description: [
+      `${asset.name} - ${asset.theme}`,
+      quote?.price != null ? `Current price: $${quote.price.toFixed(2)}` : null,
+      quote?.changePct != null ? `Change: ${quote.changePct > 0 ? "+" : ""}${quote.changePct.toFixed(2)}%` : null,
+      `Sector: ${asset.sector}`,
+      asset.risk === "high" ? "High volatility stock." : "Moderate volatility stock.",
+    ].filter(Boolean).join(". "),
+  }
+
+  const isLoading = status === "analyzing" || status === "paying" || status === "confirming"
+  const isDone = walletConnected && status === "done" && analysis
+
+  const verdictDir = analysis?.verdict?.direction
+  const verdictConf = analysis?.verdict?.confidence ?? 0
+  const verdictRationale = analysis?.verdict?.rationale
+  const isYes = verdictDir === "YES"
+  const verdictColor = isYes ? "oklch(0.68 0.18 155)" : "oklch(0.60 0.18 25)"
+  const verdictLabel = isYes ? "Bullish" : "Bearish"
+
+  // Key factors from fundamental analysis
+  const factors = analysis?.fundamentalAnalysis?.signals?.slice(0, 3) ?? []
+  const handleAnalyze = () => {
+    if (!walletConnected) {
+      login()
+      return
+    }
+    void unlockAnalysis(marketObject, wallet)
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-[oklch(0.72_0.16_250/0.25)] bg-[oklch(0.08_0.01_260/0.54)] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 px-3.5 pt-3 pb-2.5">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[oklch(0.72_0.16_250/0.15)]">
+            <Brain className="h-3.5 w-3.5 text-[oklch(0.72_0.16_250)]" />
+          </div>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.72_0.16_250)]">AI Analysis</span>
+          {isDone && (
+            <span className="rounded-full bg-[oklch(0.72_0.16_250/0.12)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[oklch(0.72_0.16_250)]">
+              Live
+            </span>
+          )}
+        </div>
+        {!isDone && (
+          <span className="text-[9px] text-muted-foreground/50 uppercase tracking-wide">
+            {walletConnected ? (isLoading ? "Analyzing..." : "Ready") : "Wallet"}
+          </span>
+        )}
+      </div>
+
+      <div className="px-3.5 pb-3.5">
+        {/* Idle state - CTA */}
+        {!isDone && (!walletConnected || !isLoading) && (
+          <div>
+            <p className="text-[12px] leading-5 text-muted-foreground">
+              Get a live AI verdict on {asset.displaySymbol}: news, sentiment, and price catalysts.
+            </p>
+            <button
+              type="button"
+              onClick={handleAnalyze}
+              className={cn(
+                "relative mt-3 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-2.5 text-[12px] font-bold transition-all active:scale-[0.98]",
+                walletConnected
+                  ? "bg-[oklch(0.72_0.16_250)] text-black hover:brightness-110"
+                  : "border border-[oklch(0.72_0.16_250/0.50)] bg-[oklch(0.72_0.16_250/0.10)] text-[oklch(0.82_0.16_250)] shadow-[0_0_0_1px_oklch(0.72_0.16_250/0.18),0_0_26px_oklch(0.72_0.16_250/0.18)] hover:bg-[oklch(0.72_0.16_250/0.15)]"
+              )}
+            >
+              {!walletConnected && (
+                <span className="pointer-events-none absolute inset-0 animate-pulse bg-[linear-gradient(110deg,transparent,oklch(1_0_0/0.10),transparent)]" />
+              )}
+              <span className="relative inline-flex items-center gap-2">
+                {walletConnected ? <Sparkles className="h-3.5 w-3.5" /> : <Wallet className="h-3.5 w-3.5" />}
+                {walletConnected ? `Analyze ${asset.displaySymbol}` : "Connect wallet to analyze"}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {walletConnected && isLoading && (
+          <div className="flex items-center gap-3 py-3">
+            <Loader2 className="h-4 w-4 animate-spin text-[oklch(0.72_0.16_250)]" />
+            <div>
+              <p className="text-[12px] font-semibold text-foreground">
+                {status === "analyzing" ? "Running analysis..." : "Connecting..."}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Fetching live news and signals</p>
+            </div>
+          </div>
+        )}
+
+        {/* Done state - verdict */}
+        {isDone && (
+          <div className="space-y-3">
+            {/* Verdict row */}
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Verdict</div>
+                <div className="mt-0.5 text-lg font-bold" style={{ color: verdictColor }}>
+                  {verdictLabel}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Confidence</div>
+                <div className="mt-0.5 font-mono text-lg font-bold text-foreground">{verdictConf}%</div>
+              </div>
+            </div>
+
+            {/* Confidence bar */}
+            <div className="h-1.5 overflow-hidden rounded-full bg-[oklch(0.18_0.014_255)]">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${verdictConf}%`, background: verdictColor }}
+              />
+            </div>
+
+            {/* Rationale */}
+            {verdictRationale && (
+              <p className="text-[11px] leading-5 text-muted-foreground/80">{verdictRationale}</p>
+            )}
+
+            {/* Key factors */}
+            {factors.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">Key Factors</div>
+                {factors.map((sig: any, i: number) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                    <span
+                      className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{
+                        background: sig.direction === "YES"
+                          ? "oklch(0.68 0.18 155)"
+                          : sig.direction === "NO"
+                          ? "oklch(0.60 0.18 25)"
+                          : "oklch(0.78 0.16 82)",
+                      }}
+                    />
+                    <span className="leading-4">{sig.reason ?? sig.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Re-analyze */}
+            <button
+              type="button"
+              onClick={handleAnalyze}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 text-[10px] font-semibold text-[oklch(0.72_0.16_250/0.7)] hover:text-[oklch(0.72_0.16_250)] transition-colors disabled:opacity-40"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Refresh analysis
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, onTrade }: {
   asset: RwaAsset
@@ -1020,10 +1195,10 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
         <div className="mt-3 rounded-xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.54)] p-3.5">
           <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Overview</div>
           <p className="text-sm leading-relaxed text-foreground">{asset.theme}</p>
-          <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-            In-depth analysis with price catalysts and risk signals coming soon.
-          </p>
         </div>
+
+        {/* AI Analysis */}
+        <StockAnalysisSection asset={asset} quote={quote} />
 
         {/* Trading status */}
         <div className="mt-3 rounded-xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.54)] p-3.5">
@@ -1076,15 +1251,7 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
         </div>
 
         {/* Action buttons */}
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            disabled
-            className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[oklch(0.78_0.16_82/0.40)] text-[oklch(0.10_0.012_260)] text-xs font-bold opacity-50 cursor-not-allowed"
-          >
-            <Brain className="h-4 w-4" />
-            Analyze
-          </button>
+        <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             type="button"
             disabled={!canBuy}
@@ -1314,18 +1481,31 @@ function RwaTradeModal({
       // Step 1 — check balance + allowance
       setStatus("checking")
       const amountInRaw = BigInt(activeQuote.amountInRaw)
+      const feeRaw = activeQuote.platformFee ? BigInt(activeQuote.platformFee.amountRaw) : 0n
+      const totalRequired = amountInRaw  // amountInRaw already includes fee (API deducts from swap)
 
       const inputToken = new Contract(activeQuote.tokenIn.address, ERC20_ABI, signer)
       const balance = await inputToken.balanceOf(signerAddress) as bigint
-      if (balance < amountInRaw) {
+      if (balance < totalRequired) {
         throw new Error(`Not enough ${activeQuote.tokenIn.symbol} in your wallet for this trade.`)
       }
 
-      // Step 2 — approve if needed
+      // Step 1.5 — collect platform fee in the input token.
+      if (activeQuote.platformFee && feeRaw > 0n) {
+        setStatus("checking")
+        const feeTx = await (inputToken as any).transfer(
+          activeQuote.platformFee.receiver,
+          feeRaw
+        )
+        await feeTx.wait(1)
+      }
+
+      // Step 2 — approve if needed (approve only the swap amount, not incl. fee already sent)
+      const swapAmountInRaw = BigInt(activeQuote.swapAmountInRaw ?? activeQuote.amountInRaw)
       const allowance = await inputToken.allowance(signerAddress, activeQuote.spender) as bigint
-      if (allowance < amountInRaw) {
+      if (allowance < swapAmountInRaw) {
         setStatus("approving")
-        const approvalTx = await inputToken.approve(activeQuote.spender, amountInRaw)
+        const approvalTx = await inputToken.approve(activeQuote.spender, swapAmountInRaw)
         await approvalTx.wait(1)
       }
 
@@ -1351,7 +1531,7 @@ function RwaTradeModal({
         return
       }
 
-      // Step 3 — execute swap
+      // Step 3 — execute swap (using post-fee amount)
       setStatus("swapping")
       const router = new Contract(activeQuote.router, PANCAKE_V3_ROUTER_ABI, signer)
       const deadline = Math.floor(Date.now() / 1000) + 10 * 60
@@ -1361,7 +1541,7 @@ function RwaTradeModal({
         fee: activeQuote.fee,
         recipient: signerAddress,
         deadline,
-        amountIn: amountInRaw,
+        amountIn: swapAmountInRaw,
         amountOutMinimum: BigInt(activeQuote.amountOutMinimumRaw),
         sqrtPriceLimitX96: 0n,
       })
@@ -1544,10 +1724,20 @@ function RwaTradeModal({
                   </div>
                 </div>
 
+                {/* Platform fee row */}
+                {quote?.platformFee && (
+                  <div className="mt-2 flex items-center justify-between rounded-xl border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.08_0.01_260/0.5)] px-3 py-2 text-[11px]">
+                    <span className="text-muted-foreground">Platform fee <span className="text-muted-foreground/50">(0.5%)</span></span>
+                    <span className="font-mono font-semibold text-foreground">
+                      {Number(quote.platformFee.amountHuman).toFixed(4)} {quote.platformFee.token.symbol}
+                    </span>
+                  </div>
+                )}
+
                 {/* Quote details + staleness */}
                 {quote && (
                   <div className={cn(
-                    "mt-3 flex items-center justify-between rounded-xl border p-3 text-[11px] transition-colors",
+                    "mt-2 flex items-center justify-between rounded-xl border p-3 text-[11px] transition-colors",
                     quoteStale
                       ? "border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.07)] text-[oklch(0.82_0.14_82)]"
                       : "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.06)] text-[oklch(0.72_0.16_155)]"
