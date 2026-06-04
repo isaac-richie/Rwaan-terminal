@@ -15,10 +15,30 @@ import {
   Lock,
   ChevronDown,
   ChevronRight,
+  Globe2,
+  Send,
 } from "lucide-react"
 
 const PREMIUM_ANALYSIS_FEE_ENABLED =
   process.env.NEXT_PUBLIC_PREMIUM_ANALYSIS_FEE_ENABLED === "true"
+
+const SOCIAL_LINKS = [
+  {
+    label: "Telegram",
+    href: process.env.NEXT_PUBLIC_TELEGRAM_URL ?? "https://t.me/RWAN_Chat",
+    icon: Send,
+  },
+  {
+    label: "X",
+    href: process.env.NEXT_PUBLIC_X_URL ?? "https://x.com/RWAN_Official",
+    icon: X,
+  },
+  {
+    label: "Website",
+    href: process.env.NEXT_PUBLIC_WEBSITE_URL ?? "https://www.rawlianalytics.io",
+    icon: Globe2,
+  },
+]
 
 // ─── Legal sheet (Terms / Privacy) ───────────────────────────────────────────
 
@@ -605,10 +625,27 @@ export function Footer() {
               <p className="text-[11px] text-muted-foreground/40">
                 © {new Date().getFullYear()} Rawli Analytics. Not financial advice. Trade responsibly.
               </p>
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground/30">
-                <button onClick={() => setTermsOpen(true)} className="hover:text-muted-foreground transition-colors">Terms</button>
-                <span>·</span>
-                <button onClick={() => setPrivacyOpen(true)} className="hover:text-muted-foreground transition-colors">Privacy</button>
+              <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground/30">
+                <div className="flex items-center gap-2">
+                  {SOCIAL_LINKS.map(({ label, href, icon: Icon }) => (
+                    <a
+                      key={label}
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={label}
+                      title={label}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[oklch(0.20_0.014_255/0.72)] bg-[oklch(0.10_0.012_260/0.72)] text-muted-foreground/45 transition-colors hover:border-[oklch(0.78_0.16_82/0.40)] hover:text-[oklch(0.82_0.16_82)]"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                    </a>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setTermsOpen(true)} className="hover:text-muted-foreground transition-colors">Terms</button>
+                  <span>·</span>
+                  <button onClick={() => setPrivacyOpen(true)} className="hover:text-muted-foreground transition-colors">Privacy</button>
+                </div>
               </div>
             </div>
 

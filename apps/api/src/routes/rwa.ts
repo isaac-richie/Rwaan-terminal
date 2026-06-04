@@ -177,6 +177,7 @@ type RwaSafeRoute =
       fee: number;
       pool: string;
       roundTripBps: number;
+      lowLiquidity: boolean;
       testInputRaw: string;
       testTokenOutRaw: string;
       testSellBackRaw: string;
@@ -187,6 +188,7 @@ type RwaSafeRoute =
       reactor: string;
       permit2: string;
       roundTripBps: number;
+      lowLiquidity: boolean;
       testInputRaw: string;
       testTokenOutRaw: string;
       testSellBackRaw: string;
@@ -904,7 +906,7 @@ async function submitPancakeXOrder(input: {
 }
 
 async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null> {
-  const cacheKey = buildCacheKey("rwa:pancake:safe-route:v2", { address: token.address.toLowerCase() });
+  const cacheKey = buildCacheKey("rwa:pancake:executable-route:v1", { address: token.address.toLowerCase() });
   const cached = await getJsonCacheEntry<RwaSafeRoute | null>(cacheKey);
   if (cached) return cached.value;
 
@@ -936,14 +938,13 @@ async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null>
           reactor: PANCAKEX_V3_REACTOR,
           permit2: PANCAKEX_PERMIT2,
           roundTripBps: Number((sellBack.amountOut * 10_000n) / ROUTE_TEST_USDT_RAW),
+          lowLiquidity: Number((sellBack.amountOut * 10_000n) / ROUTE_TEST_USDT_RAW) < MIN_ROUND_TRIP_BPS,
           testInputRaw: ROUTE_TEST_USDT_RAW.toString(),
           testTokenOutRaw: buy.amountOut.toString(),
           testSellBackRaw: sellBack.amountOut.toString(),
         };
-        if (route.roundTripBps >= MIN_ROUND_TRIP_BPS) {
-          await setJsonCache(cacheKey, route, 60, { staleTtlSeconds: 300 });
-          return route;
-        }
+        await setJsonCache(cacheKey, route, 60, { staleTtlSeconds: 300 });
+        return route;
       }
     }
   } catch {
@@ -967,6 +968,7 @@ async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null>
         fee,
         pool,
         roundTripBps: Number((sellBack.amountOut * 10_000n) / ROUTE_TEST_USDT_RAW),
+        lowLiquidity: Number((sellBack.amountOut * 10_000n) / ROUTE_TEST_USDT_RAW) < MIN_ROUND_TRIP_BPS,
         testInputRaw: ROUTE_TEST_USDT_RAW.toString(),
         testTokenOutRaw: buy.amountOut.toString(),
         testSellBackRaw: sellBack.amountOut.toString(),
@@ -978,7 +980,6 @@ async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null>
 
   const safe = candidates
     .filter((candidate): candidate is RwaSafeRoute => Boolean(candidate))
-    .filter((candidate) => candidate.roundTripBps >= MIN_ROUND_TRIP_BPS)
     .sort((a, b) => b.roundTripBps - a.roundTripBps)[0] ?? null;
 
   await setJsonCache(cacheKey, safe, 60, { staleTtlSeconds: 300 });
@@ -1108,7 +1109,7 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
   if (!safeRoute) {
     return {
       symbol: asset.displaySymbol,
-      status: "route_unsafe",
+      status: "quote_adapter_unavailable",
       tradable: false,
       exitVerified: false,
       source: ONDO_TOKEN_LIST_URL,
@@ -1117,24 +1118,24 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
       settlementAsset: BSC_USDT,
       buy: {
         enabled: false,
-        status: "route_unsafe",
-        note: "A pool may exist, but the live buy/sell spread is too wide for Rawli to enable it.",
+        status: "quote_adapter_unavailable",
+        note: "PancakeSwap could not return an executable buy quote for this stock right now.",
       },
       sell: {
         enabled: false,
-        status: "route_unsafe",
-        note: "Sell is locked until a small round-trip quote returns at least 90% of the test input.",
+        status: "quote_adapter_unavailable",
+        note: "PancakeSwap could not return an executable sell quote for this stock right now.",
       },
       copy: {
-        primary: "Low liquidity",
-        secondary: "This stock has low trading volume right now. Trading will unlock once liquidity improves.",
+        primary: "Route unavailable",
+        secondary: "PancakeSwap is not returning a live buy and sell quote for this stock right now.",
       },
     };
   }
 
   return {
     symbol: asset.displaySymbol,
-    status: "tradable",
+    status: safeRoute.lowLiquidity ? "route_unsafe" : "tradable",
     tradable: true,
     exitVerified: true,
     source: ONDO_TOKEN_LIST_URL,
@@ -1167,20 +1168,26 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
     buy: {
       enabled: true,
       status: "enabled",
-      note: safeRoute.kind === "pcsx"
+      note: safeRoute.lowLiquidity
+        ? "PancakeSwap returned a live buy quote, but liquidity is thin. Review the quote carefully."
+        : safeRoute.kind === "pcsx"
         ? "Live USDT buy route verified through PancakeSwapX."
         : "Live USDT buy route verified through PancakeSwap V3.",
     },
     sell: {
       enabled: true,
       status: "enabled",
-      note: safeRoute.kind === "pcsx"
+      note: safeRoute.lowLiquidity
+        ? "PancakeSwap returned a live sell quote, but liquidity is thin. Review the quote carefully."
+        : safeRoute.kind === "pcsx"
         ? "Live USDT sell route verified through PancakeSwapX."
         : "Live USDT sell route verified through PancakeSwap V3.",
     },
     copy: {
-      primary: "Ready to trade",
-      secondary: safeRoute.kind === "pcsx"
+      primary: safeRoute.lowLiquidity ? "Low liquidity" : "Ready to trade",
+      secondary: safeRoute.lowLiquidity
+        ? "Tradable on PancakeSwap, but liquidity is thin and the quote can move sharply. Review the final quote before confirming."
+        : safeRoute.kind === "pcsx"
         ? "Buy and sell this stock using USDT. We verify both directions through PancakeSwapX before enabling trading."
         : "Buy and sell this stock using USDT. We verify both directions before enabling trading.",
     },
@@ -1349,6 +1356,7 @@ async function buildSwapQuote(
       pool: "Signed order",
       slippageBps,
       roundTripBps: route.roundTripBps,
+      lowLiquidity: route.lowLiquidity,
       tokenIn: {
         symbol: tokenIn.symbol,
         address: tokenIn.address,
@@ -1399,6 +1407,7 @@ async function buildSwapQuote(
     pool: route.pool,
     slippageBps,
     roundTripBps: route.roundTripBps,
+    lowLiquidity: route.lowLiquidity,
     tokenIn: {
       symbol: tokenIn.symbol,
       address: tokenIn.address,
@@ -1568,8 +1577,8 @@ export async function rwaRoutes(app: FastifyInstance): Promise<void> {
         reply.status(409);
         return {
           ok: false,
-          error: "rwa_route_not_safe",
-          message: "No safe two-way PancakeSwap route is available for this stock right now.",
+          error: "rwa_route_unavailable",
+          message: "No executable PancakeSwap buy and sell route is available for this stock right now.",
         };
       }
 

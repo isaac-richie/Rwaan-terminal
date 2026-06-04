@@ -5,11 +5,9 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import {
   ArrowUpRight,
-  Brain,
   Flame,
   Newspaper,
   Sparkles,
-  Zap,
 } from "lucide-react"
 import { fetchMarkets, getCachedMarkets } from "@/lib/markets"
 import { cacheMarketForDetail } from "@/lib/market-detail-cache"
@@ -189,26 +187,14 @@ export function MarketHero() {
           </span>
         </h1>
 
-        {/* Sub-row: description + feature chips */}
+        {/* Sub-row: description */}
         <div
-          className="hero-enter mt-5 flex flex-wrap items-center gap-3"
+          className="hero-enter mt-5"
           style={{ animationDelay: "160ms" }}
         >
           <p className="text-sm leading-relaxed text-muted-foreground max-w-sm">
-            Live Polymarket liquidity. BNB-native funding. AI market briefings.
+            Live prediction markets with real-time pricing and non-custodial trading.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { icon: Zap, label: "BNB funded" },
-              { icon: Brain, label: "AI reports" },
-              { icon: Flame, label: "Live books" },
-            ].map(({ icon: Icon, label }) => (
-              <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(0.24_0.015_255/0.7)] bg-[oklch(0.15_0.013_260/0.85)] px-3 py-1 text-[11px] font-semibold text-muted-foreground">
-                <Icon className="h-3 w-3 text-[oklch(0.80_0.16_82)]" />
-                {label}
-              </span>
-            ))}
-          </div>
         </div>
       </div>
 

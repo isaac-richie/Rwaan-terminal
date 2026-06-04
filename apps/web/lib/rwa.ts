@@ -124,6 +124,7 @@ export type RwaSwapQuote = {
   pool: string
   slippageBps: number
   roundTripBps: number
+  lowLiquidity?: boolean
   tokenIn: {
     symbol: string
     address: string

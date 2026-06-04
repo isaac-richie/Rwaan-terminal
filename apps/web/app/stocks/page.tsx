@@ -65,6 +65,7 @@ function formatEndDate(d: string | null) {
 
 function routeLabel(route?: RwaAsset["route"]) {
   if (!route) return "Checking"
+  if (route.tradable && route.status === "route_unsafe") return "Low Liquidity"
   if (route.exitVerified) return "Live"
   if (route.status === "blocked") return "Unavailable"
   if (routeNeedsLiveCheck(route)) return "Checking"
@@ -75,6 +76,7 @@ function routeLabel(route?: RwaAsset["route"]) {
 }
 
 function routeTone(route?: RwaAsset["route"]) {
+  if (route?.tradable && route.status === "route_unsafe") return "gold"
   if (route?.exitVerified) return "positive"
   if (routeNeedsLiveCheck(route)) return "gold"
   if (route?.status === "watch_only" || route?.status === "blocked") return "danger"
@@ -1594,7 +1596,9 @@ function RwaTradeModal({
                       : "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.06)] text-[oklch(0.72_0.16_155)]"
                   )}>
                     <span>
-                      {quote.execution.kind === "pcsx"
+                      {quote.lowLiquidity
+                        ? "Low liquidity"
+                        : quote.execution.kind === "pcsx"
                         ? `${quote.venue} signed order`
                         : `Fee ${(quote.fee / 10_000).toFixed(2)}%`} · Two-way {(quote.roundTripBps / 100).toFixed(1)}%
                     </span>
