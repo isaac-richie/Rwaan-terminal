@@ -22,16 +22,27 @@ const routeQuerySchema = z.object({
   region: z.string().trim().min(2).max(2).optional(),
 });
 
+const addressSchema = z.string().trim().regex(/^0x[a-fA-F0-9]{40}$/);
+
 const swapQuoteQuerySchema = z.object({
   symbol: z.string().trim().min(1).max(16),
   side: z.enum(["buy", "sell"]),
   amount: z.string().trim().regex(/^\d+(\.\d{1,18})?$/),
   slippageBps: z.coerce.number().int().min(10).max(1000).optional(),
+  swapper: addressSchema.optional(),
+  recipient: addressSchema.optional(),
+});
+
+const swapSubmitBodySchema = z.object({
+  chainId: z.literal(56),
+  encodedOrder: z.string().trim().regex(/^0x[a-fA-F0-9]+$/),
+  quoteId: z.string().trim().min(1).max(120),
+  signature: z.string().trim().regex(/^0x[a-fA-F0-9]+$/),
 });
 
 const ONDO_TOKEN_LIST_URL = "https://tokens.pancakeswap.finance/ondo-rwa-tokens.json";
 const BNB_CHAIN_ID = 56;
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 const BSC_USDT = {
   symbol: "USDT" as const,
   address: "0x55d398326f99059fF775485246999027B3197955" as Address,
@@ -41,6 +52,11 @@ const PANCAKE_V3_FACTORY = "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865" as Addre
 const PANCAKE_V3_QUOTER_V2 = "0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997" as Address;
 const PANCAKE_V3_SWAP_ROUTER = "0x1b81D678ffb9C0263b24A97847620C99d213eB14" as Address;
 const PANCAKE_V3_FEES = [100, 500, 2500, 10000] as const;
+const PANCAKEX_PRICE_ENDPOINT = "https://x.pancakeswap.com/order-price/get-price";
+const PANCAKEX_ORDER_ENDPOINT = "https://x.pancakeswap.com/order-handler/order";
+const PANCAKEX_PERMIT2 = "0x31c2F6fcFf4F8759b3Bd5Bf0e1084A055615c768" as Address;
+const PANCAKEX_V3_REACTOR = "0xB75BB4c7AaaCFA400758BF024C2FFEfe17C9cBe3" as Address;
+const PANCAKEX_ROUTE_USER = "0x1111111111111111111111111111111111111111" as Address;
 const DEFAULT_SLIPPAGE_BPS = 200;
 const ROUTE_TEST_USDT_RAW = parseUnits("10", BSC_USDT.decimals);
 const MIN_ROUND_TRIP_BPS = 9000;
@@ -127,12 +143,12 @@ type RwaRouteHealth = {
     decimals: 18;
   };
   dex?: {
-    venue: "PancakeSwap V3";
-    router: string;
-    quoter: string;
-    factory: string;
-    fee: number;
-    pool: string;
+    venue: "PancakeSwap V3" | "PancakeSwapX";
+    router?: string;
+    quoter?: string;
+    factory?: string;
+    fee?: number;
+    pool?: string;
     roundTripBps: number;
     testInputRaw: string;
     testTokenOutRaw: string;
@@ -154,18 +170,41 @@ type RwaRouteHealth = {
   };
 };
 
-type RwaSafeRoute = {
-  fee: number;
-  pool: string;
-  roundTripBps: number;
-  testInputRaw: string;
-  testTokenOutRaw: string;
-  testSellBackRaw: string;
-};
+type RwaSafeRoute =
+  | {
+      kind: "v3";
+      venue: "PancakeSwap V3";
+      fee: number;
+      pool: string;
+      roundTripBps: number;
+      testInputRaw: string;
+      testTokenOutRaw: string;
+      testSellBackRaw: string;
+    }
+  | {
+      kind: "pcsx";
+      venue: "PancakeSwapX";
+      reactor: string;
+      permit2: string;
+      roundTripBps: number;
+      testInputRaw: string;
+      testTokenOutRaw: string;
+      testSellBackRaw: string;
+    };
 
 type PancakeQuote = {
   amountOut: bigint;
   gasEstimate: bigint;
+};
+
+type PancakeXQuote = {
+  amountOut: bigint;
+  amountOutMinimum: bigint;
+  quoteId: string;
+  encodedOrder: string;
+  orderHash: string | null;
+  permitData: unknown;
+  orderInfo: any;
 };
 
 type RwaQuote = {
@@ -793,12 +832,124 @@ async function quotePancakeExactInput(
   };
 }
 
+async function quotePancakeXExactInput(
+  tokenIn: { address: Address; decimals: number; symbol: string },
+  tokenOut: { address: Address; decimals: number; symbol: string },
+  amountIn: bigint,
+  slippageBps: number,
+  swapper: Address,
+  recipient: Address
+): Promise<PancakeXQuote> {
+  const res = await fetch(PANCAKEX_PRICE_ENDPOINT, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount: amountIn.toString(),
+      type: "EXACT_INPUT",
+      tokenInChainId: BNB_CHAIN_ID,
+      tokenOutChainId: BNB_CHAIN_ID,
+      slippageTolerance: (slippageBps / 100).toFixed(2),
+      tokenIn: tokenIn.address,
+      tokenOut: tokenOut.address,
+      configs: [{
+        routingType: "DUTCH_LIMIT",
+        swapper,
+        recipient,
+      }],
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  const payload = await res.json().catch(() => null) as any;
+  if (!res.ok || !payload || payload.messageType === "ERROR") {
+    const message = payload?.message?.error ?? payload?.detail ?? `pancakex_quote_${res.status}`;
+    throw new Error(String(message));
+  }
+
+  const bestOrder = payload?.message?.bestOrder;
+  const order = bestOrder?.order;
+  const output = order?.orderInfo?.outputs?.[0];
+  if (bestOrder?.type !== "DUTCH_LIMIT" || !order?.quoteId || !order?.encodedOrder || !output?.startAmount) {
+    throw new Error("pancakex_no_dutch_limit_order");
+  }
+
+  return {
+    amountOut: BigInt(output.startAmount),
+    amountOutMinimum: BigInt(output.endAmount ?? output.minAmount ?? output.startAmount),
+    quoteId: String(order.quoteId),
+    encodedOrder: String(order.encodedOrder),
+    orderHash: typeof order.orderHash === "string" ? order.orderHash : null,
+    permitData: order.permitData,
+    orderInfo: order.orderInfo,
+  };
+}
+
+async function submitPancakeXOrder(input: {
+  chainId: 56;
+  encodedOrder: string;
+  quoteId: string;
+  signature: string;
+}) {
+  const res = await fetch(PANCAKEX_ORDER_ENDPOINT, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const payload = await res.json().catch(() => null) as any;
+  if (!res.ok || !payload?.hash) {
+    throw new Error(String(payload?.detail ?? payload?.message ?? `pancakex_submit_${res.status}`));
+  }
+  return { hash: String(payload.hash), chainId: input.chainId };
+}
+
 async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null> {
-  const cacheKey = buildCacheKey("rwa:pancake:v3:safe-route", { address: token.address.toLowerCase() });
+  const cacheKey = buildCacheKey("rwa:pancake:safe-route:v2", { address: token.address.toLowerCase() });
   const cached = await getJsonCacheEntry<RwaSafeRoute | null>(cacheKey);
   if (cached) return cached.value;
 
   const tokenAddress = token.address as Address;
+  const tokenAsset = { symbol: token.symbol, address: tokenAddress, decimals: token.decimals };
+
+  try {
+    const buy = await quotePancakeXExactInput(
+      BSC_USDT,
+      tokenAsset,
+      ROUTE_TEST_USDT_RAW,
+      DEFAULT_SLIPPAGE_BPS,
+      PANCAKEX_ROUTE_USER,
+      PANCAKEX_ROUTE_USER
+    );
+    if (buy.amountOut > 0n) {
+      const sellBack = await quotePancakeXExactInput(
+        tokenAsset,
+        BSC_USDT,
+        buy.amountOut,
+        DEFAULT_SLIPPAGE_BPS,
+        PANCAKEX_ROUTE_USER,
+        PANCAKEX_ROUTE_USER
+      );
+      if (sellBack.amountOut > 0n) {
+        const route: RwaSafeRoute = {
+          kind: "pcsx",
+          venue: "PancakeSwapX",
+          reactor: PANCAKEX_V3_REACTOR,
+          permit2: PANCAKEX_PERMIT2,
+          roundTripBps: Number((sellBack.amountOut * 10_000n) / ROUTE_TEST_USDT_RAW),
+          testInputRaw: ROUTE_TEST_USDT_RAW.toString(),
+          testTokenOutRaw: buy.amountOut.toString(),
+          testSellBackRaw: sellBack.amountOut.toString(),
+        };
+        if (route.roundTripBps >= MIN_ROUND_TRIP_BPS) {
+          await setJsonCache(cacheKey, route, 60, { staleTtlSeconds: 300 });
+          return route;
+        }
+      }
+    }
+  } catch {
+    // Fall through to the older V3 router check. Some tokens still quote there.
+  }
+
   const candidates: Array<RwaSafeRoute | null> = await Promise.all(PANCAKE_V3_FEES.map(async (fee) => {
     try {
       const pool = await getPancakePool(BSC_USDT.address, tokenAddress, fee);
@@ -811,6 +962,8 @@ async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null>
       if (sellBack.amountOut <= 0n) return null;
 
       return {
+        kind: "v3",
+        venue: "PancakeSwap V3",
         fee,
         pool,
         roundTripBps: Number((sellBack.amountOut * 10_000n) / ROUTE_TEST_USDT_RAW),
@@ -988,31 +1141,48 @@ async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRo
     chain: { name: "BNB Chain", chainId: BNB_CHAIN_ID },
     token: { symbol: token.symbol, address: token.address, decimals: token.decimals, logoURI: token.logoURI },
     settlementAsset: BSC_USDT,
-    dex: {
-      venue: "PancakeSwap V3",
-      router: PANCAKE_V3_SWAP_ROUTER,
-      quoter: PANCAKE_V3_QUOTER_V2,
-      factory: PANCAKE_V3_FACTORY,
-      fee: safeRoute.fee,
-      pool: safeRoute.pool,
-      roundTripBps: safeRoute.roundTripBps,
-      testInputRaw: safeRoute.testInputRaw,
-      testTokenOutRaw: safeRoute.testTokenOutRaw,
-      testSellBackRaw: safeRoute.testSellBackRaw,
-    },
+    dex: safeRoute.kind === "pcsx"
+      ? {
+          venue: "PancakeSwapX",
+          router: safeRoute.reactor,
+          quoter: PANCAKEX_PRICE_ENDPOINT,
+          pool: "Signed order",
+          roundTripBps: safeRoute.roundTripBps,
+          testInputRaw: safeRoute.testInputRaw,
+          testTokenOutRaw: safeRoute.testTokenOutRaw,
+          testSellBackRaw: safeRoute.testSellBackRaw,
+        }
+      : {
+          venue: "PancakeSwap V3",
+          router: PANCAKE_V3_SWAP_ROUTER,
+          quoter: PANCAKE_V3_QUOTER_V2,
+          factory: PANCAKE_V3_FACTORY,
+          fee: safeRoute.fee,
+          pool: safeRoute.pool,
+          roundTripBps: safeRoute.roundTripBps,
+          testInputRaw: safeRoute.testInputRaw,
+          testTokenOutRaw: safeRoute.testTokenOutRaw,
+          testSellBackRaw: safeRoute.testSellBackRaw,
+        },
     buy: {
       enabled: true,
       status: "enabled",
-      note: "Live USDT buy route verified through PancakeSwap V3.",
+      note: safeRoute.kind === "pcsx"
+        ? "Live USDT buy route verified through PancakeSwapX."
+        : "Live USDT buy route verified through PancakeSwap V3.",
     },
     sell: {
       enabled: true,
       status: "enabled",
-      note: "Live USDT sell route verified through PancakeSwap V3.",
+      note: safeRoute.kind === "pcsx"
+        ? "Live USDT sell route verified through PancakeSwapX."
+        : "Live USDT sell route verified through PancakeSwap V3.",
     },
     copy: {
       primary: "Ready to trade",
-      secondary: "Buy and sell this stock using USDT. We verify both directions before enabling trading.",
+      secondary: safeRoute.kind === "pcsx"
+        ? "Buy and sell this stock using USDT. We verify both directions through PancakeSwapX before enabling trading."
+        : "Buy and sell this stock using USDT. We verify both directions before enabling trading.",
     },
   };
 }
@@ -1131,8 +1301,8 @@ async function buildCatalogRouteHealth(asset: RwaAsset, region?: string): Promis
       note: "Sell unlocks only after Rawli verifies the same asset has a safe exit route.",
     },
     copy: {
-      primary: "Route check on select",
-      secondary: "This token is mapped on BNB Chain. Rawli runs the deeper buy/sell liquidity check when you open it.",
+      primary: "Checking route",
+      secondary: "This stock is mapped on BNB Chain. Rawli is verifying the live PancakeSwapX buy and sell route.",
     },
   };
 }
@@ -1142,7 +1312,9 @@ async function buildSwapQuote(
   token: OndoToken,
   side: "buy" | "sell",
   amount: string,
-  slippageBps = DEFAULT_SLIPPAGE_BPS
+  slippageBps = DEFAULT_SLIPPAGE_BPS,
+  swapper?: Address,
+  recipient?: Address
 ) {
   const route = await findSafeUsdtRoute(token);
   if (!route) return null;
@@ -1151,6 +1323,65 @@ async function buildSwapQuote(
   const tokenOut = side === "buy" ? { symbol: token.symbol, address: token.address as Address, decimals: token.decimals } : BSC_USDT;
   const amountInRaw = parseUnits(amount, tokenIn.decimals);
   if (amountInRaw <= 0n) return null;
+
+  if (route.kind === "pcsx") {
+    const orderSwapper = swapper ?? ZERO_ADDRESS;
+    const orderRecipient = recipient ?? orderSwapper;
+    const quoted = await quotePancakeXExactInput(
+      tokenIn,
+      tokenOut,
+      amountInRaw,
+      slippageBps,
+      orderSwapper,
+      orderRecipient
+    );
+
+    return {
+      symbol: asset.displaySymbol,
+      side,
+      venue: "PancakeSwapX",
+      chainId: BNB_CHAIN_ID,
+      router: PANCAKEX_V3_REACTOR,
+      spender: PANCAKEX_PERMIT2,
+      quoter: PANCAKEX_PRICE_ENDPOINT,
+      factory: "",
+      fee: 0,
+      pool: "Signed order",
+      slippageBps,
+      roundTripBps: route.roundTripBps,
+      tokenIn: {
+        symbol: tokenIn.symbol,
+        address: tokenIn.address,
+        decimals: tokenIn.decimals,
+      },
+      tokenOut: {
+        symbol: tokenOut.symbol,
+        address: tokenOut.address,
+        decimals: tokenOut.decimals,
+      },
+      amountInRaw: amountInRaw.toString(),
+      amountInHuman: formatUnits(amountInRaw, tokenIn.decimals),
+      amountOutRaw: quoted.amountOut.toString(),
+      amountOutHuman: formatUnits(quoted.amountOut, tokenOut.decimals),
+      amountOutMinimumRaw: quoted.amountOutMinimum.toString(),
+      amountOutMinimumHuman: formatUnits(quoted.amountOutMinimum, tokenOut.decimals),
+      gasEstimate: "0",
+      generatedAt: new Date().toISOString(),
+      execution: {
+        kind: "pcsx",
+        orderType: "DUTCH_LIMIT",
+        quoteId: quoted.quoteId,
+        encodedOrder: quoted.encodedOrder,
+        orderHash: quoted.orderHash,
+        permitData: quoted.permitData,
+        orderInfo: quoted.orderInfo,
+        permit2: PANCAKEX_PERMIT2,
+        reactor: PANCAKEX_V3_REACTOR,
+        swapper: orderSwapper,
+        recipient: orderRecipient,
+      },
+    };
+  }
 
   const quoted = await quotePancakeExactInput(tokenIn.address, tokenOut.address, amountInRaw, route.fee);
   const amountOutMinimumRaw = (quoted.amountOut * BigInt(10_000 - slippageBps)) / 10_000n;
@@ -1186,6 +1417,9 @@ async function buildSwapQuote(
     amountOutMinimumHuman: formatUnits(amountOutMinimumRaw, tokenOut.decimals),
     gasEstimate: quoted.gasEstimate.toString(),
     generatedAt: new Date().toISOString(),
+    execution: {
+      kind: "v3",
+    },
   };
 }
 
@@ -1325,7 +1559,9 @@ export async function rwaRoutes(app: FastifyInstance): Promise<void> {
         token,
         query.data.side,
         query.data.amount,
-        query.data.slippageBps ?? DEFAULT_SLIPPAGE_BPS
+        query.data.slippageBps ?? DEFAULT_SLIPPAGE_BPS,
+        query.data.swapper as Address | undefined,
+        (query.data.recipient ?? query.data.swapper) as Address | undefined
       );
 
       if (!quote) {
@@ -1342,6 +1578,27 @@ export async function rwaRoutes(app: FastifyInstance): Promise<void> {
       req.log.warn({ err, symbol: query.data.symbol, side: query.data.side }, "rwa swap quote unavailable");
       reply.status(502);
       return { ok: false, error: "rwa_swap_quote_unavailable" };
+    }
+  });
+
+  app.post("/rwa/swap/submit", async (req, reply) => {
+    const body = swapSubmitBodySchema.safeParse(req.body ?? {});
+    if (!body.success) {
+      reply.status(400);
+      return { ok: false, error: "invalid_rwa_swap_submit_body" };
+    }
+
+    try {
+      const submitted = await submitPancakeXOrder(body.data);
+      return { ok: true, order: submitted };
+    } catch (err) {
+      req.log.warn({ err }, "rwa pancakex submit unavailable");
+      reply.status(502);
+      return {
+        ok: false,
+        error: "rwa_swap_submit_unavailable",
+        message: err instanceof Error ? err.message : "Could not submit this stock order.",
+      };
     }
   });
 

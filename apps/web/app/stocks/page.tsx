@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils"
 import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet"
 import { friendlyErrorMessage } from "@/lib/friendly-errors"
 import {
-  fetchRwaAssets, fetchRwaQuotes, fetchRelatedMarkets, fetchRwaRouteHealth, fetchRwaSwapQuote,
+  fetchRwaAssets, fetchRwaQuotes, fetchRelatedMarkets, fetchRwaRouteHealth, fetchRwaSwapQuote, submitRwaSwapOrder,
   type RwaAsset, type RwaQuote, type RelatedMarket, type RwaSwapQuote,
 } from "@/lib/rwa"
 
@@ -67,6 +67,7 @@ function routeLabel(route?: RwaAsset["route"]) {
   if (!route) return "Checking"
   if (route.exitVerified) return "Live"
   if (route.status === "blocked") return "Unavailable"
+  if (routeNeedsLiveCheck(route)) return "Checking"
   if (route.status === "watch_only") return "Coming Soon"
   if (route.status === "route_unsafe") return "Low Liquidity"
   if (route.status === "quote_adapter_unavailable") return "Paused"
@@ -75,8 +76,17 @@ function routeLabel(route?: RwaAsset["route"]) {
 
 function routeTone(route?: RwaAsset["route"]) {
   if (route?.exitVerified) return "positive"
+  if (routeNeedsLiveCheck(route)) return "gold"
   if (route?.status === "watch_only" || route?.status === "blocked") return "danger"
   return "gold"
+}
+
+function routeNeedsLiveCheck(route?: RwaAsset["route"]) {
+  return Boolean(
+    route?.token.address &&
+    !route.exitVerified &&
+    (route.copy.primary === "Checking route" || route.copy.primary === "Route check on select")
+  )
 }
 
 const BSC_CHAIN_ID = 56
@@ -383,7 +393,7 @@ function matchesStockFilter(asset: RwaAsset, filter: StockFilterKey) {
     case "high-beta":
       return asset.risk === "high"
     case "watch":
-      return !asset.route?.exitVerified
+      return !asset.route?.exitVerified && !asset.route?.token.address
     case "all":
     default:
       return true
@@ -548,7 +558,7 @@ export default function StocksPage() {
 
   useEffect(() => {
     if (!selectedAsset) return
-    if (selectedAsset.route?.copy.primary !== "Route check on select") return
+    if (!routeNeedsLiveCheck(selectedAsset.route)) return
 
     let cancelled = false
     fetchRwaRouteHealth(selectedAsset.displaySymbol, "NG")
@@ -561,7 +571,45 @@ export default function StocksPage() {
       .catch(() => {})
 
     return () => { cancelled = true }
-  }, [selectedAsset?.id, selectedAsset?.route?.copy.primary, selectedAsset?.displaySymbol])
+  }, [selectedAsset?.id, selectedAsset?.route?.copy.primary, selectedAsset?.route?.token.address, selectedAsset?.displaySymbol])
+
+  useEffect(() => {
+    const pending = visibleAssets
+      .filter((asset) => routeNeedsLiveCheck(asset.route))
+      .slice(0, 6)
+
+    if (pending.length === 0) return
+
+    let cancelled = false
+    Promise.allSettled(
+      pending.map(async (asset) => ({
+        id: asset.id,
+        route: await fetchRwaRouteHealth(asset.displaySymbol, "NG"),
+      }))
+    ).then((results) => {
+      if (cancelled) return
+
+      const updates = new Map<string, NonNullable<RwaAsset["route"]>>()
+      for (const result of results) {
+        if (result.status === "fulfilled" && result.value.route) {
+          updates.set(result.value.id, result.value.route)
+        }
+      }
+      if (updates.size === 0) return
+
+      setAssets((current) => current.map((asset) => {
+        const route = updates.get(asset.id)
+        return route ? { ...asset, route } : asset
+      }))
+    }).catch(() => {})
+
+    return () => { cancelled = true }
+  }, [
+    visibleAssets
+      .filter((asset) => routeNeedsLiveCheck(asset.route))
+      .map((asset) => asset.id)
+      .join(","),
+  ])
 
   const handleSelectAsset = (id: string) => {
     setSelectedId(id)
@@ -1154,17 +1202,33 @@ function DetailPanel({ asset, quote, relatedMarkets, relatedLoading, positive, o
 }
 
 // ─── Trade modal ──────────────────────────────────────────────────────────────
-type TradeStatus = "idle" | "quoting" | "checking" | "approving" | "swapping" | "confirming" | "done" | "error"
+type TradeStatus = "idle" | "quoting" | "checking" | "approving" | "signing" | "submitting" | "swapping" | "confirming" | "done" | "error"
 
-const EXEC_STEPS: Array<{ key: TradeStatus; label: string }> = [
+const V3_EXEC_STEPS: Array<{ key: TradeStatus; label: string }> = [
   { key: "checking",   label: "Checking balance" },
   { key: "approving",  label: "Approving token" },
   { key: "swapping",   label: "Executing swap" },
   { key: "confirming", label: "Confirming on-chain" },
 ]
 
+const PCSX_EXEC_STEPS: Array<{ key: TradeStatus; label: string }> = [
+  { key: "checking",   label: "Checking balance" },
+  { key: "approving",  label: "Approving Permit2" },
+  { key: "signing",    label: "Signing order" },
+  { key: "submitting", label: "Submitting order" },
+]
+
 const QUICK_BUY  = ["10", "50", "100"]
 const QUICK_SELL = ["0.1", "0.5", "1"]
+
+function sameAddress(a?: string | null, b?: string | null) {
+  return Boolean(a && b && a.toLowerCase() === b.toLowerCase())
+}
+
+function typedDataTypes(types: Record<string, Array<{ name: string; type: string }>>) {
+  const { EIP712Domain: _domain, ...rest } = types
+  return rest
+}
 
 function RwaTradeModal({
   request,
@@ -1190,13 +1254,14 @@ function RwaTradeModal({
 
   const asset = request?.asset ?? null
   const side = request?.side ?? "buy"
-  const executing = ["checking", "approving", "swapping", "confirming"].includes(status)
+  const executing = ["checking", "approving", "signing", "submitting", "swapping", "confirming"].includes(status)
   const busy = status === "quoting" || executing
   const inputSymbol = side === "buy" ? "USDT" : (asset?.route?.token.symbol ?? asset?.displaySymbol ?? "Stock")
   const outputSymbol = side === "buy" ? (asset?.route?.token.symbol ?? asset?.displaySymbol ?? "Stock") : "USDT"
   const title = side === "buy" ? `Buy ${asset?.displaySymbol ?? ""}` : `Sell ${asset?.displaySymbol ?? ""}`
   const quickAmounts = side === "buy" ? QUICK_BUY : QUICK_SELL
   const quoteStale = quoteAge > 30
+  const execSteps = quote?.execution.kind === "pcsx" ? PCSX_EXEC_STEPS : V3_EXEC_STEPS
 
   // Reset when modal opens for a new asset/side
   useEffect(() => {
@@ -1234,7 +1299,14 @@ function RwaTradeModal({
     setStatus("quoting")
     setError(null)
     try {
-      const q = await fetchRwaSwapQuote({ symbol: asset.displaySymbol, side, amount, slippageBps: 200 })
+      const q = await fetchRwaSwapQuote({
+        symbol: asset.displaySymbol,
+        side,
+        amount,
+        slippageBps: 200,
+        swapper: walletAddress ?? undefined,
+        recipient: walletAddress ?? undefined,
+      })
       setQuote(q)
       setStatus("idle")
     } catch (err) {
@@ -1250,28 +1322,37 @@ function RwaTradeModal({
     setError(null)
     setTxHash(null)
 
-    // If no quote yet (or stale), fetch one before executing
-    let activeQuote = quote
-    if (!activeQuote || quoteStale) {
-      setStatus("quoting")
-      try {
-        activeQuote = await fetchRwaSwapQuote({ symbol: asset.displaySymbol, side, amount, slippageBps: 200 })
-        setQuote(activeQuote)
-        setQuoteAge(0)
-      } catch (err) {
-        setStatus("error")
-        setError(friendlyErrorMessage(err, "Could not get a price right now. Please try again.", "trade"))
-        return
-      }
-    }
-
     try {
-      // Step 1 — check balance + allowance
-      setStatus("checking")
       const provider = await ensureBscWallet(wallet)
       const ethersProvider = new BrowserProvider(provider as any)
       const signer = await ethersProvider.getSigner()
       const signerAddress = await signer.getAddress()
+
+      // PancakeSwapX orders are wallet-bound, so always re-quote if the quote
+      // was anonymous or belongs to a different active wallet.
+      let activeQuote = quote
+      const needsWalletBoundQuote =
+        !activeQuote ||
+        quoteStale ||
+        (activeQuote.execution.kind === "pcsx" && !sameAddress(activeQuote.execution.swapper, signerAddress))
+
+      if (needsWalletBoundQuote) {
+        setStatus("quoting")
+        activeQuote = await fetchRwaSwapQuote({
+          symbol: asset.displaySymbol,
+          side,
+          amount,
+          slippageBps: 200,
+          swapper: signerAddress,
+          recipient: signerAddress,
+        })
+        setQuote(activeQuote)
+        setQuoteAge(0)
+      }
+      if (!activeQuote) throw new Error("Could not get a price right now. Please try again.")
+
+      // Step 1 — check balance + allowance
+      setStatus("checking")
       const amountInRaw = BigInt(activeQuote.amountInRaw)
 
       const inputToken = new Contract(activeQuote.tokenIn.address, ERC20_ABI, signer)
@@ -1286,6 +1367,28 @@ function RwaTradeModal({
         setStatus("approving")
         const approvalTx = await inputToken.approve(activeQuote.spender, amountInRaw)
         await approvalTx.wait(1)
+      }
+
+      if (activeQuote.execution.kind === "pcsx") {
+        setStatus("signing")
+        const permitData = activeQuote.execution.permitData
+        const signature = await signer.signTypedData(
+          permitData.domain as any,
+          typedDataTypes(permitData.types) as any,
+          permitData.values as any
+        )
+
+        setStatus("submitting")
+        const submitted = await submitRwaSwapOrder({
+          chainId: activeQuote.chainId,
+          encodedOrder: activeQuote.execution.encodedOrder,
+          quoteId: activeQuote.execution.quoteId,
+          signature,
+        })
+
+        setTxHash(submitted.hash)
+        setStatus("done")
+        return
       }
 
       // Step 3 — execute swap
@@ -1314,7 +1417,7 @@ function RwaTradeModal({
     }
   }
 
-  const currentStepIdx = EXEC_STEPS.findIndex((s) => s.key === status)
+  const currentStepIdx = execSteps.findIndex((s) => s.key === status)
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center lg:items-center">
@@ -1336,7 +1439,7 @@ function RwaTradeModal({
             <p className="mt-1 text-sm text-muted-foreground">
               {side === "buy" ? "You bought" : "You sold"} <span className="font-semibold text-foreground">{outputSymbol}</span>
             </p>
-            {txHash && (
+            {txHash && quote?.execution.kind === "v3" && (
               <a
                 href={`https://bscscan.com/tx/${txHash}`}
                 target="_blank"
@@ -1346,6 +1449,12 @@ function RwaTradeModal({
                 <ExternalLink className="h-3 w-3" />
                 {shortHash(txHash)}
               </a>
+            )}
+            {txHash && quote?.execution.kind === "pcsx" && (
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.07)] px-3 py-2 font-mono text-[11px] text-[oklch(0.72_0.16_155)]">
+                <ShieldCheck className="h-3 w-3" />
+                Order {shortHash(txHash)}
+              </div>
             )}
             <button
               type="button"
@@ -1382,7 +1491,7 @@ function RwaTradeModal({
             {/* Execution progress */}
             {executing && (
               <div className="mt-4 rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.08_0.01_260/0.72)] p-4 space-y-3">
-                {EXEC_STEPS.map((step, i) => {
+                {execSteps.map((step, i) => {
                   const done = i < currentStepIdx
                   const active = i === currentStepIdx
                   return (
@@ -1484,7 +1593,11 @@ function RwaTradeModal({
                       ? "border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.07)] text-[oklch(0.82_0.14_82)]"
                       : "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.06)] text-[oklch(0.72_0.16_155)]"
                   )}>
-                    <span>Fee {(quote.fee / 10_000).toFixed(2)}% · Spread {(quote.roundTripBps / 100).toFixed(1)}%</span>
+                    <span>
+                      {quote.execution.kind === "pcsx"
+                        ? `${quote.venue} signed order`
+                        : `Fee ${(quote.fee / 10_000).toFixed(2)}%`} · Two-way {(quote.roundTripBps / 100).toFixed(1)}%
+                    </span>
                     <span className="font-semibold">
                       {quoteStale ? "Quote expired — refresh" : `${30 - quoteAge}s`}
                     </span>
@@ -1544,10 +1657,12 @@ function RwaTradeModal({
             {executing && (
               <div className="mt-4 flex h-12 items-center justify-center gap-2 rounded-xl border border-[oklch(0.22_0.015_255/0.5)] bg-[oklch(0.13_0.012_260/0.5)] text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {status === "checking" ? "Checking your balance…" :
-                 status === "approving" ? "Waiting for approval…" :
-                 status === "swapping" ? "Submitting trade…" :
-                 "Waiting for confirmation…"}
+                {status === "checking" ? "Checking your balance..." :
+                 status === "approving" ? "Waiting for approval..." :
+                 status === "signing" ? "Waiting for signature..." :
+                 status === "submitting" ? "Submitting order..." :
+                 status === "swapping" ? "Submitting trade..." :
+                 "Waiting for confirmation..."}
               </div>
             )}
           </div>

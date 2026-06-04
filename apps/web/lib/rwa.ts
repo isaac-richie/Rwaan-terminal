@@ -84,12 +84,12 @@ export type RwaRouteHealth = {
     decimals: 18
   }
   dex?: {
-    venue: "PancakeSwap V3"
-    router: string
-    quoter: string
-    factory: string
-    fee: number
-    pool: string
+    venue: "PancakeSwap V3" | "PancakeSwapX"
+    router?: string
+    quoter?: string
+    factory?: string
+    fee?: number
+    pool?: string
     roundTripBps: number
     testInputRaw: string
     testTokenOutRaw: string
@@ -114,7 +114,7 @@ export type RwaRouteHealth = {
 export type RwaSwapQuote = {
   symbol: string
   side: "buy" | "sell"
-  venue: "PancakeSwap V3"
+  venue: "PancakeSwap V3" | "PancakeSwapX"
   chainId: 56
   router: string
   spender: string
@@ -142,6 +142,26 @@ export type RwaSwapQuote = {
   amountOutMinimumHuman: string
   gasEstimate: string
   generatedAt: string
+  execution:
+    | { kind: "v3" }
+    | {
+        kind: "pcsx"
+        orderType: "DUTCH_LIMIT"
+        quoteId: string
+        encodedOrder: string
+        orderHash: string | null
+        permitData: {
+          domain: Record<string, unknown>
+          types: Record<string, Array<{ name: string; type: string }>>
+          values: Record<string, unknown>
+          primaryType?: string
+        }
+        orderInfo: Record<string, unknown>
+        permit2: string
+        reactor: string
+        swapper: string
+        recipient: string
+      }
 }
 
 export type RwaAssetsResponse = {
@@ -193,16 +213,38 @@ export async function fetchRwaSwapQuote(input: {
   side: "buy" | "sell"
   amount: string
   slippageBps?: number
+  swapper?: string
+  recipient?: string
 }): Promise<RwaSwapQuote> {
   const url = new URL(`${API_BASE}/rwa/swap/quote`)
   url.searchParams.set("symbol", input.symbol)
   url.searchParams.set("side", input.side)
   url.searchParams.set("amount", input.amount)
   if (input.slippageBps) url.searchParams.set("slippageBps", String(input.slippageBps))
+  if (input.swapper) url.searchParams.set("swapper", input.swapper)
+  if (input.recipient) url.searchParams.set("recipient", input.recipient)
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } })
   const data = await res.json().catch(() => null) as { ok?: boolean; quote?: RwaSwapQuote; message?: string; error?: string } | null
   if (!res.ok || !data?.quote) {
     throw new Error(data?.message ?? "Stock route quote unavailable")
   }
   return data.quote
+}
+
+export async function submitRwaSwapOrder(input: {
+  chainId: 56
+  encodedOrder: string
+  quoteId: string
+  signature: string
+}): Promise<{ hash: string; chainId: 56 }> {
+  const res = await fetch(`${API_BASE}/rwa/swap/submit`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  })
+  const data = await res.json().catch(() => null) as { ok?: boolean; order?: { hash: string; chainId: 56 }; message?: string } | null
+  if (!res.ok || !data?.order?.hash) {
+    throw new Error(data?.message ?? "Could not submit this stock order.")
+  }
+  return data.order
 }
