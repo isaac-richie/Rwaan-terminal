@@ -164,6 +164,12 @@ export function usePremiumAnalysis(marketId: string) {
   const unlockAnalysis = useCallback(
     async (market: Record<string, unknown>, wallet?: ConnectedWallet | null) => {
       setError(null)
+
+      if (!wallet) {
+        setStatus("idle")
+        return
+      }
+
       setStatus("analyzing")
 
       try {
@@ -184,10 +190,6 @@ export function usePremiumAnalysis(marketId: string) {
             }
           }
           throw new Error("Unexpected response from analysis endpoint")
-        }
-
-        if (!wallet) {
-          throw new Error("wallet_required")
         }
 
         const { paymentRequired } = (await res.json()) as {

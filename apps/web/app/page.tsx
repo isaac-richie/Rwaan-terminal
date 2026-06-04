@@ -8,6 +8,7 @@ import { CategoriesBar } from "@/components/categories-bar"
 import { MarketsGrid } from "@/components/markets-grid"
 import { EdgeFeed } from "@/components/edge-feed"
 import { Footer } from "@/components/footer"
+import { OnboardingSheet } from "@/components/onboarding-sheet"
 
 function HomeContent() {
   const searchParams = useSearchParams()
@@ -24,6 +25,7 @@ function HomeContent() {
 
   return (
     <div className="terminal-grid-bg min-h-screen bg-background flex flex-col ambient-glow">
+      <OnboardingSheet />
       <Navbar />
 
       {/* Hero: always shown — mobile gets compact swipeable version */}

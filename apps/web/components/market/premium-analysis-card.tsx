@@ -17,6 +17,7 @@ import {
   Activity,
   BarChart3,
   Target,
+  Wallet,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -1398,11 +1399,18 @@ function UnlockedState({ analysis }: { analysis: PremiumAnalysis }) {
 function LockedState({
   onUnlock,
   loading,
+  walletConnected,
 }: {
   onUnlock: () => void
   loading: boolean
+  walletConnected: boolean
 }) {
   const feeEnabled = PREMIUM_ANALYSIS_FEE_ENABLED
+  const actionLabel = !walletConnected
+    ? "Connect wallet to analyze"
+    : feeEnabled
+    ? "Unlock for $1 USDT"
+    : "Generate analysis"
 
   return (
     <div className="flex min-h-[400px] flex-col space-y-5">
@@ -1458,16 +1466,28 @@ function LockedState({
       </div>
 
       <Button
-        className="mt-auto h-11 w-full font-semibold"
+        className={[
+          "relative mt-auto h-11 w-full overflow-hidden font-semibold transition-all",
+          !walletConnected
+            ? "border border-[oklch(0.78_0.16_82/0.55)] bg-[oklch(0.78_0.16_82/0.10)] text-[oklch(0.86_0.16_82)] shadow-[0_0_0_1px_oklch(0.78_0.16_82/0.20),0_0_28px_oklch(0.78_0.16_82/0.20)] hover:bg-[oklch(0.78_0.16_82/0.16)]"
+            : "",
+        ].join(" ")}
         onClick={onUnlock}
         disabled={loading}
       >
-        {loading ? (
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-        ) : (
-          <Zap className="w-4 h-4 mr-2" />
+        {!walletConnected && (
+          <span className="pointer-events-none absolute inset-0 animate-pulse bg-[linear-gradient(110deg,transparent,oklch(1_0_0/0.10),transparent)]" />
         )}
-        {feeEnabled ? "Unlock for $1 USDT" : "Generate free analysis"}
+        <span className="relative inline-flex items-center justify-center">
+          {loading ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : !walletConnected ? (
+            <Wallet className="w-4 h-4 mr-2" />
+          ) : (
+            <Zap className="w-4 h-4 mr-2" />
+          )}
+          {actionLabel}
+        </span>
       </Button>
     </div>
   )
@@ -1498,9 +1518,10 @@ export function PremiumAnalysisCard({ market }: PremiumAnalysisCardProps) {
   const { login, authenticated } = usePrivy()
   const activePrivyWallet = useActivePrivyWallet()
   const { status, analysis, unlockAnalysis } = usePremiumAnalysis(market.id)
+  const walletConnected = Boolean(authenticated && activePrivyWallet.wallet)
 
   const handleUnlock = async () => {
-    if (PREMIUM_ANALYSIS_FEE_ENABLED && !authenticated) {
+    if (!walletConnected) {
       login()
       return
     }
@@ -1513,12 +1534,12 @@ export function PremiumAnalysisCard({ market }: PremiumAnalysisCardProps) {
 
   return (
     <Card className="p-5 sm:p-6 border-primary/20 bg-card shadow-[0_18px_80px_oklch(0.02_0.01_260/0.28)]">
-      {status === "done" && analysis ? (
+      {walletConnected && status === "done" && analysis ? (
         <UnlockedState analysis={analysis} />
-      ) : isLoading ? (
+      ) : walletConnected && isLoading ? (
         <LoadingState status={status} />
       ) : (
-        <LockedState onUnlock={handleUnlock} loading={isLoading} />
+        <LockedState onUnlock={handleUnlock} loading={isLoading} walletConnected={walletConnected} />
       )}
     </Card>
   )
