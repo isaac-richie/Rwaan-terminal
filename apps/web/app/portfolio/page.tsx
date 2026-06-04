@@ -367,7 +367,7 @@ function BalanceLedgerCard({
           { label: "Available", value: collateralLoading ? "Syncing…" : formatPusd(liquidPusd), sub: "Ready to use" },
           { label: "In Positions", value: formatPortfolioMoney(inPositions), sub: "Open share value" },
           { label: "Claimable", value: formatPortfolioMoney(claimableValue), sub: claimableValue > 0 ? "Ready to claim" : "None pending", blue: true },
-          { label: "Reserved", value: formatPortfolioMoney(lockedOrdersValue), sub: openOrdersCount ? `${openOrdersCount} open order${openOrdersCount !== 1 ? "s" : ""}` : clobReady ? "No open orders" : "Session needed", gold: true, span2: true },
+          { label: "In Orders", value: formatPortfolioMoney(lockedOrdersValue), sub: openOrdersCount ? `${openOrdersCount} open order${openOrdersCount !== 1 ? "s" : ""}` : clobReady ? "No open orders" : "Not active", gold: true, span2: true },
         ].map((item) => (
           <div
             key={item.label}

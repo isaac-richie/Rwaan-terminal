@@ -249,7 +249,7 @@ function NavbarBalanceBreakdown() {
                     <span className="font-mono font-bold text-foreground">{formatPortfolioMoney(availableToTrade)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4 text-xs">
-                    <span className="underline decoration-dotted underline-offset-4 text-foreground">pUSD balance</span>
+                    <span className="underline decoration-dotted underline-offset-4 text-foreground">Wallet balance</span>
                     <span className="font-mono font-bold text-foreground">{formatPusd(pUsdBalance)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4 text-xs">

@@ -181,7 +181,53 @@ export type RwaAssetsResponse = {
   disclaimers: string[]
 }
 
+// ─── Module-level stale-while-revalidate cache ───────────────────────────────
+// Serves cached data instantly on navigation-back while quietly refreshing.
+const ASSETS_FRESH_MS = 2 * 60_000   // 2 min — serve without revalidation
+const ASSETS_STALE_MS = 20 * 60_000  // 20 min — serve stale, revalidate in bg
+const QUOTES_FRESH_MS = 30_000       // 30s — prices refresh more frequently
+const QUOTES_STALE_MS = 5 * 60_000   // 5 min stale
+
+type CacheEntry<T> = { value: T; ts: number }
+let _assetsCache: CacheEntry<RwaAssetsResponse> | null = null
+let _quotesCache: Map<string, CacheEntry<Record<string, RwaQuote>>> = new Map()
+let _assetsFlight: Promise<RwaAssetsResponse> | null = null
+
 export async function fetchRwaAssets(region = "NG"): Promise<RwaAssetsResponse> {
+  const now = Date.now()
+
+  // Fresh — serve immediately, no network
+  if (_assetsCache && now - _assetsCache.ts < ASSETS_FRESH_MS) {
+    return _assetsCache.value
+  }
+
+  // Stale — serve immediately AND revalidate in background
+  if (_assetsCache && now - _assetsCache.ts < ASSETS_STALE_MS) {
+    if (!_assetsFlight) {
+      _assetsFlight = _doFetchAssets(region).then(v => {
+        _assetsCache = { value: v, ts: Date.now() }
+        _assetsFlight = null
+        return v
+      }).catch(() => { _assetsFlight = null; return _assetsCache!.value })
+    }
+    return _assetsCache.value
+  }
+
+  // Cold — deduplicate simultaneous fetches
+  if (_assetsFlight) return _assetsFlight
+
+  _assetsFlight = _doFetchAssets(region).then(v => {
+    _assetsCache = { value: v, ts: Date.now() }
+    _assetsFlight = null
+    return v
+  }).catch(err => {
+    _assetsFlight = null
+    throw err
+  })
+  return _assetsFlight
+}
+
+async function _doFetchAssets(region: string): Promise<RwaAssetsResponse> {
   const url = new URL(`${API_BASE}/rwa/assets`)
   url.searchParams.set("region", region)
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } })
@@ -191,12 +237,23 @@ export async function fetchRwaAssets(region = "NG"): Promise<RwaAssetsResponse> 
 
 export async function fetchRwaQuotes(symbols: string[]): Promise<Record<string, RwaQuote>> {
   if (!symbols.length) return {}
+  const key = symbols.slice().sort().join(",")
+  const now = Date.now()
+  const cached = _quotesCache.get(key)
+
+  if (cached && now - cached.ts < QUOTES_FRESH_MS) return cached.value
+
   const url = new URL(`${API_BASE}/rwa/quotes`)
   url.searchParams.set("symbols", symbols.join(","))
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } })
-  if (!res.ok) throw new Error("RWA quotes unavailable")
+  if (!res.ok) {
+    if (cached && now - cached.ts < QUOTES_STALE_MS) return cached.value
+    throw new Error("RWA quotes unavailable")
+  }
   const data = await res.json() as { ok?: boolean; quotes?: RwaQuote[] }
-  return Object.fromEntries((data.quotes ?? []).map((quote) => [quote.symbol, quote]))
+  const result = Object.fromEntries((data.quotes ?? []).map((quote) => [quote.symbol, quote]))
+  _quotesCache.set(key, { value: result, ts: now })
+  return result
 }
 
 export async function fetchRelatedMarkets(assetId: string): Promise<RelatedMarket[]> {

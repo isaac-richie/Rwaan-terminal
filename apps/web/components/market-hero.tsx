@@ -167,7 +167,7 @@ export function MarketHero() {
           style={{ animationDelay: "0ms" }}
         >
           <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
-          Rawli · prediction terminal · live
+          Live markets · updated now
         </div>
 
         {/* Main heading — three visual lines */}
@@ -264,9 +264,9 @@ export function MarketHero() {
                   {activeMarket.question}
                 </h2>
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}>
-                  <span className="font-mono">{activeMarket.volume} Vol.</span>
+                  <span className="font-mono">{activeMarket.volume} traded</span>
                   <span className="text-[oklch(0.24_0.015_255)]">·</span>
-                  <span className="font-mono">{activeMarket.liquidity} Liq.</span>
+                  <span className="font-mono">{activeMarket.liquidity} available</span>
                   <span className="ml-auto flex items-center gap-1 text-[oklch(0.78_0.16_82/0.7)] group-hover:text-[oklch(0.78_0.16_82)]">
                     Open market <ArrowUpRight className="h-3 w-3" />
                   </span>

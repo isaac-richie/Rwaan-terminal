@@ -49,12 +49,12 @@ const TRUST_SIGNALS = [
     tone: "text-[oklch(0.72_0.18_155)] border-[oklch(0.68_0.18_155/0.34)] bg-[oklch(0.68_0.18_155/0.09)]",
   },
   {
-    label: "Non-custodial",
+    label: "Self-custody",
     icon: Lock,
     tone: "text-[oklch(0.84_0.16_82)] border-[oklch(0.78_0.16_82/0.34)] bg-[oklch(0.78_0.16_82/0.10)]",
   },
   {
-    label: "On-chain",
+    label: "Verified",
     icon: Link2,
     tone: "text-[oklch(0.72_0.14_245)] border-[oklch(0.62_0.16_245/0.34)] bg-[oklch(0.62_0.16_245/0.10)]",
   },
@@ -576,7 +576,7 @@ export function Footer() {
                 </Link>
 
                 <p className="max-w-sm text-[12px] leading-6 text-muted-foreground/70">
-                  Professional prediction market terminal — live market feed, AI-powered intelligence, non-custodial order execution, and BNB-native funding.
+                  Live prediction markets, AI-powered intelligence, and self-custody trading — from anywhere in the world.
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2 pt-1">

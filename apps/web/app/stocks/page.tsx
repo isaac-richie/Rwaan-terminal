@@ -512,7 +512,8 @@ export default function StocksPage() {
   const remainingAssetCount = Math.max(0, filteredAssets.length - visibleAssets.length)
 
   const load = useCallback(async (quiet = false) => {
-    quiet ? setRefreshing(true) : setLoading(true)
+    // Only show skeleton on first load — cache serves instantly on nav-back
+    if (!quiet) setLoading(true)
     setError(null)
     setQuoteError(null)
     try {
@@ -535,7 +536,20 @@ export default function StocksPage() {
     }
   }, [])
 
+  // On mount: the cache serves instantly — no spinner on nav-back
   useEffect(() => { void load() }, [load])
+
+  // Silently refresh quotes every 60s while page is visible
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (assets.length > 0 && !document.hidden) {
+        fetchRwaQuotes(assets.map(a => a.quoteSymbol))
+          .then(setQuotes)
+          .catch(() => {})
+      }
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [assets])
 
   useEffect(() => {
     setVisibleAssetCount(STOCK_BATCH_SIZE)
