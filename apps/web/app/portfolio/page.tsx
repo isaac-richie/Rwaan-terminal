@@ -351,19 +351,16 @@ function BalanceLedgerCard({
   return (
     <div className="surface-card rounded-2xl p-5 sm:p-6">
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <CircleDollarSign className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Your Funds</span>
-        </div>
+        <span className="text-sm font-semibold text-foreground">Funds</span>
         <Button
           type="button"
           variant="secondary"
           onClick={clobReady ? onRefreshOrders : onPrepareSession}
           disabled={missingTradingWallet || openOrdersLoading}
-          className="h-8 rounded-lg border border-[oklch(0.22_0.015_255)] bg-transparent px-3 text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground hover:bg-[oklch(0.16_0.014_255)] hover:text-foreground disabled:opacity-40"
+          className="h-8 rounded-xl border border-[oklch(0.22_0.015_255)] bg-transparent px-3 text-[10px] font-semibold text-muted-foreground hover:bg-[oklch(0.16_0.014_255)] hover:text-foreground disabled:opacity-40"
         >
           {openOrdersLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-          {clobReady ? "Sync" : "Prepare"}
+          {clobReady ? "Sync" : "Activate"}
         </Button>
       </div>
 
@@ -841,47 +838,49 @@ function PortfolioContent() {
           </div>
 
           {/* Account value — large, centered */}
-          <div className="mt-4 text-center">
-            <h1 className="text-[42px] font-bold tracking-tight text-foreground leading-none">
+          <div className="mt-5 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground/60 mb-3">Total balance</p>
+            <h1 className="text-[48px] font-bold tracking-tight text-foreground leading-none">
               {data || pUsdBalance !== null || stockHoldings.totalValue > 0 ? formatPortfolioMoney(accountValue) : "$0.00"}
             </h1>
 
-            {/* P/L pills */}
-            <div className="mt-2.5 flex items-center justify-center gap-2 flex-wrap">
-              <span className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold",
+            {/* Single clean P&L row */}
+            <div className="mt-4 flex items-center justify-center gap-3">
+              {/* Unrealized gains */}
+              <div className={cn(
+                "flex items-center gap-1.5 rounded-2xl px-4 py-2 text-[12px] font-semibold",
                 stats.unrealizedPositive
-                  ? "border-[oklch(0.68_0.18_155/0.30)] bg-[oklch(0.68_0.18_155/0.08)] text-[oklch(0.72_0.18_155)]"
-                  : "border-[oklch(0.60_0.18_25/0.30)] bg-[oklch(0.60_0.18_25/0.08)] text-[oklch(0.64_0.18_25)]"
+                  ? "bg-[oklch(0.68_0.18_155/0.10)] text-[oklch(0.72_0.18_155)]"
+                  : "bg-[oklch(0.60_0.18_25/0.10)] text-[oklch(0.64_0.18_25)]"
               )}>
-                {stats.unrealizedPositive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-                {data ? portfolio.summary.unrealized : "$0.00"}
-              </span>
-              <span className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold",
+                {stats.unrealizedPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                <span>{data ? portfolio.summary.unrealized : "—"}</span>
+                <span className="text-[10px] opacity-70">open</span>
+              </div>
+
+              {/* Realized */}
+              <div className={cn(
+                "flex items-center gap-1.5 rounded-2xl px-4 py-2 text-[12px] font-semibold",
                 stats.realizedPositive
-                  ? "border-[oklch(0.68_0.18_155/0.20)] bg-[oklch(0.68_0.18_155/0.05)] text-[oklch(0.72_0.18_155)]"
-                  : "border-[oklch(0.60_0.18_25/0.20)] bg-[oklch(0.60_0.18_25/0.05)] text-[oklch(0.64_0.18_25)]"
+                  ? "bg-[oklch(0.68_0.18_155/0.07)] text-[oklch(0.72_0.18_155)]"
+                  : "bg-[oklch(0.60_0.18_25/0.07)] text-[oklch(0.64_0.18_25)]"
               )}>
-                {data ? portfolio.summary.realized : "$0.00"}
-              </span>
-              {claimableValue > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.70_0.11_210/0.28)] bg-[oklch(0.70_0.11_210/0.08)] px-2.5 py-1 text-[10px] font-semibold text-[oklch(0.76_0.13_210)]">
-                  <CircleDollarSign className="h-2.5 w-2.5" />
-                  Claimable {formatPortfolioMoney(claimableValue)}
-                </span>
-              )}
-              {stockHoldings.totalValue > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("stocks")}
-                  className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.78_0.16_82/0.28)] bg-[oklch(0.78_0.16_82/0.08)] px-2.5 py-1 text-[10px] font-semibold text-[oklch(0.82_0.16_82)] hover:bg-[oklch(0.78_0.16_82/0.14)] transition-colors"
-                >
-                  <BarChart3 className="h-2.5 w-2.5" />
-                  Stocks {formatPortfolioMoney(stockHoldings.totalValue)}
-                </button>
-              )}
+                <span>{data ? portfolio.summary.realized : "—"}</span>
+                <span className="text-[10px] opacity-70">realized</span>
+              </div>
             </div>
+
+            {/* Claimable + stocks secondary line */}
+            {(claimableValue > 0 || stockHoldings.totalValue > 0) && (
+              <div className="mt-2 flex items-center justify-center gap-2">
+                {claimableValue > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.70_0.11_210/0.28)] bg-[oklch(0.70_0.11_210/0.08)] px-3 py-1 text-[11px] font-semibold text-[oklch(0.76_0.13_210)]">
+                    <CircleDollarSign className="h-3 w-3" />
+                    {formatPortfolioMoney(claimableValue)} claimable
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1005,42 +1004,55 @@ function PortfolioContent() {
 
         {/* ── Top stats strip ─────────────────────────────── */}
         <div className="mt-5 grid grid-cols-3 gap-2.5">
-          {[
-            {
-              label: "Positions",
-              value: data ? String(openPositions.length + stockHoldings.holdings.length) : "—",
-              sub: "active now",
-              icon: Layers3,
-              tone: "gold" as const,
-            },
-            {
-              label: "Realized",
-              value: data ? portfolio.summary.realized : "—",
-              sub: "total gains",
-              icon: stats.realizedPositive ? TrendingUp : TrendingDown,
-              tone: stats.realizedPositive ? "positive" as const : "negative" as const,
-            },
-            {
-              label: "Claimable",
-              value: data ? formatPortfolioMoney(claimableValue) : "—",
-              sub: claimableValue > 0 ? "tap to claim" : "none pending",
-              icon: CircleDollarSign,
-              tone: claimableValue > 0 ? "positive" as const : "gold" as const,
-            },
-          ].map(({ label, value, sub, icon: Icon, tone }) => (
-            <div key={label} className="surface-card rounded-2xl p-4 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
-                <Icon className={cn("h-3.5 w-3.5",
-                  tone === "positive" && "text-[oklch(0.68_0.18_155)]",
-                  tone === "negative" && "text-[oklch(0.60_0.18_25)]",
-                  tone === "gold" && "text-[oklch(0.78_0.16_82)]",
-                )} />
-              </div>
-              <div className="font-bold text-xl text-foreground tabular-nums leading-none">{value}</div>
-              <div className="text-[10px] text-muted-foreground">{sub}</div>
+          {/* Positions */}
+          <div className="surface-card rounded-2xl p-4 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/70">Open</span>
+              <Layers3 className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
             </div>
-          ))}
+            <div className="font-bold text-2xl text-foreground tabular-nums leading-none">
+              {data ? openPositions.length + stockHoldings.holdings.length : "—"}
+            </div>
+            <div className="mt-1.5 text-[10px] text-muted-foreground">positions</div>
+          </div>
+
+          {/* Realized P&L */}
+          <div className="surface-card rounded-2xl p-4 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/70">Gains</span>
+              {stats.realizedPositive
+                ? <TrendingUp className="h-3.5 w-3.5 text-[oklch(0.68_0.18_155)]" />
+                : <TrendingDown className="h-3.5 w-3.5 text-[oklch(0.60_0.18_25)]" />}
+            </div>
+            <div className={cn("font-bold text-2xl tabular-nums leading-none",
+              stats.realizedPositive ? "text-[oklch(0.68_0.18_155)]" : data ? "text-[oklch(0.60_0.18_25)]" : "text-foreground"
+            )}>
+              {data ? portfolio.summary.realized : "—"}
+            </div>
+            <div className="mt-1.5 text-[10px] text-muted-foreground">realized</div>
+          </div>
+
+          {/* Claimable */}
+          <div className={cn("rounded-2xl p-4 flex flex-col border",
+            claimableValue > 0
+              ? "bg-[oklch(0.70_0.11_210/0.07)] border-[oklch(0.70_0.11_210/0.22)]"
+              : "surface-card border-transparent"
+          )}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/70">Claim</span>
+              <CircleDollarSign className={cn("h-3.5 w-3.5",
+                claimableValue > 0 ? "text-[oklch(0.76_0.13_210)]" : "text-[oklch(0.78_0.16_82)]"
+              )} />
+            </div>
+            <div className={cn("font-bold text-2xl tabular-nums leading-none",
+              claimableValue > 0 ? "text-[oklch(0.76_0.13_210)]" : "text-foreground"
+            )}>
+              {data ? formatPortfolioMoney(claimableValue) : "—"}
+            </div>
+            <div className="mt-1.5 text-[10px] text-muted-foreground">
+              {claimableValue > 0 ? "available" : "nothing yet"}
+            </div>
+          </div>
         </div>
 
         {/* ── Balance ledger ──────────────────────────────── */}
@@ -1306,9 +1318,9 @@ function PortfolioContent() {
 
         {/* ── Stocks tab ──────────────────────────────────── */}
 
-                {/* ── Activity feed ─────────────────────────────────── */}
-        <div className="mt-6 sm:mt-8 grid gap-4 lg:grid-cols-12">
-          <div className="surface-card rounded-2xl lg:col-span-7 flex flex-col min-h-[320px] sm:min-h-[420px]">
+                {/* ── Activity feed — full width ─────────────────────── */}
+        <div className="mt-6 sm:mt-8">
+          <div className="surface-card rounded-2xl flex flex-col min-h-[280px]">
             <ActivityFeed
               trades={trades}
               bridgeTxs={fundingStatus.transactions}
@@ -1319,82 +1331,6 @@ function PortfolioContent() {
               loading={portfolio.loading || fundingStatus.loading}
               walletAddress={walletAddress}
             />
-          </div>
-
-          <div className="surface-card rounded-2xl p-5 lg:col-span-5 flex flex-col gap-5">
-
-            {/* Header */}
-            <div className="flex items-center gap-2">
-              <Layers3 className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Position Summary</span>
-            </div>
-
-            {/* 2×2 stat grid */}
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                {
-                  label: "Open value",
-                  value: data ? formatPortfolioMoney(stats.openValue) : "—",
-                  sub: `${data ? openPositions.length : "—"} position${openPositions.length === 1 ? "" : "s"}`,
-                  positive: true,
-                },
-                {
-                  label: "Total shares",
-                  value: data ? formatPortfolioNumber(stats.shares) : "—",
-                  sub: "across all markets",
-                  positive: true,
-                },
-                {
-                  label: "Unrealized P/L",
-                  value: data ? formatPercent(stats.avgPnlPercent) : "—",
-                  sub: "avg per position",
-                  positive: stats.avgPnlPercent >= 0,
-                },
-                {
-                  label: "Realized P/L",
-                  value: data ? portfolio.summary.realized : "—",
-                  sub: `${data ? closedPositions.length : "—"} closed`,
-                  positive: stats.realizedPositive,
-                },
-              ].map(({ label, value, sub, positive }) => (
-                <div
-                  key={label}
-                  className="rounded-xl border border-[oklch(0.16_0.014_255)] bg-[oklch(0.11_0.012_260/0.6)] p-3 flex flex-col gap-1"
-                >
-                  <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</span>
-                  <span className={cn(
-                    "font-mono text-[15px] font-bold leading-none",
-                    label.includes("P/L") && data
-                      ? positive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.60_0.18_25)]"
-                      : "text-foreground"
-                  )}>{value}</span>
-                  <span className="text-[9px] text-muted-foreground">{sub}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Position allocation bar */}
-            {data && (openPositions.length + closedPositions.length) > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-1.5 text-[9px] text-muted-foreground">
-                  <span>Open</span>
-                  <span>Closed</span>
-                </div>
-                <div className="h-1.5 w-full rounded-full overflow-hidden bg-[oklch(0.16_0.014_255)]">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[oklch(0.78_0.16_82/0.8)] to-[oklch(0.78_0.16_82)]"
-                    style={{
-                      width: `${Math.round((openPositions.length / (openPositions.length + closedPositions.length)) * 100)}%`,
-                    }}
-                  />
-                </div>
-                <div className="flex items-center justify-between mt-1 text-[9px] font-mono text-muted-foreground">
-                  <span>{openPositions.length}</span>
-                  <span>{closedPositions.length}</span>
-                </div>
-              </div>
-            )}
-
           </div>
         </div>
 
