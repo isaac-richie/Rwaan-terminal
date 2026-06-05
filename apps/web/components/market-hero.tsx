@@ -153,8 +153,20 @@ export function MarketHero() {
     router.push(`/markets/${market.id}`)
   }
 
+  // Show skeleton while loading
   if (loading && trending.length === 0) return <HeroSkeleton />
-  if (!activeMarket) return null
+
+  // If no markets loaded after attempt, show empty state instead of null
+  // This keeps the hero visible on mobile instead of disappearing
+  if (!activeMarket) {
+    return (
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top pb-4 sm:pb-7 relative z-[1]">
+        <div className="rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260/0.95)] p-8 text-center">
+          <p className="text-sm text-muted-foreground">Markets loading...</p>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top pb-4 sm:pb-7 relative z-[1]">
@@ -214,7 +226,7 @@ export function MarketHero() {
           <button
             type="button"
             onClick={() => goToMarket(activeMarket)}
-            className="group relative h-[240px] sm:h-[280px] overflow-hidden text-left scanline"
+            className="group relative h-[240px] sm:h-[320px] lg:h-[380px] overflow-hidden text-left scanline"
           >
             {/* Full-strength artwork treatment keeps market thumbnails bright and crisp. */}
             {(activeMarket.image || activeMarket.icon) && (
@@ -227,10 +239,10 @@ export function MarketHero() {
                   alt=""
                   fill
                   priority
-                  quality={90}
-                  sizes="(max-width: 1024px) 100vw, 900px"
+                  quality={95}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 900px"
                   data-image-sharp
-                  className="scale-[1.01] object-cover brightness-[1.05] sm:brightness-[1.22] contrast-[1.16] saturate-[1.24]"
+                  className="scale-[1.01] object-cover brightness-[1.05] sm:brightness-[1.18] lg:brightness-[1.20] contrast-[1.16] saturate-[1.24]"
                 />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_48%_42%,transparent_0%,transparent_36%,oklch(0.08_0.012_260/0.10)_72%)]" />
               </div>
