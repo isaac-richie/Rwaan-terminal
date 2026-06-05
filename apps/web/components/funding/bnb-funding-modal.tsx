@@ -544,7 +544,7 @@ export function BnbFundingModal({
     }
 
     if (!withdrawAmountBaseUnit || withdrawAmountBaseUnit === "0" || withdrawAmountInvalid || withdrawAmountExceedsBalance) {
-      setWithdrawError("Enter a valid pUSD amount that does not exceed your available balance.")
+      setWithdrawError("Enter a valid amount that does not exceed your available balance.")
       return
     }
 
@@ -554,7 +554,7 @@ export function BnbFundingModal({
     }
 
     if (!depositWalletWithdrawMode && withdrawGasAssist.status?.eligible) {
-      setWithdrawError("Get Polygon Gas Assist first, then retry the pUSD transfer.")
+      setWithdrawError("Prepare your gas allowance first, then retry the withdrawal.")
       return
     }
 
@@ -727,9 +727,9 @@ export function BnbFundingModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-1.5rem)] max-w-[min(38rem,calc(100vw-1.5rem))] flex-col overflow-hidden border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260)] p-0 sm:max-w-[38rem]">
         <DialogHeader className="shrink-0 border-b border-[oklch(0.22_0.015_255)] px-5 pb-4 pt-5 pr-10">
-          <DialogTitle className="text-foreground">Manage bridge funds</DialogTitle>
+          <DialogTitle className="text-foreground">Fund your account</DialogTitle>
           <DialogDescription className="break-words">
-            Deposit from BNB or withdraw Polymarket pUSD back to your connected BNB wallet.
+            Send funds from your BNB wallet or withdraw your balance back at any time.
           </DialogDescription>
         </DialogHeader>
 
@@ -760,7 +760,7 @@ export function BnbFundingModal({
             </div>
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="text-muted-foreground">{activeTab === "deposit" ? "Destination" : "Source"}</span>
-              <span className="font-semibold text-[oklch(0.78_0.16_82)]">Polymarket pUSD</span>
+              <span className="font-semibold text-[oklch(0.78_0.16_82)]">Trading balance</span>
             </div>
           </div>
 
@@ -819,7 +819,7 @@ export function BnbFundingModal({
             <div className="space-y-4">
               <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.145_0.014_255)] p-4 text-xs space-y-3">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                  <span className="text-muted-foreground">Available pUSD</span>
+                  <span className="text-muted-foreground">Available balance</span>
                   <span className="min-w-0 max-w-full truncate text-right font-mono text-foreground">{formatPusd(collateralBalance)}</span>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
@@ -834,15 +834,15 @@ export function BnbFundingModal({
                   className="h-8 w-full gap-2 text-[10px] font-bold uppercase tracking-widest"
                 >
                   <RefreshCw className={cn("h-3 w-3", refreshingCollateral && "animate-spin")} />
-                  Refresh pUSD balance
+                  Refresh balance
                 </Button>
                 {!collateralSessionReady && !depositWalletWithdrawMode ? (
                   <p className="text-[11px] leading-snug text-[oklch(0.78_0.16_82)]">
-                    Prepare the CLOB session first so Rawli can read your live Polymarket pUSD balance before withdrawal.
+                    Activate your trading session first so Rawli can read your balance before withdrawal.
                   </p>
                 ) : !hasKnownWithdrawBalance ? (
                   <p className="text-[11px] leading-snug text-muted-foreground">
-                    Refresh your pUSD balance before entering a withdrawal amount.
+                    Refresh your balance before entering a withdrawal amount.
                   </p>
                 ) : withdrawBalanceAmount <= 0 ? (
                   <p className="text-[11px] leading-snug text-[oklch(0.74_0.14_25)]">
@@ -870,7 +870,7 @@ export function BnbFundingModal({
                     value={withdrawAmount}
                     onChange={(event) => handleWithdrawAmountChange(event.target.value)}
                     inputMode="decimal"
-                    placeholder="pUSD amount"
+                    placeholder="Amount to withdraw"
                     className="h-11 border-[oklch(0.22_0.015_255)] bg-[oklch(0.16_0.014_255)]"
                   />
                 </div>
@@ -951,7 +951,7 @@ export function BnbFundingModal({
                     Withdrawal transfer sent
                   </span>
                   <p className="text-muted-foreground leading-snug">
-                    {withdrawResult.amount ? `${withdrawResult.amount} pUSD was sent to the Polymarket withdrawal route. ` : ""}
+                    {withdrawResult.amount ? `${withdrawResult.amount} was sent to the withdrawal route. ` : ""}
                     Funds typically arrive within 10–30 minutes depending on bridge congestion.
                   </p>
                   {withdrawResult.txHash && (
@@ -999,14 +999,14 @@ export function BnbFundingModal({
                     : withdrawStatus === "sending"
                     ? depositWalletWithdrawMode
                       ? "Sign withdrawal..."
-                      : "Confirm pUSD transfer..."
+                      : "Confirm transfer..."
                     : withdrawStatus === "confirming"
                     ? depositWalletWithdrawMode
                       ? "Relaying transfer..."
                       : "Confirming transfer..."
                     : withdrawStatus === "done"
                     ? "Withdrawal transfer sent ✓"
-                    : "Withdraw pUSD"}
+                    : "Withdraw funds"}
                 </span>
               </Button>
             </div>
@@ -1016,9 +1016,9 @@ export function BnbFundingModal({
           <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.145_0.014_255)] p-4 text-xs">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Route quote</div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Transfer preview</div>
                 <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                  Preview bridge output and timing before sending assets to the deposit address.
+                  See the estimated amount you'll receive and how long it takes before sending.
                 </p>
               </div>
               <Button type="button" onClick={handleQuote} disabled={quoteDisabled} variant="secondary" className="gap-2">
@@ -1061,8 +1061,11 @@ export function BnbFundingModal({
               <span className="font-mono text-foreground">{shortAddress(depositAddress)}</span>
             </div>
             {depositAddress ? (
-              <div className="mt-3 rounded-lg border border-[oklch(0.22_0.015_255)] bg-[oklch(0.10_0.012_260)] p-3 font-mono text-[11px] leading-relaxed text-muted-foreground break-all">
-                {depositAddress}
+              <div className="mt-3 rounded-lg border border-[oklch(0.22_0.015_255)] bg-[oklch(0.10_0.012_260)] p-3">
+                <p className="font-mono text-[10px] leading-relaxed text-muted-foreground break-all select-all">
+                  {depositAddress}
+                </p>
+                <p className="mt-1.5 text-[9px] text-muted-foreground/50">Tap to select · Send only BNB or USDT to this address</p>
               </div>
             ) : null}
 
@@ -1143,7 +1146,7 @@ export function BnbFundingModal({
           <AlertDialogTitle className="text-foreground">Confirm withdrawal</AlertDialogTitle>
           <AlertDialogDescription className="text-muted-foreground">
             You are about to withdraw{" "}
-            <span className="font-semibold text-foreground">{withdrawAmount} pUSD</span>{" "}
+            <span className="font-semibold text-foreground">{withdrawAmount}</span>{" "}
             from your Polymarket trading account to your {depositWalletWithdrawMode ? "connected" : "Polygon"} wallet.
             <br /><br />
             This transaction is irreversible once submitted. Ensure the destination address is correct.
@@ -1155,7 +1158,7 @@ export function BnbFundingModal({
             className="bg-[oklch(0.58_0.2_25)] hover:bg-[oklch(0.62_0.18_25)] text-white"
             onClick={() => { setWithdrawConfirmOpen(false); void handleWithdraw() }}
           >
-            Yes, withdraw {withdrawAmount} pUSD
+            Yes, withdraw {withdrawAmount}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

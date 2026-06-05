@@ -30,6 +30,7 @@ import { usePrivy } from "@privy-io/react-auth";
 
 import { Footer } from "@/components/footer";
 import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
+import { ComponentErrorBoundary } from "@/components/ui/error-boundary";
 import { Navbar } from "@/components/navbar";
 import { ActivityFeed } from "@/components/portfolio/activity-feed";
 import { Button } from "@/components/ui/button";
@@ -1552,21 +1553,23 @@ function PortfolioContent() {
         </div>
 
       </main>
-      <BnbFundingModal
-        open={fundingOpen}
-        onOpenChange={setFundingOpen}
-        initialTab="deposit"
-        profile={tradingProfile.profile}
-        depositAddress={depositAddress}
-        loadingDeposit={tradingProfile.depositLoading}
-        onCreateDepositAddress={tradingProfile.createDepositAddress}
-        wallet={connectedWallet}
-        collateralBalance={collateral?.balance ?? null}
-        collateralAllowance={collateral?.allowance ?? null}
-        collateralSessionReady={Boolean(collateral)}
-        onRefreshCollateralBalance={readiness.refresh}
-        onFundingSent={handleFundingSent}
-      />
+      <ComponentErrorBoundary onReset={() => setFundingOpen(false)}>
+        <BnbFundingModal
+          open={fundingOpen}
+          onOpenChange={setFundingOpen}
+          initialTab="deposit"
+          profile={tradingProfile.profile}
+          depositAddress={depositAddress}
+          loadingDeposit={tradingProfile.depositLoading}
+          onCreateDepositAddress={tradingProfile.createDepositAddress}
+          wallet={connectedWallet}
+          collateralBalance={collateral?.balance ?? null}
+          collateralAllowance={collateral?.allowance ?? null}
+          collateralSessionReady={Boolean(collateral)}
+          onRefreshCollateralBalance={readiness.refresh}
+          onFundingSent={handleFundingSent}
+        />
+      </ComponentErrorBoundary>
       <Footer />
     </div>
   );

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { BrowserProvider, Contract, formatUnits as formatTokenUnits } from "ethers"
 import { usePrivy, type ConnectedWallet } from "@privy-io/react-auth"
+import { ComponentErrorBoundary } from "@/components/ui/error-boundary"
 import {
   Activity, BadgeDollarSign, BarChart3,
   AlertTriangle, ArrowUpRight, Brain, ChevronDown, ChevronRight,
@@ -943,14 +944,16 @@ export default function StocksPage() {
         </div>
       )}
 
-      <RwaTradeModal
-        request={tradeRequest}
-        wallet={wallet}
-        walletAddress={walletAddress}
-        authenticated={authenticated}
-        onConnect={login}
-        onClose={() => setTradeRequest(null)}
-      />
+      <ComponentErrorBoundary onReset={() => setTradeRequest(null)}>
+        <RwaTradeModal
+          request={tradeRequest}
+          wallet={wallet}
+          walletAddress={walletAddress}
+          authenticated={authenticated}
+          onConnect={login}
+          onClose={() => setTradeRequest(null)}
+        />
+      </ComponentErrorBoundary>
 
       <Footer />
     </div>
