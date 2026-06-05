@@ -1374,6 +1374,10 @@ function typedDataTypes(types: Record<string, Array<{ name: string; type: string
   return rest
 }
 
+function rwaQuoteExecutionKind(quote?: RwaSwapQuote | null) {
+  return quote?.execution?.kind ?? "v3"
+}
+
 function RwaTradeModal({
   request,
   wallet,
@@ -1405,7 +1409,7 @@ function RwaTradeModal({
   const title = side === "buy" ? `Buy ${asset?.displaySymbol ?? ""}` : `Sell ${asset?.displaySymbol ?? ""}`
   const quickAmounts = side === "buy" ? QUICK_BUY : QUICK_SELL
   const quoteStale = quoteAge > 30
-  const execSteps = quote?.execution.kind === "pcsx" ? PCSX_EXEC_STEPS : V3_EXEC_STEPS
+  const execSteps = rwaQuoteExecutionKind(quote) === "pcsx" ? PCSX_EXEC_STEPS : V3_EXEC_STEPS
 
   // Reset when modal opens for a new asset/side
   useEffect(() => {
@@ -1478,7 +1482,7 @@ function RwaTradeModal({
       const needsWalletBoundQuote =
         !activeQuote ||
         quoteStale ||
-        (activeQuote.execution.kind === "pcsx" && !sameAddress(activeQuote.execution.swapper, signerAddress))
+        (activeQuote.execution?.kind === "pcsx" && !sameAddress(activeQuote.execution.swapper, signerAddress))
 
       if (needsWalletBoundQuote) {
         setStatus("quoting")
@@ -1526,7 +1530,7 @@ function RwaTradeModal({
         await approvalTx.wait(1)
       }
 
-      if (activeQuote.execution.kind === "pcsx") {
+      if (activeQuote.execution?.kind === "pcsx") {
         setStatus("signing")
         const permitData = activeQuote.execution.permitData
         const signature = await signer.signTypedData(
@@ -1596,7 +1600,7 @@ function RwaTradeModal({
             <p className="mt-1 text-sm text-muted-foreground">
               {side === "buy" ? "You bought" : "You sold"} <span className="font-semibold text-foreground">{outputSymbol}</span>
             </p>
-            {txHash && quote?.execution.kind === "v3" && (
+            {txHash && rwaQuoteExecutionKind(quote) === "v3" && (
               <a
                 href={`https://bscscan.com/tx/${txHash}`}
                 target="_blank"
@@ -1607,7 +1611,7 @@ function RwaTradeModal({
                 {shortHash(txHash)}
               </a>
             )}
-            {txHash && quote?.execution.kind === "pcsx" && (
+            {txHash && rwaQuoteExecutionKind(quote) === "pcsx" && (
               <div className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.07)] px-3 py-2 font-mono text-[11px] text-[oklch(0.72_0.16_155)]">
                 <ShieldCheck className="h-3 w-3" />
                 Order {shortHash(txHash)}
@@ -1762,7 +1766,7 @@ function RwaTradeModal({
                     <span>
                       {quote.lowLiquidity
                         ? "Low liquidity"
-                        : quote.execution.kind === "pcsx"
+                        : rwaQuoteExecutionKind(quote) === "pcsx"
                         ? `${quote.venue} order`
                         : `Fee ${(quote.fee / 10_000).toFixed(2)}%`} · {(quote.roundTripBps / 100).toFixed(1)}% efficiency
                     </span>

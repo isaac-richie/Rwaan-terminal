@@ -295,7 +295,17 @@ export async function fetchRwaSwapQuote(input: {
   if (!res.ok || !data?.quote) {
     throw new Error(data?.message ?? "Stock route quote unavailable")
   }
-  return data.quote
+
+  const quote = data.quote
+  // Production API versions before PancakeSwapX support returned executable
+  // V3 quotes without an explicit execution object. Normalize them here so the
+  // stock trade modal can keep working during staggered frontend/backend deploys.
+  return {
+    ...quote,
+    swapAmountInRaw: quote.swapAmountInRaw ?? quote.amountInRaw,
+    swapAmountInHuman: quote.swapAmountInHuman ?? quote.amountInHuman,
+    execution: quote.execution ?? { kind: "v3" },
+  }
 }
 
 export async function submitRwaSwapOrder(input: {
