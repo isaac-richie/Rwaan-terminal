@@ -87,7 +87,7 @@ function StockCard({ holding, onTrade }: { holding: StockHolding; onTrade: () =>
           <div className="flex items-center gap-3 min-w-0">
             {/* Asset mark */}
             <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-[12px] font-bold"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border text-[12px] font-bold"
               style={{
                 background: `${asset.accent ?? "oklch(0.78 0.16 82)"}/0.12`,
                 borderColor: `${asset.accent ?? "oklch(0.78 0.16 82)"}/0.28`,
@@ -102,7 +102,6 @@ function StockCard({ holding, onTrade }: { holding: StockHolding; onTrade: () =>
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="inline-flex items-center gap-1 rounded-md border border-[oklch(0.78_0.16_82/0.22)] bg-[oklch(0.78_0.16_82/0.07)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[oklch(0.84_0.16_82)]">
                   <BarChart3 className="h-2 w-2" />
-                  Stock
                 </span>
                 <span className={cn(
                   "flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest",
@@ -240,10 +239,6 @@ function PredictionCard({
           <div className="min-w-0 flex-1">
             {/* Type + outcome + time badges */}
             <div className="flex flex-wrap items-center gap-1.5 mb-2">
-              <span className="inline-flex items-center gap-1 rounded-md border border-[oklch(0.70_0.11_210/0.25)] bg-[oklch(0.70_0.11_210/0.07)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[oklch(0.76_0.13_210)]">
-                <Zap className="h-2 w-2" />
-                Prediction
-              </span>
               <span className={cn(
                 "rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest",
                 isYes
@@ -455,11 +450,11 @@ export function UnifiedHoldings({
       {/* Filter pills */}
       <div className="flex items-center gap-2 flex-wrap">
         <FilterPill active={filter === "all"} count={totalCount} onClick={() => setFilter("all")}>
-          All holdings
+          All
         </FilterPill>
         <FilterPill active={filter === "predictions"} count={totalPredictionCount} onClick={() => setFilter("predictions")}>
           <Zap className="h-3 w-3" />
-          Predictions
+          Active
         </FilterPill>
         <FilterPill active={filter === "stocks"} count={totalStockCount} onClick={() => setFilter("stocks")}>
           <BarChart3 className="h-3 w-3" />
@@ -488,7 +483,7 @@ export function UnifiedHoldings({
                 <div className="flex items-center gap-2 pt-1">
                   <BarChart3 className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
                   <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                    Stock Holdings · BNB Chain
+                    Stocks
                   </span>
                 </div>
               )}
@@ -516,7 +511,7 @@ export function UnifiedHoldings({
                 <div className="flex items-center gap-2">
                   <Zap className="h-3.5 w-3.5 text-[oklch(0.76_0.13_210)]" />
                   <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                    Prediction Positions · Polygon
+                    Predictions
                   </span>
                 </div>
               )}

@@ -207,7 +207,7 @@ function SummaryBanner({
 
       {/* P&L note */}
       <p className="mt-3 text-[10px] text-muted-foreground/60">
-        Day P&amp;L based on today's price change vs previous close. Holdings are in your BNB wallet.
+        Day P&amp;L based on today's price change vs previous close.
       </p>
     </div>
   )
@@ -243,9 +243,6 @@ export function StockHoldingsPanel({
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
           <span className="text-sm font-bold text-foreground">Stock Holdings</span>
-          <span className="rounded-full border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.08)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[oklch(0.82_0.16_82)]">
-            BNB Chain
-          </span>
         </div>
         <div className="flex items-center gap-2">
           {lastUpdated && (
@@ -269,7 +266,7 @@ export function StockHoldingsPanel({
       {loading && holdings.length === 0 && (
         <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Reading your BNB wallet…
+          Reading your holdings…
         </div>
       )}
 
@@ -314,7 +311,6 @@ export function StockHoldingsPanel({
           <span className="text-[11px] text-muted-foreground/70 font-mono">
             {walletAddress.slice(0, 8)}…{walletAddress.slice(-6)}
           </span>
-          <span className="text-[11px] text-muted-foreground/50">· BNB Chain</span>
           <a
             href={`https://bscscan.com/address/${walletAddress}`}
             target="_blank"

@@ -367,32 +367,35 @@ function BalanceLedgerCard({
         </Button>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
-        {[
-          { label: "Balance", value: collateralLoading ? "Syncing…" : formatPusd(pUsdBalance), sub: "Trading wallet" },
-          { label: "Available", value: collateralLoading ? "Syncing…" : formatPusd(liquidPusd), sub: "Ready to use" },
-          { label: "In Positions", value: formatPortfolioMoney(inPositions), sub: "Open share value" },
-          { label: "Claimable", value: formatPortfolioMoney(claimableValue), sub: claimableValue > 0 ? "Ready to claim" : "None pending", blue: true },
-          { label: "Stocks", value: stocksLoading && stockValue === 0 ? "Reading…" : formatPortfolioMoney(stockValue), sub: "BNB Chain holdings", gold: true },
-          { label: "In Orders", value: formatPortfolioMoney(lockedOrdersValue), sub: openOrdersCount ? `${openOrdersCount} open order${openOrdersCount !== 1 ? "s" : ""}` : clobReady ? "No open orders" : "Not active", gold: true, span2: true },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className={cn(
-              "rounded-xl sm:rounded-2xl border p-3 sm:p-4",
-              (item as any).span2 && "col-span-2 lg:col-span-1",
-              (item as any).blue
-                ? "border-[oklch(0.70_0.11_210/0.24)] bg-[oklch(0.70_0.11_210/0.07)]"
-                : (item as any).gold
-                ? "border-[oklch(0.78_0.16_82/0.18)] bg-[oklch(0.78_0.16_82/0.05)]"
-                : "border-[oklch(0.20_0.014_255)] bg-[oklch(0.12_0.012_260/0.65)]"
-            )}
-          >
-            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.14em] sm:tracking-[0.16em] text-muted-foreground">{item.label}</div>
-            <div className="mt-2 sm:mt-3 font-mono text-lg sm:text-xl font-bold text-foreground">{item.value}</div>
-            <div className="mt-1 text-[10px] text-muted-foreground">{item.sub}</div>
+      <div className="mt-5 space-y-3">
+        {/* Primary balance row */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-[oklch(0.20_0.014_255)] bg-[oklch(0.12_0.012_260/0.65)] p-4">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Balance</div>
+            <div className="mt-2 font-mono text-2xl font-bold text-foreground">{collateralLoading ? "…" : formatPusd(pUsdBalance)}</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">Ready to trade</div>
           </div>
-        ))}
+          <div className="rounded-2xl border border-[oklch(0.78_0.16_82/0.18)] bg-[oklch(0.78_0.16_82/0.05)] p-4">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stocks</div>
+            <div className="mt-2 font-mono text-2xl font-bold text-foreground">{stocksLoading && stockValue === 0 ? "…" : formatPortfolioMoney(stockValue)}</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">{stockValue > 0 ? "Current value" : "No holdings"}</div>
+          </div>
+        </div>
+        {/* Secondary row — smaller details */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl border border-[oklch(0.20_0.014_255)] bg-[oklch(0.10_0.010_260/0.5)] px-3 py-2.5">
+            <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/70">In positions</div>
+            <div className="mt-1.5 font-mono text-[13px] font-bold text-foreground">{formatPortfolioMoney(inPositions)}</div>
+          </div>
+          <div className="rounded-xl border border-[oklch(0.70_0.11_210/0.20)] bg-[oklch(0.70_0.11_210/0.05)] px-3 py-2.5">
+            <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/70">Claimable</div>
+            <div className="mt-1.5 font-mono text-[13px] font-bold text-[oklch(0.76_0.13_210)]">{formatPortfolioMoney(claimableValue)}</div>
+          </div>
+          <div className="rounded-xl border border-[oklch(0.20_0.014_255)] bg-[oklch(0.10_0.010_260/0.5)] px-3 py-2.5">
+            <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/70">In orders</div>
+            <div className="mt-1.5 font-mono text-[13px] font-bold text-foreground">{formatPortfolioMoney(lockedOrdersValue)}</div>
+          </div>
+        </div>
       </div>
 
       <BalanceBar
@@ -1001,24 +1004,41 @@ function PortfolioContent() {
         )}
 
         {/* ── Top stats strip ─────────────────────────────── */}
-        <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
+        <div className="mt-5 grid grid-cols-3 gap-2.5">
           {[
-            { label: "Status", value: tradingWalletAddress ? "Active" : "—", icon: ShieldCheck, tone: tradingWalletAddress ? "positive" : "gold" as const },
-            { label: "Open", value: data ? String(openPositions.length) : "—", icon: Layers3, tone: "gold" as const },
-            { label: "Closed", value: data ? String(closedPositions.length) : "—", icon: CheckCircle2, tone: stats.realizedPositive ? "positive" as const : "negative" as const },
-            { label: "Claimable", value: data ? formatPortfolioMoney(claimableValue) : "—", icon: CircleDollarSign, tone: claimableValue > 0 ? "positive" as const : "gold" as const },
-            { label: "Avg P/L", value: data ? formatPercent(stats.avgPnlPercent) : "—", icon: stats.avgPnlPercent >= 0 ? TrendingUp : TrendingDown, tone: stats.avgPnlPercent >= 0 ? "positive" as const : "negative" as const },
-          ].map(({ label, value, icon: Icon, tone }) => (
-            <div key={label} className="surface-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.16em] text-muted-foreground truncate">{label}</span>
-                <Icon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0",
+            {
+              label: "Positions",
+              value: data ? String(openPositions.length + stockHoldings.holdings.length) : "—",
+              sub: "active now",
+              icon: Layers3,
+              tone: "gold" as const,
+            },
+            {
+              label: "Realized",
+              value: data ? portfolio.summary.realized : "—",
+              sub: "total gains",
+              icon: stats.realizedPositive ? TrendingUp : TrendingDown,
+              tone: stats.realizedPositive ? "positive" as const : "negative" as const,
+            },
+            {
+              label: "Claimable",
+              value: data ? formatPortfolioMoney(claimableValue) : "—",
+              sub: claimableValue > 0 ? "tap to claim" : "none pending",
+              icon: CircleDollarSign,
+              tone: claimableValue > 0 ? "positive" as const : "gold" as const,
+            },
+          ].map(({ label, value, sub, icon: Icon, tone }) => (
+            <div key={label} className="surface-card rounded-2xl p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
+                <Icon className={cn("h-3.5 w-3.5",
                   tone === "positive" && "text-[oklch(0.68_0.18_155)]",
                   tone === "negative" && "text-[oklch(0.60_0.18_25)]",
                   tone === "gold" && "text-[oklch(0.78_0.16_82)]",
                 )} />
               </div>
-              <div className="mt-2 text-base sm:text-xl font-bold tracking-tight text-foreground truncate">{value}</div>
+              <div className="font-bold text-xl text-foreground tabular-nums leading-none">{value}</div>
+              <div className="text-[10px] text-muted-foreground">{sub}</div>
             </div>
           ))}
         </div>
