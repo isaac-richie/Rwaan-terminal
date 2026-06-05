@@ -847,6 +847,7 @@ function PortfolioContent() {
             {/* Single clean P&L row */}
             <div className="mt-4 flex items-center justify-center gap-3">
               {/* Unrealized gains */}
+              {/* Unrealized — open prediction positions */}
               <div className={cn(
                 "flex items-center gap-1.5 rounded-2xl px-4 py-2 text-[12px] font-semibold",
                 stats.unrealizedPositive
@@ -855,19 +856,22 @@ function PortfolioContent() {
               )}>
                 {stats.unrealizedPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
                 <span>{data ? portfolio.summary.unrealized : "—"}</span>
-                <span className="text-[10px] opacity-70">open</span>
+                <span className="text-[10px] opacity-60">predictions</span>
               </div>
 
-              {/* Realized */}
-              <div className={cn(
-                "flex items-center gap-1.5 rounded-2xl px-4 py-2 text-[12px] font-semibold",
-                stats.realizedPositive
-                  ? "bg-[oklch(0.68_0.18_155/0.07)] text-[oklch(0.72_0.18_155)]"
-                  : "bg-[oklch(0.60_0.18_25/0.07)] text-[oklch(0.64_0.18_25)]"
-              )}>
-                <span>{data ? portfolio.summary.realized : "—"}</span>
-                <span className="text-[10px] opacity-70">realized</span>
-              </div>
+              {/* Stocks day P&L */}
+              {stockHoldings.totalValue > 0 && (
+                <div className={cn(
+                  "flex items-center gap-1.5 rounded-2xl px-4 py-2 text-[12px] font-semibold",
+                  stockHoldings.totalDayPnl >= 0
+                    ? "bg-[oklch(0.68_0.18_155/0.07)] text-[oklch(0.72_0.18_155)]"
+                    : "bg-[oklch(0.60_0.18_25/0.07)] text-[oklch(0.64_0.18_25)]"
+                )}>
+                  {stockHoldings.totalDayPnl >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                  <span>{stockHoldings.totalDayPnl >= 0 ? "+" : ""}{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(stockHoldings.totalDayPnl)}</span>
+                  <span className="text-[10px] opacity-60">stocks today</span>
+                </div>
+              )}
             </div>
 
             {/* Claimable + stocks secondary line */}
@@ -1019,7 +1023,7 @@ function PortfolioContent() {
           {/* Realized P&L */}
           <div className="surface-card rounded-2xl p-4 flex flex-col">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/70">Gains</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/70">P&amp;L</span>
               {stats.realizedPositive
                 ? <TrendingUp className="h-3.5 w-3.5 text-[oklch(0.68_0.18_155)]" />
                 : <TrendingDown className="h-3.5 w-3.5 text-[oklch(0.60_0.18_25)]" />}
@@ -1029,7 +1033,7 @@ function PortfolioContent() {
             )}>
               {data ? portfolio.summary.realized : "—"}
             </div>
-            <div className="mt-1.5 text-[10px] text-muted-foreground">realized</div>
+            <div className="mt-1.5 text-[10px] text-muted-foreground">closed predictions</div>
           </div>
 
           {/* Claimable */}
