@@ -34,7 +34,7 @@ import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
 import { ComponentErrorBoundary } from "@/components/ui/error-boundary";
 import { Navbar } from "@/components/navbar";
 import { ActivityFeed } from "@/components/portfolio/activity-feed";
-import { StockHoldingsPanel } from "@/components/portfolio/stock-holdings-panel";
+import { UnifiedHoldings } from "@/components/portfolio/unified-holdings";
 import { useStockHoldings } from "@/hooks/use-stock-holdings";
 import { Button } from "@/components/ui/button";
 import { useFundingStatus } from "@/hooks/use-funding-status";
@@ -1050,21 +1050,17 @@ function PortfolioContent() {
           </div>
         )}
 
-        {/* ── Tabs ────────────────────────────────────────── */}
+        {/* ── Tabs — Orders & Closed only (Holdings unified below) ── */}
         <div className="mt-5 sm:mt-8 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="grid grid-cols-4 gap-0.5 sm:gap-1 rounded-xl sm:rounded-2xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.10_0.012_260/0.65)] p-0.5 sm:p-1">
-            <TabButton active={activeTab === "positions"} count={openPositions.length} onClick={() => setActiveTab("positions")}>
-              <span className="sm:hidden">Open</span>
-              <span className="hidden sm:inline">Positions</span>
+          <div className="grid grid-cols-3 gap-0.5 sm:gap-1 rounded-xl sm:rounded-2xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.10_0.012_260/0.65)] p-0.5 sm:p-1 w-full sm:w-auto">
+            <TabButton active={activeTab === "positions"} count={openPositions.length + stockHoldings.holdings.length} onClick={() => setActiveTab("positions")}>
+              Holdings
             </TabButton>
             <TabButton active={activeTab === "orders"} count={clobSession.openOrders.length} onClick={() => setActiveTab("orders")}>
               Orders
             </TabButton>
             <TabButton active={activeTab === "closed"} count={closedPositions.length} onClick={() => setActiveTab("closed")}>
               Closed
-            </TabButton>
-            <TabButton active={activeTab === "stocks"} onClick={() => setActiveTab("stocks")}>
-              Stocks
             </TabButton>
           </div>
           <div className="hidden sm:flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
@@ -1073,171 +1069,38 @@ function PortfolioContent() {
           </div>
         </div>
 
-        {/* ── Positions tab ───────────────────────────────── */}
+        {/* ── Holdings tab — unified predictions + stocks ── */}
         {activeTab === "positions" && (
-          <div className="mt-4">
-            {openPositions.length ? (
-              <div className="space-y-3">
-                {openPositions.map((pos: any, idx: number) => {
-                  const routeId = marketRouteId(pos);
-                  const shares = valueOf(pos?.size, pos?.position_size);
-                  const pnl = getPositionPnl(pos);
-                  const pnlPercent = getPositionPnlPercent(pos);
-                  const pnlPositive = pnl >= 0;
-                  const value = getPositionValue(pos);
-                  const avgPrice = pos?.avgPrice ?? pos?.avg_entry_price ?? pos?.entry_price;
-                  const currentPrice = pos?.curPrice ?? pos?.cur_price ?? pos?.current_price ?? pos?.price;
-                  const marketHref = routeId ? `/markets/${encodeURIComponent(String(routeId))}` : null;
-                  const avgCents = (() => { const n = Number(avgPrice) || 0; return n <= 1 ? n * 100 : n; })();
-                  const curCents = (() => { const n = Number(currentPrice) || 0; return n <= 1 ? n * 100 : n; })();
-                  const outcome = positionOutcome(pos);
-                  const isYes = outcome.toLowerCase().includes("yes");
-                  const isNo = outcome.toLowerCase().includes("no");
-                  const endTime = getPositionEndTime(pos);
-                  const timeLeft = formatTimeLeft(endTime);
-                  const endDateStr = formatEndDate(endTime);
-                  const maxPayout = shares; // $1 per share
-
-                  const handleSell = () => {
-                    openPositionMarket(pos, routeId, new URLSearchParams({ side: "sell", outcome, shares: shares.toFixed(4) }));
-                  };
-
-                  return (
-                    <article key={`pos-${idx}`} className="group surface-card rounded-xl sm:rounded-2xl overflow-hidden border border-[oklch(0.20_0.015_255)] transition-all hover:border-[oklch(0.26_0.016_255)] hover:shadow-[0_8px_32px_oklch(0_0_0/0.30)]">
-                      {/* Accent bar */}
-                      <div className={cn("h-0.5 w-full", pnlPositive ? "bg-gradient-to-r from-[oklch(0.68_0.18_155/0.8)] to-transparent" : "bg-gradient-to-r from-[oklch(0.60_0.18_25/0.8)] to-transparent")} />
-
-                      <div className="p-3.5 sm:p-5">
-                        {/* Header: badges + P/L */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mb-1.5 sm:mb-2">
-                              <span className={cn(
-                                "rounded-md border px-1.5 sm:px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.10em]",
-                                isYes ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.08)] text-[oklch(0.72_0.18_155)]"
-                                : isNo ? "border-[oklch(0.60_0.18_25/0.25)] bg-[oklch(0.60_0.18_25/0.08)] text-[oklch(0.64_0.18_25)]"
-                                : "border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.014_255)] text-muted-foreground"
-                              )}>
-                                {outcome}
-                              </span>
-                              {timeLeft.label && (
-                                <span className={cn(
-                                  "flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.10em]",
-                                  timeLeft.urgency === "critical"
-                                    ? "border-[oklch(0.60_0.18_25/0.35)] bg-[oklch(0.60_0.18_25/0.10)] text-[oklch(0.72_0.18_25)]"
-                                    : timeLeft.urgency === "soon"
-                                    ? "border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.08)] text-[oklch(0.84_0.16_82)]"
-                                    : "border-[oklch(0.22_0.015_255)] bg-[oklch(0.15_0.014_255)] text-muted-foreground"
-                                )}>
-                                  <Clock3 className="h-2.5 w-2.5" />
-                                  {timeLeft.label}
-                                </span>
-                              )}
-                            </div>
-                            <h3 className="text-[13px] sm:text-[14px] font-semibold leading-snug text-foreground line-clamp-2">
-                              {positionLabel(pos)}
-                            </h3>
-                          </div>
-
-                          {/* P/L block */}
-                          <div className="shrink-0 text-right">
-                            <div className={cn("text-lg sm:text-xl font-bold tabular-nums",
-                              pnlPositive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.60_0.18_25)]"
-                            )}>
-                              {formatPortfolioPnl(pnl)}
-                            </div>
-                            <div className={cn("text-[10px] sm:text-[11px] font-semibold tabular-nums",
-                              pnlPositive ? "text-[oklch(0.68_0.18_155/0.7)]" : "text-[oklch(0.60_0.18_25/0.7)]"
-                            )}>
-                              {formatPercent(pnlPercent)}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Price journey bar */}
-                        {avgCents > 0 && curCents > 0 && (
-                          <div className="mt-2.5 sm:mt-3">
-                            <div className="relative h-1 w-full overflow-hidden rounded-full bg-[oklch(0.16_0.014_255)]">
-                              <div
-                                className={cn("absolute inset-y-0 left-0 rounded-full transition-all duration-700",
-                                  pnlPositive ? "bg-[oklch(0.68_0.18_155/0.55)]" : "bg-[oklch(0.60_0.18_25/0.55)]"
-                                )}
-                                style={{ width: `${Math.max(2, Math.min(98, curCents))}%` }}
-                              />
-                              <div
-                                className="absolute inset-y-0 w-px bg-[oklch(0.55_0.01_255)]"
-                                style={{ left: `${Math.max(2, Math.min(98, avgCents))}%` }}
-                              />
-                            </div>
-                            <div className="mt-1 flex items-center justify-between text-[9px] text-muted-foreground">
-                              <span>Entry {formatPrice(avgPrice)}</span>
-                              <span className={cn("font-semibold", pnlPositive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.60_0.18_25)]")}>
-                                Now {formatPrice(currentPrice)}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Stats — compact grid on mobile */}
-                        <div className="mt-2.5 sm:mt-3 grid grid-cols-4 gap-x-2 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
-                          <div>
-                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground">Shares</div>
-                            <div className="mt-0.5 font-mono text-[12px] sm:text-[13px] font-semibold text-foreground">{formatPortfolioNumber(shares)}</div>
-                          </div>
-                          <div>
-                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground">Value</div>
-                            <div className="mt-0.5 font-mono text-[12px] sm:text-[13px] font-semibold text-foreground">{formatPortfolioMoney(value)}</div>
-                          </div>
-                          <div>
-                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground">Payout</div>
-                            <div className="mt-0.5 font-mono text-[12px] sm:text-[13px] font-semibold text-[oklch(0.72_0.18_155)]">{formatPortfolioMoney(maxPayout)}</div>
-                          </div>
-                          <div>
-                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground">Avg</div>
-                            <div className="mt-0.5 font-mono text-[12px] sm:text-[13px] font-semibold text-foreground">{formatPrice(avgPrice)}</div>
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="mt-3 flex items-center gap-2">
-                          <button
-                            onClick={() => openPositionMarket(pos, routeId)}
-                            disabled={!marketHref}
-                            className="flex h-9 flex-1 items-center justify-center gap-1 rounded-xl border border-[oklch(0.24_0.016_255)] bg-transparent text-[11px] font-bold text-muted-foreground transition-colors hover:border-[oklch(0.32_0.016_255)] hover:text-foreground disabled:opacity-40 active:scale-[0.97]"
-                          >
-                            View <ArrowUpRight className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={handleSell}
-                            disabled={!marketHref}
-                            className="flex h-9 flex-1 items-center justify-center gap-1 rounded-xl bg-[oklch(0.78_0.16_82)] text-[11px] font-bold text-[oklch(0.10_0.012_260)] transition-colors hover:bg-[oklch(0.83_0.16_82)] disabled:opacity-40 active:scale-[0.97]"
-                          >
-                            <ArrowDownUp className="h-3 w-3" />
-                            Sell
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState
-                title={walletAddress ? "No open positions" : "Wallet not connected"}
-                description={walletAddress
-                  ? "Buy shares on any market and they'll appear here with live P/L."
-                  : "Connect your wallet to load positions."}
-                action={
-                  <Button asChild className="rounded-xl bg-[oklch(0.78_0.16_82)] text-[oklch(0.10_0.012_260)] hover:bg-[oklch(0.83_0.16_82)]">
-                    <Link href="/">Explore markets</Link>
-                  </Button>
-                }
-              />
-            )}
-          </div>
+          <ComponentErrorBoundary>
+            <UnifiedHoldings
+              openPositions={openPositions}
+              stockHoldings={stockHoldings.holdings}
+              stocksLoading={stockHoldings.loading}
+              walletConnected={Boolean(walletAddress)}
+              formatMoney={formatPortfolioMoney}
+              formatPnl={formatPortfolioPnl}
+              formatPercent={formatPercent}
+              formatPrice={formatPrice}
+              formatPortfolioNumber={formatPortfolioNumber}
+              formatTimeLeft={formatTimeLeft}
+              positionLabel={positionLabel}
+              positionOutcome={positionOutcome}
+              getPositionPnl={getPositionPnl}
+              getPositionPnlPercent={getPositionPnlPercent}
+              getPositionValue={getPositionValue}
+              getPositionEndTime={getPositionEndTime}
+              marketRouteId={marketRouteId}
+              onViewPosition={(pos, routeId) => openPositionMarket(pos, routeId)}
+              onSellPosition={(pos, routeId) => {
+                const outcome = positionOutcome(pos);
+                const shares = valueOf(pos?.size, pos?.position_size);
+                openPositionMarket(pos, routeId, new URLSearchParams({ side: "sell", outcome, shares: shares.toFixed(4) }));
+              }}
+            />
+          </ComponentErrorBoundary>
         )}
 
-        {/* ── Orders tab ──────────────────────────────────── */}
+                {/* ── Orders tab ──────────────────────────────────── */}
         {activeTab === "orders" && (
           <div className="mt-4">
             {clobSession.status !== "ready" ? (
@@ -1416,18 +1279,8 @@ function PortfolioContent() {
         )}
 
         {/* ── Stocks tab ──────────────────────────────────── */}
-        {activeTab === "stocks" && (
-          <div className="mt-4">
-            <ComponentErrorBoundary compact>
-              <StockHoldingsPanel
-                {...stockHoldings}
-                walletAddress={walletAddress}
-              />
-            </ComponentErrorBoundary>
-          </div>
-        )}
 
-        {/* ── Activity feed ─────────────────────────────────── */}
+                {/* ── Activity feed ─────────────────────────────────── */}
         <div className="mt-6 sm:mt-8 grid gap-4 lg:grid-cols-12">
           <div className="surface-card rounded-2xl lg:col-span-7 flex flex-col min-h-[320px] sm:min-h-[420px]">
             <ActivityFeed
