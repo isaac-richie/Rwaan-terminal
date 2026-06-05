@@ -9,6 +9,7 @@ import {
   AlertCircle,
   ArrowDownUp,
   ArrowUpRight,
+  BarChart3,
   Briefcase,
   Building2,
   CheckCircle2,
@@ -33,6 +34,8 @@ import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
 import { ComponentErrorBoundary } from "@/components/ui/error-boundary";
 import { Navbar } from "@/components/navbar";
 import { ActivityFeed } from "@/components/portfolio/activity-feed";
+import { StockHoldingsPanel } from "@/components/portfolio/stock-holdings-panel";
+import { useStockHoldings } from "@/hooks/use-stock-holdings";
 import { Button } from "@/components/ui/button";
 import { useFundingStatus } from "@/hooks/use-funding-status";
 import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet";
@@ -566,6 +569,9 @@ function PortfolioContent() {
   const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null);
   const [fundingOpen, setFundingOpen] = useState(false);
 
+  // Stock holdings — reads BNB chain token balances + live quotes
+  const stockHoldings = useStockHoldings(connectedWallet, walletAddress);
+
   const data = portfolio.data;
   const openPositions = data?.positions ?? [];
   const closedPositions = data?.closedPositions ?? [];
@@ -857,6 +863,16 @@ function PortfolioContent() {
                   <CircleDollarSign className="h-2.5 w-2.5" />
                   Claimable {formatPortfolioMoney(claimableValue)}
                 </span>
+              )}
+              {stockHoldings.totalValue > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("stocks")}
+                  className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.78_0.16_82/0.28)] bg-[oklch(0.78_0.16_82/0.08)] px-2.5 py-1 text-[10px] font-semibold text-[oklch(0.82_0.16_82)] hover:bg-[oklch(0.78_0.16_82/0.14)] transition-colors"
+                >
+                  <BarChart3 className="h-2.5 w-2.5" />
+                  Stocks {formatPortfolioMoney(stockHoldings.totalValue)}
+                </button>
               )}
             </div>
           </div>
@@ -1401,62 +1417,13 @@ function PortfolioContent() {
 
         {/* ── Stocks tab ──────────────────────────────────── */}
         {activeTab === "stocks" && (
-          <div className="mt-4 space-y-4">
-            {/* Hero card */}
-            <div className="surface-card rounded-2xl p-5 sm:p-6 border border-[oklch(0.78_0.16_82/0.18)] bg-[oklch(0.78_0.16_82/0.04)]">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[oklch(0.78_0.16_82/0.28)] bg-[oklch(0.78_0.16_82/0.10)]">
-                  <Building2 className="h-5 w-5 text-[oklch(0.82_0.16_82)]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.82_0.16_82)]">Stock Holdings</div>
-                  <h2 className="mt-0.5 text-lg font-bold text-foreground">Your stocks live on BNB Chain</h2>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground max-w-lg">
-                    When you buy stocks on Rawli, you receive token representations (e.g. NVDAon, AAPLon) held directly in your wallet. Your holdings are always yours — check them any time on the Stocks page.
-                  </p>
-                </div>
-                <Link
-                  href="/stocks"
-                  className="shrink-0 flex h-11 sm:h-9 items-center gap-2 rounded-xl bg-[oklch(0.78_0.16_82)] px-5 sm:px-4 text-sm sm:text-xs font-bold text-[oklch(0.10_0.012_260)] hover:bg-[oklch(0.83_0.16_82)] transition-colors"
-                >
-                  <Building2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-                  Go to Stocks
-                </Link>
-              </div>
-            </div>
-
-            {/* How it works */}
-            <div className="surface-card rounded-2xl p-5 sm:p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Layers3 className="h-4 w-4 text-[oklch(0.78_0.16_82)]" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">How Stock Trading Works</span>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  { step: "1", title: "Browse stocks", desc: "Find US stocks and ETFs with live prices on the Stocks page.", color: "oklch(0.78 0.16 82)" },
-                  { step: "2", title: "Buy with USDT", desc: "Pay with USDT in your wallet. Tokens are delivered directly to you.", color: "oklch(0.68 0.18 155)" },
-                  { step: "3", title: "Sell anytime", desc: "Sell back to USDT whenever you want. Prices track the real market.", color: "oklch(0.72 0.16 250)" },
-                ].map(({ step, title, desc, color }) => (
-                  <div key={step} className="rounded-xl border border-[oklch(0.20_0.014_255)] bg-[oklch(0.11_0.012_260/0.6)] p-4">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold mb-3" style={{ background: `${color}/0.15`, color, border: `1px solid ${color}/0.30` }}>
-                      {step}
-                    </div>
-                    <div className="text-sm font-semibold text-foreground">{title}</div>
-                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Wallet note */}
-            {walletAddress && (
-              <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260/0.5)] px-4 py-3 flex items-center gap-3">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-[oklch(0.68_0.18_155)]" />
-                <p className="text-xs text-muted-foreground">
-                  Your stock tokens are held at <span className="font-mono text-foreground">{walletAddress.slice(0, 8)}…{walletAddress.slice(-6)}</span> on BNB Chain. Connect a BNB wallet to the Stocks page to view and trade them.
-                </p>
-              </div>
-            )}
+          <div className="mt-4">
+            <ComponentErrorBoundary compact>
+              <StockHoldingsPanel
+                {...stockHoldings}
+                walletAddress={walletAddress}
+              />
+            </ComponentErrorBoundary>
           </div>
         )}
 
