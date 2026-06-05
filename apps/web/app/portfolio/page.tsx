@@ -325,6 +325,7 @@ function BalanceLedgerCard({
   lockedOrdersValue, lockedBuyCollateral, lockedSellValue, lockedSellShares,
   openOrdersCount, accountValue, collateralLoading, collateralError,
   clobReady, openOrdersLoading, onPrepareSession, onRefreshOrders, tradingWalletAddress,
+  stockValue, stocksLoading,
 }: {
   pUsdBalance: number | null; pUsdAllowance: number | null; spendablePusd: number | null;
   liquidPusd: number | null; inPositions: number; claimableValue: number; lockedOrdersValue: number;
@@ -332,6 +333,7 @@ function BalanceLedgerCard({
   openOrdersCount: number; accountValue: number; collateralLoading: boolean;
   collateralError: string | null; clobReady: boolean; openOrdersLoading: boolean;
   onPrepareSession: () => void; onRefreshOrders: () => void; tradingWalletAddress?: string | null;
+  stockValue: number; stocksLoading: boolean;
 }) {
   const allowanceNeedsApproval = pUsdBalance !== null && pUsdBalance > 0 && (pUsdAllowance ?? 0) <= 0;
   const missingTradingWallet = !tradingWalletAddress;
@@ -371,6 +373,7 @@ function BalanceLedgerCard({
           { label: "Available", value: collateralLoading ? "Syncing…" : formatPusd(liquidPusd), sub: "Ready to use" },
           { label: "In Positions", value: formatPortfolioMoney(inPositions), sub: "Open share value" },
           { label: "Claimable", value: formatPortfolioMoney(claimableValue), sub: claimableValue > 0 ? "Ready to claim" : "None pending", blue: true },
+          { label: "Stocks", value: stocksLoading && stockValue === 0 ? "Reading…" : formatPortfolioMoney(stockValue), sub: "BNB Chain holdings", gold: true },
           { label: "In Orders", value: formatPortfolioMoney(lockedOrdersValue), sub: openOrdersCount ? `${openOrdersCount} open order${openOrdersCount !== 1 ? "s" : ""}` : clobReady ? "No open orders" : "Not active", gold: true, span2: true },
         ].map((item) => (
           <div
@@ -626,7 +629,8 @@ function PortfolioContent() {
   const spendablePusd = pUsdBalance === null || pUsdAllowance === null ? null : Math.min(pUsdBalance, pUsdAllowance);
   const openOrderSummary = useMemo(() => summarizeOpenOrders(clobSession.openOrders), [clobSession.openOrders]);
   const liquidPusd = spendablePusd === null ? null : Math.max(0, spendablePusd - openOrderSummary.buyCollateral);
-  const accountValue = (pUsdBalance ?? 0) + stats.openValue + claimableValue;
+  // Total account value = prediction balance + open positions + claimable + stock holdings
+  const accountValue = (pUsdBalance ?? 0) + stats.openValue + claimableValue + stockHoldings.totalValue;
 
   const accountRefreshRef = useRef({
     portfolioRefresh: portfolio.refresh, fundingRefresh: fundingStatus.refresh,
@@ -836,7 +840,7 @@ function PortfolioContent() {
           {/* Account value — large, centered */}
           <div className="mt-4 text-center">
             <h1 className="text-[42px] font-bold tracking-tight text-foreground leading-none">
-              {data || pUsdBalance !== null ? formatPortfolioMoney(accountValue) : "$0.00"}
+              {data || pUsdBalance !== null || stockHoldings.totalValue > 0 ? formatPortfolioMoney(accountValue) : "$0.00"}
             </h1>
 
             {/* P/L pills */}
@@ -890,7 +894,7 @@ function PortfolioContent() {
               )}
             </div>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              {data || pUsdBalance !== null ? formatPortfolioMoney(accountValue) : "—"}
+              {data || pUsdBalance !== null || stockHoldings.totalValue > 0 ? formatPortfolioMoney(accountValue) : "—"}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className={cn(
@@ -1031,6 +1035,8 @@ function PortfolioContent() {
             openOrdersLoading={clobSession.openOrdersStatus === "loading" || clobSession.status === "preparing"}
             onPrepareSession={() => void clobSession.prepareSession()}
             onRefreshOrders={() => void clobSession.refreshOpenOrders()}
+            stockValue={stockHoldings.totalValue}
+            stocksLoading={stockHoldings.loading}
             tradingWalletAddress={tradingWalletAddress}
           />
         </div>
