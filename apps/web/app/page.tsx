@@ -9,6 +9,7 @@ import { MarketsGrid } from "@/components/markets-grid"
 import { EdgeFeed } from "@/components/edge-feed"
 import { Footer } from "@/components/footer"
 import { OnboardingSheet } from "@/components/onboarding-sheet"
+import { fetchRwaAssets, fetchRwaQuotes } from "@/lib/rwa"
 
 function HomeContent() {
   const searchParams = useSearchParams()
@@ -22,6 +23,34 @@ function HomeContent() {
   useEffect(() => {
     if (searchQuery) setCategory("all")
   }, [searchQuery])
+
+  // ── Pre-fetch stocks data while user browses markets ──
+  // On home page load, silently fetch RWA assets + quotes in background.
+  // By the time user clicks Stocks tab, data is cached and loads instantly.
+  useEffect(() => {
+    async function prefetchStocks() {
+      try {
+        // Fetch RWA assets catalog — populates module-level cache
+        const assets = await fetchRwaAssets("NG")
+
+        // Extract first 20 symbols and fetch their quotes
+        const symbols = assets.assets
+          .filter(a => a.quoteSymbol)
+          .slice(0, 20)
+          .map(a => a.quoteSymbol)
+
+        if (symbols.length > 0) {
+          // Fetch quotes — also cached at module level
+          await fetchRwaQuotes(symbols)
+        }
+      } catch (err) {
+        // Silent fail — stocks page will handle fetch failure gracefully
+        // This is just a background optimization, not critical to home page
+      }
+    }
+
+    prefetchStocks()
+  }, [])
 
   return (
     <div className="terminal-grid-bg min-h-screen bg-background flex flex-col ambient-glow">
