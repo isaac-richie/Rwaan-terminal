@@ -278,6 +278,12 @@ export interface PremiumAnalysisResult {
 const GENERIC_PREMIUM_FALLBACK_RATIONALE =
   "Insufficient live data for a high-conviction directional call.";
 
+function isPaidPremiumReport(market: PremiumAnalysisInput): boolean {
+  const marketId = String(market.id ?? "").toLowerCase();
+  if (marketId.startsWith("stock:")) return config.payment.stockAnalysisFeeEnabled;
+  return config.payment.analysisFeeEnabled;
+}
+
 function isGenericPremiumFallback(rationale?: string | null) {
   return String(rationale ?? "")
     .toLowerCase()
@@ -502,10 +508,11 @@ function buildPremiumPrompt(
     : "";
 
   const isNonCryptoWithFundamental = !ta && !!fundamental;
+  const isPaidReport = isPaidPremiumReport(market);
 
   return [
     `You are a senior quantitative intelligence analyst producing a premium market report.`,
-    config.payment.analysisFeeEnabled
+    isPaidReport
       ? `You have been paid $1 for this analysis. Deliver maximum value.`
       : `This report is free during testing, but it must still feel production-grade and high-value.`,
     ta

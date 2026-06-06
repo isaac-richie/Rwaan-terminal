@@ -33,6 +33,16 @@ const requestSchema = z.object({
   market: marketSchema
 });
 
+function isStockAnalysisMarket(marketId?: string | null): boolean {
+  return String(marketId ?? "").toLowerCase().startsWith("stock:");
+}
+
+function shouldGatePremiumAnalysis(marketId?: string | null): boolean {
+  return isStockAnalysisMarket(marketId)
+    ? config.payment.stockAnalysisFeeEnabled
+    : config.payment.analysisFeeEnabled;
+}
+
 /**
  * Market-implied P(YES) from the consensus outcome price. Handles both percentage
  * (0-100) and fractional (0-1) encodings. Returns null for non-binary / unpriced markets.
@@ -73,8 +83,20 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/analysis/premium/price", async () => {
+    const paymentRequirement = buildPaymentRequirement();
+
     if (config.payment.analysisFeeEnabled) {
-      return { ok: true, free: false, testing: false, price: buildPaymentRequirement() };
+      return {
+        ok: true,
+        free: false,
+        testing: false,
+        price: paymentRequirement,
+        stock: {
+          free: !config.payment.stockAnalysisFeeEnabled,
+          testing: !config.payment.stockAnalysisFeeEnabled,
+          price: config.payment.stockAnalysisFeeEnabled ? paymentRequirement : null,
+        },
+      };
     }
 
     return {
@@ -82,6 +104,11 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       free: true,
       testing: true,
       price: null,
+      stock: {
+        free: !config.payment.stockAnalysisFeeEnabled,
+        testing: !config.payment.stockAnalysisFeeEnabled,
+        price: config.payment.stockAnalysisFeeEnabled ? paymentRequirement : null,
+      },
       memo: "Premium intelligence reports are free during testing.",
     };
   });
@@ -94,7 +121,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     "/analysis/premium",
     {
       preHandler: async (req, reply) => {
-        if (!config.payment.analysisFeeEnabled) return;
+        const marketId = (req.body as any)?.market?.id ?? "";
+        if (!shouldGatePremiumAnalysis(marketId)) return;
         return premiumPaymentGate(req, reply);
       },
     },

@@ -5,6 +5,7 @@ import type { PremiumNewsArticle } from "./news.js";
 export type MarketCategory =
   | "politics"
   | "economics"
+  | "stocks"
   | "ipos"
   | "sports"
   | "science_tech"
@@ -47,6 +48,13 @@ export function detectMarketCategory(
     )
   )
     return "ipos";
+
+  if (
+    /stock|stocks|equity|equities|shares|etf|earnings|guidance|revenue|eps|valuation|free cash flow|buyback|dividend|sector rotation|wall street|nasdaq|nyse/.test(
+      text
+    )
+  )
+    return "stocks";
 
   if (
     /politi|elect|president|senator|congress|vote|ballot|democrat|republican|prime minister|parliament|govern/.test(
@@ -92,6 +100,7 @@ export function detectMarketCategory(
 const BASE_RATES: Record<MarketCategory, number> = {
   politics: 50,      // elections are definitionally uncertain for favorites
   economics: 58,     // analyst consensus is correct more often than not
+  stocks: 52,        // equity direction has a slight upward drift, but single-name dispersion is high
   ipos: 45,           // IPO timing and valuation markets often resolve below optimistic narrative
   sports: 50,        // high variance, home favorite bias small
   science_tech: 42,  // ambitious milestones typically run late/fail
@@ -109,6 +118,10 @@ const YES_SIGNALS = [
   "filed for ipo", "confidential ipo filing", "s-1", "registration statement",
   "roadshow", "underwriter", "underwriters", "plans ipo", "preparing ipo",
   "expects to list", "public listing", "nasdaq listing", "nyse listing",
+  "raises guidance", "raised guidance", "beats earnings", "earnings beat",
+  "upgrade", "upgraded", "price target raised", "buy rating", "outperform",
+  "margin expansion", "record revenue", "revenue growth", "strong demand",
+  "buyback", "dividend increase", "free cash flow", "cost cuts",
 ];
 
 const NO_SIGNALS = [
@@ -119,6 +132,9 @@ const NO_SIGNALS = [
   "delays ipo", "delayed ipo", "postpones ipo", "postponed ipo", "shelves ipo",
   "shelved ipo", "staying private", "remain private", "market volatility",
   "regulatory scrutiny", "sec investigation", "valuation cut", "down round",
+  "cuts guidance", "cut guidance", "misses earnings", "earnings miss",
+  "downgraded", "downgrade", "price target cut", "sell rating", "underperform",
+  "margin pressure", "revenue decline", "weak demand", "layoffs", "debt concern",
 ];
 
 function scoreNewsSentiment(
@@ -568,6 +584,16 @@ export function buildCategoryFramework(
         `- Assess: analyst consensus vs crowd wisdom — where does Street disagree with the market?`,
         `- Key insight: economic data surprises drive rapid repricing; monitor real-time release calendar`,
         `- Contrast: what would have to be true for the market to be wrong?`,
+      ].join("\n");
+
+    case "stocks":
+      return [
+        `EQUITY ANALYSIS FRAMEWORK:`,
+        `- Evaluate: earnings quality, revenue growth, margin direction, guidance, and valuation versus sector peers`,
+        `- Factor: market regime, rates, sector rotation, liquidity, institutional positioning, and recent analyst revisions`,
+        `- Assess: price action vs fundamentals — whether momentum is supported by catalysts or only short-term flow`,
+        `- Key insight: tokenized stocks trade through secondary liquidity, so analysis must separate company outlook from route/liquidity risk`,
+        `- Contrast: what catalyst, earnings print, guidance update, or macro shock would invalidate the current bullish/bearish read?`,
       ].join("\n");
 
     case "ipos":

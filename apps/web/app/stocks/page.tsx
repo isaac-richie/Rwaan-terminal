@@ -676,38 +676,59 @@ export default function StocksPage() {
           </div>
 
           {/* Stats strip */}
-          <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-            {[
-              { label: "Stocks", value: assets.length > 0 ? String(assets.length) : "--", icon: TrendingUp },
-              {
-                label: "Available",
-                value: assets.length > 0 ? `${mappedCount}/${assets.length}` : "--",
-                icon: Wallet,
-                green: mappedCount > 0,
-              },
-              {
-                label: "Live Now",
-                value: exitVerifiedCount > 0 ? `${exitVerifiedCount} live` : "Soon",
-                icon: Activity,
-                green: exitVerifiedCount > 0,
-              },
-            ].map(({ label, value, icon: Icon, green }) => (
-              <div key={label} className={cn(
-                "rounded-xl border px-3 py-2.5",
-                green
-                  ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.06)]"
-                  : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)]"
-              )}>
-                <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                  <Icon className="h-3 w-3" />{label}
-                </div>
-                <div className={cn("mt-1.5 text-sm font-bold", green ? "text-[oklch(0.68_0.18_155)]" : "text-foreground")}>{value}</div>
+          <div className="mt-5 grid grid-cols-3 gap-3 sm:gap-4">
+            {/* Stocks */}
+            <div className="rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)] px-4 py-4">
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                <TrendingUp className="h-3 w-3" /> Stocks
               </div>
-            ))}
+              <div className="mt-2 text-2xl sm:text-3xl font-bold text-foreground tabular-nums">
+                {assets.length > 0 ? assets.length : "--"}
+              </div>
+              <div className="mt-1 text-[10px] text-muted-foreground">tracked</div>
+            </div>
+
+            {/* Available */}
+            <div className={cn(
+              "rounded-2xl border px-4 py-4",
+              mappedCount > 0
+                ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.06)]"
+                : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)]"
+            )}>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                <Wallet className="h-3 w-3" /> Available
+              </div>
+              <div className={cn("mt-2 text-2xl sm:text-3xl font-bold tabular-nums",
+                mappedCount > 0 ? "text-[oklch(0.68_0.18_155)]" : "text-foreground"
+              )}>
+                {assets.length > 0 ? `${mappedCount}/${assets.length}` : "--"}
+              </div>
+              <div className="mt-1 text-[10px] text-muted-foreground">with live price</div>
+            </div>
+
+            {/* Live Now */}
+            <div className={cn(
+              "rounded-2xl border px-4 py-4",
+              exitVerifiedCount > 0
+                ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.06)]"
+                : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)]"
+            )}>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                <Activity className="h-3 w-3" /> Live Now
+              </div>
+              <div className={cn("mt-2 text-2xl sm:text-3xl font-bold tabular-nums",
+                exitVerifiedCount > 0 ? "text-[oklch(0.68_0.18_155)]" : "text-foreground"
+              )}>
+                {assets.length > 0 ? `${exitVerifiedCount} live` : "--"}
+              </div>
+              <div className="mt-1 text-[10px] text-muted-foreground">
+                {exitVerifiedCount > 0 ? "open to trade" : "routes verifying"}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px]">
+        <div className="grid gap-5 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px]">
 
           {/* ── Left: asset grid ──────────────────────────────────────── */}
           <section className="min-w-0 space-y-4">
@@ -818,6 +839,12 @@ export default function StocksPage() {
                   )
                 })}
               </div>
+
+              {!loading && assets.length > 0 && (
+                <p className="mt-3 text-[11px] leading-5 text-muted-foreground/70">
+                  Rawli tracks {assets.length} tokenized stocks and ETFs. {exitVerifiedCount} are tradable right now because both buy and sell liquidity passed PancakeSwap route checks; the rest stay watch-only until their routes are safe.
+                </p>
+              )}
             </div>
 
             {/* Error state */}
@@ -836,7 +863,7 @@ export default function StocksPage() {
             )}
 
             {/* Asset grid */}
-            <div className="grid gap-2.5 sm:gap-3 grid-cols-1 sm:grid-cols-2">
+            <div className="grid gap-2.5 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2">
               {loading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="h-[130px] rounded-2xl shimmer" style={{ animationDelay: `${i * 60}ms` }} />
@@ -970,15 +997,21 @@ function StockAnalysisSection({ asset, quote }: { asset: RwaAsset; quote?: RwaQu
 
   const marketObject = {
     id: marketId,
-    question: `What is the outlook for ${asset.name} (${asset.displaySymbol}) stock? Is it bullish or bearish right now?`,
-    category: "Stocks",
+    question: `Is ${asset.name} (${asset.displaySymbol}) stock bullish right now?`,
+    category: "stocks",
     description: [
       `${asset.name} - ${asset.theme}`,
       quote?.price != null ? `Current price: $${quote.price.toFixed(2)}` : null,
       quote?.changePct != null ? `Change: ${quote.changePct > 0 ? "+" : ""}${quote.changePct.toFixed(2)}%` : null,
       `Sector: ${asset.sector}`,
+      `Sector group: ${asset.sectorGroup}`,
       asset.risk === "high" ? "High volatility stock." : "Moderate volatility stock.",
     ].filter(Boolean).join(". "),
+    volume: quote?.volume != null ? String(quote.volume) : undefined,
+    outcomes: [
+      { name: "Yes", price: 50 },
+      { name: "No", price: 50 },
+    ],
   }
 
   const isLoading = status === "analyzing" || status === "paying" || status === "confirming"
@@ -1018,7 +1051,7 @@ function StockAnalysisSection({ asset, quote }: { asset: RwaAsset; quote?: RwaQu
         </div>
         {!isDone && (
           <span className="text-[9px] text-muted-foreground/50 uppercase tracking-wide">
-            {walletConnected ? (isLoading ? "Analyzing..." : "Ready") : "Wallet"}
+            {walletConnected ? (isLoading ? "Unlocking..." : "$1 USDT") : "Wallet"}
           </span>
         )}
       </div>
@@ -1028,7 +1061,7 @@ function StockAnalysisSection({ asset, quote }: { asset: RwaAsset; quote?: RwaQu
         {!isDone && (!walletConnected || !isLoading) && (
           <div>
             <p className="text-[12px] leading-5 text-muted-foreground">
-              Get a live AI verdict on {asset.displaySymbol}: news, sentiment, and price catalysts.
+              Unlock a premium stock report on {asset.displaySymbol}: news, sentiment, route risk, and price catalysts.
             </p>
             <button
               type="button"
@@ -1045,7 +1078,7 @@ function StockAnalysisSection({ asset, quote }: { asset: RwaAsset; quote?: RwaQu
               )}
               <span className="relative inline-flex items-center gap-2">
                 {walletConnected ? <Sparkles className="h-3.5 w-3.5" /> : <Wallet className="h-3.5 w-3.5" />}
-                {walletConnected ? `Analyze ${asset.displaySymbol}` : "Connect wallet to analyze"}
+                {walletConnected ? `Unlock ${asset.displaySymbol} report • $1 USDT` : "Connect wallet to analyze"}
               </span>
             </button>
           </div>
@@ -1057,9 +1090,17 @@ function StockAnalysisSection({ asset, quote }: { asset: RwaAsset; quote?: RwaQu
             <Loader2 className="h-4 w-4 animate-spin text-[oklch(0.72_0.16_250)]" />
             <div>
               <p className="text-[12px] font-semibold text-foreground">
-                {status === "analyzing" ? "Running analysis..." : "Connecting..."}
+                {status === "paying"
+                  ? "Waiting for wallet..."
+                  : status === "confirming"
+                  ? "Confirming payment..."
+                  : "Running analysis..."}
               </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Fetching live news and signals</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {status === "paying" || status === "confirming"
+                  ? "Stock reports cost 1 USDT on BNB Chain"
+                  : "Fetching live news and equity signals"}
+              </p>
             </div>
           </div>
         )}
