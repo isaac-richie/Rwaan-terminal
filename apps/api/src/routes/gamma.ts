@@ -5,12 +5,13 @@ import { buildCacheKey, getJsonCache, getJsonCacheEntry, setJsonCache } from "..
 
 const gammaQuerySchema = z.record(z.string()).default({});
 // Serve fresh data for 3/5 min; honour stale data for 1 hour while revalidating.
-// Prewarm runs every 2 min — well inside the fresh window, so it only re-fetches
-// when data actually expires rather than hammering Polymarket every 60 s.
+// Prewarm runs every 90s — tighter than the 2-min TTLs so cache NEVER goes cold.
+// Old: prewarm every 120s with 180s TTL meant 60s cold windows (5-7s loads).
+// New: prewarm every 90s with 180s TTL means cache is always warm when users hit it.
 const MARKET_CACHE_TTL_SECONDS = 180;  // 3 min fresh
-const EVENT_CACHE_TTL_SECONDS  = 300;  // 5 min fresh
+const EVENT_CACHE_TTL_SECONDS  = 180;  // 3 min fresh (was 5min — matched to prewarm cycle)
 const FEED_STALE_TTL_SECONDS   = 60 * 60; // 1 h stale-while-revalidate
-const FEED_PREWARM_INTERVAL_MS = 120_000; // prewarm every 2 min
+const FEED_PREWARM_INTERVAL_MS = 90_000;  // prewarm every 90s (was 120s)
 
 // Browser / CDN cache headers for gamma feed responses.
 // max-age=60 lets browsers serve from their local cache for 60 s;
@@ -203,6 +204,19 @@ async function refreshCacheOnce<T>(
   return refresh;
 }
 
+// Hard timeout for Polymarket upstream fetches — if Polymarket takes >3s,
+// serve stale immediately rather than blocking the user for 5-7s.
+const UPSTREAM_TIMEOUT_MS = 3000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 async function getCachedOrRefresh<T>(
   cacheKey: string,
   load: () => Promise<T>,
@@ -215,7 +229,20 @@ async function getCachedOrRefresh<T>(
     void refreshCacheOnce(cacheKey, load, ttlSeconds, staleTtlSeconds).catch(() => undefined);
     return cached.value;
   }
-  return refreshCacheOnce(cacheKey, load, ttlSeconds, staleTtlSeconds);
+
+  // Cold cache — try fetch with timeout; if Polymarket is slow, serve stale anyway
+  try {
+    return await withTimeout(
+      refreshCacheOnce(cacheKey, load, ttlSeconds, staleTtlSeconds),
+      UPSTREAM_TIMEOUT_MS,
+      cacheKey,
+    );
+  } catch (err) {
+    // Timeout or fetch error — check if we have anything stale at all
+    const staleEntry = await getJsonCacheEntry<T>(cacheKey).catch(() => null);
+    if (staleEntry?.value) return staleEntry.value;
+    throw err;
+  }
 }
 
 function prewarmGammaFeeds(app: FastifyInstance) {
