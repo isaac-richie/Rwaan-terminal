@@ -228,10 +228,11 @@ export function MarketHero() {
             onClick={() => goToMarket(activeMarket)}
             className="group relative h-[240px] sm:h-[320px] lg:h-[380px] overflow-hidden text-left scanline"
           >
-            {/* Full-strength artwork treatment keeps market thumbnails bright and crisp. */}
+            {/* Full-strength artwork treatment keeps market thumbnails bright and crisp.
+                NOTE: no key prop here — avoids unmount/remount flash every 6.5s carousel tick.
+                Instead we let the Image src change in-place; next/image handles the crossfade. */}
             {(activeMarket.image || activeMarket.icon) && (
               <div
-                key={activeMarket.id}
                 className="absolute inset-0 overflow-hidden bg-[oklch(0.18_0.04_82)] transition-transform duration-700 group-hover:scale-[1.035]"
               >
                 <Image
