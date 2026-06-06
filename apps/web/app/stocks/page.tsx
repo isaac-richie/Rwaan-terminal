@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useCallback } from "react"
+import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { BrowserProvider, Contract, formatUnits as formatTokenUnits } from "ethers"
@@ -418,6 +418,7 @@ function assetListedTime(asset: RwaAsset) {
 export default function StocksPage() {
   const { login } = usePrivy()
   const { wallet, walletAddress, authenticated } = useActivePrivyWallet()
+  const handledDeepLinkRef = useRef<string | null>(null)
   const [assets, setAssets] = useState<RwaAsset[]>([])
   const [quotes, setQuotes] = useState<Record<string, RwaQuote>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -539,6 +540,33 @@ export default function StocksPage() {
 
   // On mount: the cache serves instantly — no spinner on nav-back
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (assets.length === 0) return
+    const params = new URLSearchParams(window.location.search)
+    const rawSymbol = params.get("trade") ?? params.get("symbol")
+    if (!rawSymbol) return
+
+    const normalized = rawSymbol.trim().toLowerCase()
+    const asset = assets.find((item) =>
+      [item.id, item.symbol, item.displaySymbol, item.quoteSymbol, item.route?.token.symbol]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase() === normalized)
+    )
+    if (!asset) return
+
+    const rawSide = params.get("side")?.toLowerCase()
+    const side = rawSide === "buy" || rawSide === "sell" ? rawSide : null
+    const deepLinkKey = `${asset.id}:${side ?? "detail"}`
+    if (handledDeepLinkRef.current === deepLinkKey) return
+    handledDeepLinkRef.current = deepLinkKey
+
+    setSelectedId(asset.id)
+    setActiveFilter("all")
+    setSearch("")
+    setDetailOpen(true)
+    if (side) setTradeRequest({ asset, side })
+  }, [assets])
 
   // Silently refresh quotes every 60s while page is visible
   useEffect(() => {

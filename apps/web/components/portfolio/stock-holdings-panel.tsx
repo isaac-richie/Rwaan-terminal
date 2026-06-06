@@ -233,7 +233,7 @@ export function StockHoldingsPanel({
   const router = useRouter()
 
   const goToTrade = (symbol: string) => {
-    router.push(`/stocks?trade=${symbol}`)
+    router.push(`/stocks?trade=${encodeURIComponent(symbol)}&side=sell`)
   }
 
   return (

@@ -491,7 +491,7 @@ export function UnifiedHoldings({
                 <StockCard
                   key={h.asset.id}
                   holding={h}
-                  onTrade={() => router.push(`/stocks?trade=${h.asset.displaySymbol}`)}
+                  onTrade={() => router.push(`/stocks?trade=${encodeURIComponent(h.asset.displaySymbol)}&side=sell`)}
                 />
               ))}
             </div>

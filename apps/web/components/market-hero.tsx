@@ -116,13 +116,15 @@ export function MarketHero() {
     let cancelled = false
     async function load() {
       try {
-        const [hotMarkets, newsMarkets] = await Promise.all([
-          fetchMarkets("all", 10, "trending", 0),
-          fetchMarkets("World", 14, "newest", 0).catch(() => []),
-        ])
+        const hotMarkets = await fetchMarkets("all", 10, "trending", 0)
         if (cancelled) return
         setTrending(hotMarkets)
-        setBreaking(newsMarkets.length ? newsMarkets : hotMarkets.slice(0, 8))
+        if (!cachedBreaking?.length) setBreaking(hotMarkets.slice(0, 8))
+        setLoading(false)
+
+        const newsMarkets = await fetchMarkets("World", 14, "newest", 0).catch(() => [])
+        if (cancelled || !newsMarkets.length) return
+        setBreaking(newsMarkets)
       } catch (err) {
         console.error("[rawli] Hero load failed:", err)
       } finally {

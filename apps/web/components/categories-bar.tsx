@@ -69,17 +69,24 @@ export function CategoriesBar({
   const [sortOpen, setSortOpen] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
     const loadTags = async () => {
       try {
         const res = await fetch(`${API_BASE}/gamma/tags`)
         if (!res.ok) return
         const data = await res.json()
-        if (Array.isArray(data)) setTags(data)
+        if (!cancelled && Array.isArray(data)) setTags(data)
       } catch {
         // ignore
       }
     }
-    loadTags()
+    const timer = window.setTimeout(() => {
+      void loadTags()
+    }, 5000)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [])
 
   // Close sort dropdown on outside click

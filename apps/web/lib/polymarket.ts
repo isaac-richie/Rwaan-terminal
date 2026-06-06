@@ -1045,8 +1045,7 @@ function fetchGammaMarketsAsEvents(baseParams: URLSearchParams): Promise<GammaEv
   ])
 }
 
-// For "all" + trending/volume, use curated tags across categories Rawli can analyze.
-// This gives the first screen category diversity instead of whichever single tag is hottest.
+// For category pages, use curated tags across categories Rawli can analyze.
 const FAST_ALL_TAG_IDS = Array.from(new Set(targetCategoryIds.flatMap((id) => categoryFeedTagIds[id])))
 
 export async function fetchPolymarketMarkets(
@@ -1060,11 +1059,11 @@ export async function fetchPolymarketMarkets(
     const normalizedCat = normalizeCategory(category)
     const fastAllFeed = normalizedCat === "all" && (sortBy === "trending" || sortBy === "volume") && !search
     const cryptoCategory = normalizedCat === "crypto"
-    // Reduced over-fetch multipliers — old values (×20, ×24) caused 200-800KB payloads.
-    // New values still give enough candidates to filter, but cut payload 40-60%.
+    // Keep the first "All" page on the prewarmed markets index. The old all-tags
+    // batch could pull multi-MB payloads on production and delay first render.
     const fetchLimit =
       fastAllFeed
-        ? Math.max(limit * 6, 72)    // was ×8, 96  → ~25% smaller
+        ? Math.max(limit * 2, 24)
         : cryptoCategory
         ? Math.max(limit * 10, 120)  // was ×20, 240 → 50% smaller (biggest win)
         : sortBy === "daily"
@@ -1091,18 +1090,19 @@ export async function fetchPolymarketMarkets(
       baseParams.set("offset", "0")
     }
 
-    // Fast path: "all" uses the curated category tag union, served from backend prewarm caches.
-    const tagIds = fastAllFeed
-      ? FAST_ALL_TAG_IDS
-      : getCategoryFeedTagIds(category)
-    if (tagIds.length === 0) return []
-
     let batchEvents: GammaEventRaw[]
     try {
-      batchEvents = await fetchGammaEventsBatch(baseParams, tagIds)
+      if (fastAllFeed) {
+        batchEvents = await fetchGammaMarketsAsEvents(baseParams)
+      } else {
+        const tagIds = getCategoryFeedTagIds(category)
+        if (tagIds.length === 0) return []
+        batchEvents = await fetchGammaEventsBatch(baseParams, tagIds)
+      }
     } catch (err) {
       if (!fastAllFeed) throw err
-      batchEvents = await fetchGammaMarketsAsEvents(baseParams)
+      // Fallback keeps the home page alive if the markets index has a bad moment.
+      batchEvents = await fetchGammaEventsBatch(baseParams, FAST_ALL_TAG_IDS)
     }
 
     const mergedEvents = new Map<string, GammaEventRaw>()

@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { MarketHero } from "@/components/market-hero"
@@ -15,6 +15,8 @@ function HomeContent() {
   const searchParams = useSearchParams()
   const [category, setCategory] = useState("all")
   const [sortBy, setSortBy] = useState("trending")
+  const edgeRef = useRef<HTMLDivElement | null>(null)
+  const [edgeVisible, setEdgeVisible] = useState(false)
 
   // Derive search query reactively from URL — handles both initial load
   // and client-side router.push("/?q=...") from the navbar search modal.
@@ -24,33 +26,51 @@ function HomeContent() {
     if (searchQuery) setCategory("all")
   }, [searchQuery])
 
-  // ── Pre-fetch stocks data while user browses markets ──
-  // On home page load, silently fetch RWA assets + quotes in background.
-  // By the time user clicks Stocks tab, data is cached and loads instantly.
+  // ── Pre-fetch stocks data after the first market view is already painted ──
   useEffect(() => {
     async function prefetchStocks() {
       try {
-        // Fetch RWA assets catalog — populates module-level cache
         const assets = await fetchRwaAssets("NG")
-
-        // Extract first 20 symbols and fetch their quotes
         const symbols = assets.assets
           .filter(a => a.quoteSymbol)
           .slice(0, 20)
           .map(a => a.quoteSymbol)
 
         if (symbols.length > 0) {
-          // Fetch quotes — also cached at module level
           await fetchRwaQuotes(symbols)
         }
       } catch (err) {
-        // Silent fail — stocks page will handle fetch failure gracefully
-        // This is just a background optimization, not critical to home page
+        // Silent fail — stocks page handles its own fetch state.
       }
     }
 
-    prefetchStocks()
+    const timer = window.setTimeout(() => {
+      void prefetchStocks()
+    }, 7000)
+    return () => window.clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    if (edgeVisible || searchQuery) return
+    const node = edgeRef.current
+    if (!node) return
+
+    if (!("IntersectionObserver" in window)) {
+      const timer = setTimeout(() => setEdgeVisible(true), 9000)
+      return () => clearTimeout(timer)
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return
+        setEdgeVisible(true)
+        observer.disconnect()
+      },
+      { rootMargin: "500px 0px" }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [edgeVisible, searchQuery])
 
   return (
     <div className="terminal-grid-bg min-h-screen bg-background flex flex-col ambient-glow">
@@ -97,8 +117,8 @@ function HomeContent() {
 
         {/* ── Edge Scanner / Market Intelligence ───────────────────── */}
         {!searchQuery && (
-          <div className="mt-8 sm:mt-12 border-t border-[oklch(0.18_0.014_255)] pt-8">
-            <EdgeFeed limit={6} minEdge={0.08} />
+          <div ref={edgeRef} className="mt-8 sm:mt-12 border-t border-[oklch(0.18_0.014_255)] pt-8">
+            {edgeVisible ? <EdgeFeed limit={6} minEdge={0.08} /> : null}
           </div>
         )}
       </main>
