@@ -678,51 +678,51 @@ export default function StocksPage() {
           {/* Stats strip */}
           <div className="mt-5 grid grid-cols-3 gap-3 sm:gap-4">
             {/* Stocks */}
-            <div className="rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)] px-4 py-4">
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+            <div className="rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)] px-3 sm:px-4 py-4">
+              <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
                 <TrendingUp className="h-3 w-3" /> Stocks
               </div>
-              <div className="mt-2 text-2xl sm:text-3xl font-bold text-foreground tabular-nums">
+              <div className="mt-2 text-2xl sm:text-3xl font-bold text-foreground tabular-nums leading-none">
                 {assets.length > 0 ? assets.length : "--"}
               </div>
-              <div className="mt-1 text-[10px] text-muted-foreground">tracked</div>
+              <div className="mt-1.5 text-[10px] text-muted-foreground">available</div>
             </div>
 
             {/* Available */}
             <div className={cn(
-              "rounded-2xl border px-4 py-4",
+              "rounded-2xl border px-3 sm:px-4 py-4",
               mappedCount > 0
                 ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.06)]"
                 : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)]"
             )}>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                <Wallet className="h-3 w-3" /> Available
+              <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                <Wallet className="h-3 w-3" /> Priced
               </div>
-              <div className={cn("mt-2 text-2xl sm:text-3xl font-bold tabular-nums",
+              <div className={cn("mt-2 text-2xl sm:text-3xl font-bold tabular-nums leading-none",
                 mappedCount > 0 ? "text-[oklch(0.68_0.18_155)]" : "text-foreground"
               )}>
                 {assets.length > 0 ? `${mappedCount}/${assets.length}` : "--"}
               </div>
-              <div className="mt-1 text-[10px] text-muted-foreground">with live price</div>
+              <div className="mt-1.5 text-[10px] text-muted-foreground">live prices</div>
             </div>
 
             {/* Live Now */}
             <div className={cn(
-              "rounded-2xl border px-4 py-4",
+              "rounded-2xl border px-3 sm:px-4 py-4",
               exitVerifiedCount > 0
                 ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.06)]"
                 : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)]"
             )}>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                <Activity className="h-3 w-3" /> Live Now
+              <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                <Activity className="h-3 w-3" /> Live
               </div>
-              <div className={cn("mt-2 text-2xl sm:text-3xl font-bold tabular-nums",
+              <div className={cn("mt-2 text-2xl sm:text-3xl font-bold tabular-nums leading-none",
                 exitVerifiedCount > 0 ? "text-[oklch(0.68_0.18_155)]" : "text-foreground"
               )}>
-                {assets.length > 0 ? `${exitVerifiedCount} live` : "--"}
+                {assets.length > 0 ? exitVerifiedCount : "--"}
               </div>
-              <div className="mt-1 text-[10px] text-muted-foreground">
-                {exitVerifiedCount > 0 ? "open to trade" : "routes verifying"}
+              <div className="mt-1.5 text-[10px] text-muted-foreground">
+                {exitVerifiedCount > 0 ? "open to trade" : "checking routes"}
               </div>
             </div>
           </div>
