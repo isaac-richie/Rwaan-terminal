@@ -51,9 +51,15 @@ export default function Providers({ children }: { children: ReactNode }) {
           // ethereum-only suppresses Solana wallet connectors and their
           // large SDK chunks (@solana-program/token etc.)
           walletChainType: "ethereum-only",
-          // Show only the most-used wallets to reduce WalletConnect explorer
-          // prefetch surface area on first mount.
-          walletList: ["metamask", "coinbase_wallet", "wallet_connect", "rainbow"],
+          // Community-favorite wallets via universal profile + known supported ones.
+          // universal_profile auto-detects: Trust Wallet, Bitget, Rabby, SafePal, Token Pocket, etc.
+          // Privy handles wallet discovery dynamically via WalletConnect and browser detection.
+          walletList: [
+            "metamask",
+            "coinbase_wallet",
+            "rainbow",
+            "universal_profile",  // Enables auto-detection of all other wallets
+          ],
         },
         embeddedWallets: {
           ethereum: {

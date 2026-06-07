@@ -393,8 +393,12 @@ function PrivyDesktopWallet() {
   const handleConnect = async () => {
     setWalletError(null)
     try {
-      if (authenticated) await connectWallet()
-      else await login()
+      // Use timeout to prevent hung connections on slow networks
+      const connectPromise = authenticated ? connectWallet() : login()
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Connection timeout. Please check your wallet app and try again.")), 35000)
+      )
+      await Promise.race([connectPromise, timeoutPromise])
     } catch (err: any) {
       setWalletError(walletActionError(err, "Connection failed. Try again."))
     }
@@ -418,7 +422,12 @@ function PrivyDesktopWallet() {
     setWalletError(null)
     setWalletMenuOpen(false)
     try {
-      await connectWallet()
+      // Use timeout to prevent hung connections
+      const connectPromise = connectWallet()
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Connection timeout. Please check your wallet app and try again.")), 35000)
+      )
+      await Promise.race([connectPromise, timeoutPromise])
     } catch (err: any) {
       setWalletError(walletActionError(err, "Wallet switch failed. Try again."))
     }
@@ -582,8 +591,12 @@ function PrivyMobileWallet({ onDone }: { onDone: () => void }) {
   const handleConnect = async () => {
     setWalletError(null)
     try {
-      if (walletAddress || authenticated) await connectWallet()
-      else await login()
+      // Use timeout to prevent hung connections on mobile networks
+      const connectPromise = authenticated ? connectWallet() : login()
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Connection timeout. Please check your wallet app and try again.")), 35000)
+      )
+      await Promise.race([connectPromise, timeoutPromise])
       onDone()
     } catch (err: any) {
       setWalletError(walletActionError(err, "Connection failed. Try again."))
@@ -607,7 +620,12 @@ function PrivyMobileWallet({ onDone }: { onDone: () => void }) {
     setWalletError(null)
     setWalletMenuOpen(false)
     try {
-      await connectWallet()
+      // Use timeout to prevent hung connections on mobile networks
+      const connectPromise = connectWallet()
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Connection timeout. Please check your wallet app and try again.")), 35000)
+      )
+      await Promise.race([connectPromise, timeoutPromise])
       onDone()
     } catch (err: any) {
       setWalletError(walletActionError(err, "Wallet switch failed. Try again."))
