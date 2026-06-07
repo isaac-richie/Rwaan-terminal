@@ -7,7 +7,7 @@ import {
   ArrowUpRight,
   Flame,
   Newspaper,
-  Sparkles,
+  TrendingUp,
 } from "lucide-react"
 import { fetchMarkets, getCachedMarkets } from "@/lib/markets"
 import { cacheMarketForDetail } from "@/lib/market-detail-cache"
@@ -75,21 +75,50 @@ function ProbArc({ pct, size = 140 }: { pct: number; size?: number }) {
 function HeroSkeleton() {
   return (
     <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top pb-7 relative z-[1] overflow-hidden">
-      <div className="space-y-5">
-        <div className="h-8 w-48 shimmer rounded-full" />
-        <div className="h-16 w-3/4 shimmer rounded-2xl" />
-        <div className="grid gap-4 lg:grid-cols-[1fr_0.48fr]">
-          <div className="h-[420px] shimmer rounded-2xl" />
-          <div className="h-[420px] shimmer rounded-2xl" />
+      <div className="space-y-4">
+        <div className="h-7 w-44 shimmer rounded-full" />
+        <div className="grid gap-4 lg:grid-cols-[1fr_minmax(300px,0.44fr)]">
+          <div className="h-[440px] shimmer rounded-2xl" />
+          <div className="h-[440px] shimmer rounded-2xl hidden lg:block" />
         </div>
       </div>
     </section>
   )
 }
 
+// Tiny crisp market thumbnail — rendered at native resolution so it never blurs
+function MarketThumb({ src, size = 48 }: { src?: string | null; size?: number }) {
+  const [err, setErr] = useState(false)
+  if (!src || err) {
+    return (
+      <div
+        className="shrink-0 rounded-xl border border-[oklch(0.24_0.016_255)] bg-[oklch(0.16_0.014_255)] grid place-items-center"
+        style={{ width: size, height: size }}
+      >
+        <TrendingUp className="w-5 h-5 text-[oklch(0.78_0.16_82/0.6)]" />
+      </div>
+    )
+  }
+  return (
+    <div
+      className="relative shrink-0 overflow-hidden rounded-xl border border-[oklch(0.24_0.016_255)] bg-[oklch(0.14_0.013_255)]"
+      style={{ width: size, height: size }}
+    >
+      <Image
+        src={src}
+        alt=""
+        fill
+        quality={90}
+        sizes={`${size}px`}
+        className="object-cover"
+        onError={() => setErr(true)}
+      />
+    </div>
+  )
+}
+
 export function MarketHero() {
   const router = useRouter()
-  // Hydrate from cache — instant render on re-navigation, no shimmers
   const cachedTrending = getCachedMarkets("all", 10, "trending", 0)
   const cachedBreaking = getCachedMarkets("World", 14, "newest", 0)
   const [trending, setTrending] = useState<PolymarketMarket[]>(cachedTrending ?? [])
@@ -121,7 +150,6 @@ export function MarketHero() {
         setTrending(hotMarkets)
         if (!cachedBreaking?.length) setBreaking(hotMarkets.slice(0, 8))
         setLoading(false)
-
         const newsMarkets = await fetchMarkets("World", 14, "newest", 0).catch(() => [])
         if (cancelled || !newsMarkets.length) return
         setBreaking(newsMarkets)
@@ -155,11 +183,8 @@ export function MarketHero() {
     router.push(`/markets/${market.id}`)
   }
 
-  // Show skeleton while loading
   if (loading && trending.length === 0) return <HeroSkeleton />
 
-  // If no markets loaded after attempt, show empty state instead of null
-  // This keeps the hero visible on mobile instead of disappearing
   if (!activeMarket) {
     return (
       <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top pb-4 sm:pb-7 relative z-[1]">
@@ -170,108 +195,72 @@ export function MarketHero() {
     )
   }
 
+  const heroImg = (activeMarket.image ?? activeMarket.icon) as string | undefined
+
   return (
     <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top pb-4 sm:pb-7 relative z-[1]">
 
-      {/* ── Hero headline — compact single row on desktop ── */}
+      {/* ── Compact header — hidden on mobile ── */}
       <div className="mb-4 hidden sm:flex sm:items-center sm:justify-between sm:gap-6">
-        {/* Left: badge + tight headline */}
-        <div className="hero-enter min-w-0" style={{ animationDelay: "0ms" }}>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.07)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[oklch(0.82_0.16_82)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
-              Live markets · updated now
-            </div>
+        <div className="hero-enter flex items-center gap-3" style={{ animationDelay: "0ms" }}>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.07)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[oklch(0.82_0.16_82)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
+            Live markets
           </div>
-          <h1 className="mt-2 font-bold tracking-tight text-foreground">
-            <span className="text-2xl leading-tight sm:text-3xl lg:text-4xl">
-              Trade the signal{" "}
-              <span className="text-[oklch(0.55_0.02_255)]">before it becomes</span>{" "}
-              consensus<span className="text-[oklch(0.78_0.16_82)]">.</span>
-            </span>
-          </h1>
+          <span className="text-[11px] text-muted-foreground">Real-time prediction markets</span>
         </div>
-        {/* Right: short sub-copy */}
-        <p
-          className="hero-enter shrink-0 max-w-[220px] text-right text-[12px] leading-relaxed text-muted-foreground"
-          style={{ animationDelay: "80ms" }}
-        >
-          Real-time prediction markets.<br />Non-custodial. Always live.
-        </p>
       </div>
 
-      {/* ── Main two-column layout ───────────────────────── */}
+      {/* ── Two-column grid — fixed row height so both columns match ── */}
       <div
-        className="hero-enter grid items-stretch gap-4 lg:grid-cols-[1fr_minmax(300px,0.44fr)]"
-        style={{ animationDelay: "240ms" }}
+        className="hero-enter grid items-stretch gap-4 lg:grid-cols-[1fr_minmax(300px,0.44fr)] lg:grid-rows-[430px]"
+        style={{ animationDelay: "120ms" }}
       >
-        {/* Featured market card */}
+
+        {/* ════════════════════════════════════════════════════════
+            FEATURED MARKET CARD — data-forward, no blurry background
+            ════════════════════════════════════════════════════════ */}
         <div
-          className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260/0.95)] hero-card-glow"
+          className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.115_0.012_260/0.95)] hero-card-glow h-full"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
+          {/* Amber glow line */}
+          <div className="h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_82/0.5)] to-transparent" />
 
-          {/* Image + question pane */}
+          {/* ── Top: Market identity ── */}
           <button
             type="button"
             onClick={() => goToMarket(activeMarket)}
-            className="group relative h-[240px] sm:h-[320px] lg:h-[380px] overflow-hidden text-left scanline"
+            className="group flex flex-col gap-5 p-5 sm:p-6 text-left"
           >
-            {/* Full-strength artwork treatment keeps market thumbnails bright and crisp.
-                NOTE: no key prop here — avoids unmount/remount flash every 6.5s carousel tick.
-                Instead we let the Image src change in-place; next/image handles the crossfade. */}
-            {(activeMarket.image || activeMarket.icon) && (
-              <div
-                className="absolute inset-0 overflow-hidden bg-[oklch(0.18_0.04_82)] transition-transform duration-700 group-hover:scale-[1.035]"
-              >
-                <Image
-                  src={(activeMarket.image ?? activeMarket.icon) as string}
-                  alt=""
-                  fill
-                  priority
-                  quality={100}
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 960px"
-                  data-image-sharp
-                  className="scale-[1.01] object-cover brightness-[1.08] sm:brightness-[1.22] lg:brightness-[1.25] contrast-[1.20] saturate-[1.28]"
-                  style={{ imageRendering: "crisp-edges" }}
-                />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_48%_42%,transparent_0%,transparent_36%,oklch(0.08_0.012_260/0.10)_72%)]" />
-              </div>
-            )}
-
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_28%_0%,oklch(0.88_0.17_82/0.10),transparent_52%),linear-gradient(180deg,oklch(0.08_0.012_260/0.18)_0%,oklch(0.08_0.012_260/0.52)_40%,oklch(0.08_0.012_260/0.88)_100%)]" />
-
-            {/* Amber glow line at top */}
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_82/0.6)] to-transparent" />
-
-            <div className="relative flex h-full flex-col justify-between p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-2">
-                <span className="rounded-lg border border-[oklch(0.78_0.16_82/0.34)] bg-[oklch(0.09_0.012_260/0.42)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.88_0.16_82)] shadow-[0_8px_24px_oklch(0_0_0/0.20)] backdrop-blur-sm">
+            {/* Category + time badges */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="rounded-lg bg-[oklch(0.78_0.16_82/0.10)] border border-[oklch(0.78_0.16_82/0.20)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.88_0.16_82)]">
                   {activeMarket.category ?? "Market"}
                 </span>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-lg border border-[oklch(0.68_0.18_155/0.34)] bg-[oklch(0.09_0.012_260/0.42)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[oklch(0.74_0.18_155)] shadow-[0_8px_24px_oklch(0_0_0/0.20)] backdrop-blur-sm">
-                    Live
-                  </span>
-                  <span className="rounded-lg border border-[oklch(0.22_0.015_255/0.75)] bg-[oklch(0.09_0.012_260/0.48)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[oklch(0.82_0.01_255)] shadow-[0_8px_24px_oklch(0_0_0/0.20)] backdrop-blur-sm">
-                    Closes {formatEndDate(activeMarket.endDate)}
-                  </span>
-                </div>
+                <span className="rounded-lg bg-[oklch(0.68_0.18_155/0.08)] border border-[oklch(0.68_0.18_155/0.20)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[oklch(0.74_0.18_155)]">
+                  Live
+                </span>
               </div>
+              <span className="rounded-lg bg-[oklch(0.16_0.014_255)] border border-[oklch(0.24_0.016_255)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                Closes {formatEndDate(activeMarket.endDate)}
+              </span>
+            </div>
 
-              <div>
-                <h2
-                  className="line-clamp-3 text-xl font-bold leading-tight text-foreground transition-colors group-hover:text-[oklch(0.95_0.01_90)] sm:text-2xl"
-                  style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7), 0 2px 12px rgba(0,0,0,0.5)" }}
-                >
+            {/* Image thumb + question */}
+            <div className="flex items-start gap-4 sm:gap-5">
+              <MarketThumb src={heroImg} size={56} />
+              <div className="min-w-0 flex-1">
+                <h2 className="line-clamp-3 text-lg font-bold leading-snug text-foreground transition-colors group-hover:text-[oklch(0.95_0.01_90)] sm:text-xl lg:text-2xl">
                   {activeMarket.question}
                 </h2>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}>
+                <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="font-mono">{activeMarket.volume} traded</span>
-                  <span className="text-[oklch(0.24_0.015_255)]">·</span>
+                  <span className="text-[oklch(0.24_0.015_255)]">&middot;</span>
                   <span className="font-mono">{activeMarket.liquidity} available</span>
-                  <span className="ml-auto flex items-center gap-1 text-[oklch(0.78_0.16_82/0.7)] group-hover:text-[oklch(0.78_0.16_82)]">
+                  <span className="ml-auto hidden sm:flex items-center gap-1 text-[oklch(0.78_0.16_82/0.6)] group-hover:text-[oklch(0.78_0.16_82)] transition-colors">
                     Open market <ArrowUpRight className="h-3 w-3" />
                   </span>
                 </div>
@@ -279,71 +268,78 @@ export function MarketHero() {
             </div>
           </button>
 
-          {/* Probability + trade controls */}
-          <div className="border-t border-[oklch(0.20_0.015_255)] bg-[oklch(0.10_0.012_260/0.8)] px-5 py-4 sm:px-6">
-            <div className="flex items-center gap-6">
-              {/* Radial arc */}
+          {/* ── Middle: Probability panel — flex-1 fills remaining height between identity and nav dots ── */}
+          <div className="mx-5 sm:mx-6 mb-4 flex-1 flex flex-col justify-center rounded-xl border border-[oklch(0.20_0.015_255)] bg-[oklch(0.09_0.010_260/0.8)] p-4">
+            <div className="flex items-center gap-6 sm:gap-8">
+              {/* Probability arc */}
               <div className="relative shrink-0">
-                <ProbArc pct={activePrice} size={120} />
+                <ProbArc pct={activePrice} size={110} />
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <div className="font-mono text-2xl font-bold text-foreground leading-none">{activePrice.toFixed(0)}¢</div>
                   <div className="mt-0.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{activeLabel}</div>
                 </div>
               </div>
 
-              <div className="flex-1 min-w-0">
-                {/* Yes / No row */}
-                <div className="flex items-end justify-between gap-4 mb-3">
-                  <div>
-                    <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Yes</div>
-                    <div className="mt-0.5 font-mono text-lg font-bold text-[oklch(0.68_0.18_155)]">{activePrice.toFixed(0)}¢</div>
+              {/* Yes / No breakdown */}
+              <div className="flex-1 min-w-0 space-y-3">
+                {/* YES bar */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">Yes</span>
+                    <span className="font-mono text-sm font-bold text-[oklch(0.68_0.18_155)]">{activePrice.toFixed(0)}¢</span>
                   </div>
-                  <div className="text-right">
-                    <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">No</div>
-                    <div className="mt-0.5 font-mono text-lg font-bold text-[oklch(0.62_0.18_25)]">{noPrice.toFixed(0)}¢</div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[oklch(0.16_0.014_255)]">
+                    <div
+                      className="h-full rounded-full bg-[oklch(0.68_0.18_155)] transition-all duration-700"
+                      style={{ width: `${activePrice}%` }}
+                    />
                   </div>
                 </div>
-
-                {/* Flat bar underneath */}
-                <div className="h-1.5 overflow-hidden rounded-full bg-[oklch(0.18_0.014_255)]">
-                  <div
-                    className="h-full rounded-full prob-bar-fill transition-all duration-700"
-                    style={{ width: `${activePrice}%` }}
-                  />
-                </div>
-
-                {/* Nav dots + CTA */}
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-1.5">
-                    {trending.slice(0, Math.min(trending.length, 8)).map((_, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setActiveIndex(i)}
-                        aria-label={`Go to market ${i + 1}`}
-                        className={cn(
-                          "rounded-full transition-all duration-300",
-                          i === activeIndex
-                            ? "h-1.5 w-5 bg-[oklch(0.78_0.16_82)]"
-                            : "h-1.5 w-1.5 bg-[oklch(0.28_0.016_255)] hover:bg-[oklch(0.40_0.016_255)]"
-                        )}
-                      />
-                    ))}
+                {/* NO bar */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.62_0.18_25)]">No</span>
+                    <span className="font-mono text-sm font-bold text-[oklch(0.62_0.18_25)]">{noPrice.toFixed(0)}¢</span>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => goToMarket(activeMarket)}
-                    className="flex items-center gap-1.5 rounded-full bg-[oklch(0.78_0.16_82)] px-4 py-2 text-xs font-bold text-[oklch(0.10_0.012_260)] transition-all hover:bg-[oklch(0.83_0.16_82)] hover:shadow-[0_4px_16px_oklch(0.78_0.16_82/0.35)] btn-press"
-                  >
-                    Trade now <ArrowUpRight className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="h-2 overflow-hidden rounded-full bg-[oklch(0.16_0.014_255)]">
+                    <div
+                      className="h-full rounded-full bg-[oklch(0.62_0.18_25)] transition-all duration-700"
+                      style={{ width: `${noPrice}%` }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Ticker strip — desktop animated (hidden on mobile) */}
+          {/* ── Bottom: Nav dots + CTA ── */}
+          <div className="shrink-0 flex items-center justify-between gap-3 px-5 sm:px-6 pb-4">
+            <div className="flex items-center gap-1.5">
+              {trending.slice(0, Math.min(trending.length, 8)).map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setActiveIndex(i)}
+                  aria-label={`Go to market ${i + 1}`}
+                  className={cn(
+                    "rounded-full transition-all duration-300",
+                    i === activeIndex
+                      ? "h-1.5 w-5 bg-[oklch(0.78_0.16_82)]"
+                      : "h-1.5 w-1.5 bg-[oklch(0.28_0.016_255)] hover:bg-[oklch(0.40_0.016_255)]"
+                  )}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => goToMarket(activeMarket)}
+              className="flex items-center gap-1.5 rounded-full bg-[oklch(0.78_0.16_82)] px-5 py-2.5 text-xs font-bold text-[oklch(0.10_0.012_260)] transition-all hover:bg-[oklch(0.83_0.16_82)] hover:shadow-[0_4px_16px_oklch(0.78_0.16_82/0.35)] btn-press"
+            >
+              Trade now <ArrowUpRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* ── Ticker strip — desktop only ── */}
           {marqueeMarkets.length > 0 && (
             <div className="hidden sm:block shrink-0 border-t border-[oklch(0.20_0.015_255)] bg-[oklch(0.095_0.012_260)] py-3 overflow-hidden">
               <div className="w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
@@ -364,7 +360,7 @@ export function MarketHero() {
                               src={(market.image ?? market.icon) as string}
                               alt=""
                               fill
-                              quality={90}
+                              quality={85}
                               sizes="28px"
                               className="object-contain p-0.5"
                             />
@@ -392,10 +388,10 @@ export function MarketHero() {
           )}
         </div>
 
-        {/* ── Breaking news sidebar — desktop only ── */}
-        <aside
-          className="hidden lg:flex flex-col rounded-2xl border border-[oklch(0.20_0.014_255/0.8)] bg-[oklch(0.118_0.012_260/0.96)] overflow-hidden hero-card-glow self-stretch"
-        >
+        {/* ════════════════════════════════════════════════════════
+            BREAKING NEWS SIDEBAR — desktop only
+            ════════════════════════════════════════════════════════ */}
+        <aside className="hidden lg:flex flex-col h-full rounded-2xl border border-[oklch(0.20_0.014_255/0.8)] bg-[oklch(0.118_0.012_260/0.96)] overflow-hidden hero-card-glow">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[oklch(0.18_0.014_255)] px-4 py-3">
             <div className="flex items-center gap-2">
@@ -408,7 +404,7 @@ export function MarketHero() {
             </span>
           </div>
 
-          {/* News list — scrollable within sidebar */}
+          {/* News list — scrollable */}
           <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
             {breaking.map((market, i) => {
               const price = getPrimaryPrice(market)
@@ -430,7 +426,7 @@ export function MarketHero() {
                     </span>
                     <span className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                       <span className="truncate">{market.category ?? "News"}</span>
-                      <span className="text-[oklch(0.24_0.015_255)]">·</span>
+                      <span className="text-[oklch(0.24_0.015_255)]">&middot;</span>
                       <span className="font-mono">{market.volume}</span>
                     </span>
                   </span>
@@ -447,28 +443,10 @@ export function MarketHero() {
             })}
           </div>
 
-          {/* Intelligence CTA */}
-          <div className="shrink-0 border-t border-[oklch(0.18_0.014_255)] bg-[oklch(0.10_0.012_260/0.8)] p-4">
-            <div className="rounded-xl border border-[oklch(0.78_0.16_82/0.18)] bg-[oklch(0.78_0.16_82/0.05)] p-3.5">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-[oklch(0.78_0.16_82)]" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.82_0.16_82)]">Rawli intelligence</span>
-              </div>
-              <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                {PREMIUM_ANALYSIS_FEE_ENABLED
-                  ? "Deep AI reports per market with live context, structural drivers, and a definitive YES/NO verdict. Unlock for $1 USDT."
-                  : "Free testing-phase AI reports per market with live context, structural drivers, and a definitive YES/NO verdict."}
-              </p>
-              <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-[oklch(0.78_0.16_82)]">
-                <span className="h-1 w-1 rounded-full bg-[oklch(0.78_0.16_82)]" />
-                Available on every market page
-              </div>
-            </div>
-          </div>
         </aside>
       </div>
 
-      {/* ── Mobile ticker strip — same rolling behaviour as desktop ── */}
+      {/* ── Mobile ticker strip ── */}
       {marqueeMarkets.length > 0 && (
         <div className="sm:hidden mt-3 -mx-4 border-t border-[oklch(0.20_0.015_255)] bg-[oklch(0.095_0.012_260)] py-3 overflow-hidden">
           <div className="w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">
