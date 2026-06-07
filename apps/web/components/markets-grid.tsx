@@ -10,6 +10,7 @@ interface MarketsGridProps {
   category: string
   sortBy: string
   search?: string
+  onFirstData?: () => void
 }
 
 function marketIdentity(market: PolymarketMarket) {
@@ -35,7 +36,7 @@ function dedupeMarkets(markets: PolymarketMarket[]) {
   })
 }
 
-export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
+export function MarketsGrid({ category, sortBy, search, onFirstData }: MarketsGridProps) {
   // Hydrate from module-level cache so re-navigation never shows shimmers
   const initial = getCachedMarkets(category, 12, sortBy, 0, search)
   const [markets, setMarkets] = useState<PolymarketMarket[]>(initial ?? [])
@@ -44,6 +45,7 @@ export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
   const [page, setPage] = useState(initial ? 1 : 0)
   const [hasMore, setHasMore] = useState(true)
   const fetchKey = useRef<string>("")
+  const firstDataReported = useRef(false)
 
   const load = useCallback(
     async (nextPage: number, reset = false) => {
@@ -100,6 +102,12 @@ export function MarketsGrid({ category, sortBy, search }: MarketsGridProps) {
     setPage(0)
     load(0, true)
   }, [category, sortBy, search, load])
+
+  useEffect(() => {
+    if (firstDataReported.current || loading || markets.length === 0) return
+    firstDataReported.current = true
+    onFirstData?.()
+  }, [loading, markets.length, onFirstData])
 
   const filteredMarkets = useMemo(() => markets, [markets])
 

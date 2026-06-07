@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"
+const PORTFOLIO_FRESH_MS = 30_000
+const PORTFOLIO_STALE_MS = 5 * 60_000
 
 export type PortfolioResponse = {
   address: string
@@ -15,6 +17,84 @@ export type PortfolioResponse = {
     source: "positions" | "closedPositions" | "value" | "trades"
     error: string
   }>
+}
+
+type PortfolioCacheEntry = {
+  value: PortfolioResponse
+  lastUpdated: Date
+  fetchedAt: number
+}
+
+type PortfolioHookOptions = {
+  enabled?: boolean
+  initialDelayMs?: number
+}
+
+const portfolioCache = new Map<string, PortfolioCacheEntry>()
+const portfolioFlights = new Map<string, Promise<PortfolioCacheEntry>>()
+
+function portfolioCacheKey(address: string) {
+  return address.toLowerCase()
+}
+
+function getPortfolioCacheEntry(address?: string | null, maxAgeMs = PORTFOLIO_STALE_MS) {
+  if (!address) return null
+  const entry = portfolioCache.get(portfolioCacheKey(address))
+  if (!entry) return null
+  if (Date.now() - entry.fetchedAt > maxAgeMs) {
+    portfolioCache.delete(portfolioCacheKey(address))
+    return null
+  }
+  return entry
+}
+
+function parsePortfolioPayload(rawPayload: string) {
+  if (!rawPayload) return {}
+  try {
+    return JSON.parse(rawPayload)
+  } catch {
+    return { error: rawPayload }
+  }
+}
+
+async function fetchPortfolioEntry(address: string): Promise<PortfolioCacheEntry> {
+  const key = portfolioCacheKey(address)
+  const existing = portfolioFlights.get(key)
+  if (existing) return existing
+
+  const flight = (async () => {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), 12_000)
+    try {
+      const res = await fetch(`${API_BASE}/portfolio/${address}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      })
+      const payload = parsePortfolioPayload(await res.text())
+      if (!res.ok) throw new Error(payload?.error ?? payload?.message ?? `Portfolio API returned ${res.status}`)
+      const entry = {
+        value: normalizePortfolioResponse(payload as PortfolioResponse),
+        lastUpdated: new Date(),
+        fetchedAt: Date.now(),
+      }
+      portfolioCache.set(key, entry)
+      return entry
+    } finally {
+      window.clearTimeout(timeoutId)
+      portfolioFlights.delete(key)
+    }
+  })()
+
+  portfolioFlights.set(key, flight)
+  return flight
+}
+
+export async function prefetchPolymarketPortfolio(address?: string | null) {
+  if (!address) return null
+  const cached = getPortfolioCacheEntry(address, PORTFOLIO_FRESH_MS)
+  if (cached) return cached.value
+  const entry = await fetchPortfolioEntry(address)
+  return entry.value
 }
 
 function firstValueRecord(value: any) {
@@ -227,15 +307,24 @@ export function getPositionPnlPercent(position: any) {
   return Math.abs(apiPercent) <= 2 ? apiPercent * 100 : apiPercent
 }
 
-export function usePolymarketPortfolio(address?: string | null, pollingMs?: number) {
+export function usePolymarketPortfolio(address?: string | null, pollingMs?: number, options: PortfolioHookOptions = {}) {
   const [data, setData] = useState<PortfolioResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const dataRef = useRef<PortfolioResponse | null>(null)
+  const enabled = options.enabled ?? true
+  const initialDelayMs = options.initialDelayMs ?? 0
 
-  const refresh = async () => {
-    if (!address) {
+  const applyEntry = useCallback((entry: PortfolioCacheEntry) => {
+    dataRef.current = entry.value
+    setData(entry.value)
+    setLastUpdated(entry.lastUpdated)
+    setError(entry.value.partial ? "Some portfolio details are still syncing. Showing the latest available data." : null)
+  }, [])
+
+  const refresh = useCallback(async () => {
+    if (!enabled || !address) {
       dataRef.current = null
       setData(null)
       setError(null)
@@ -244,31 +333,8 @@ export function usePolymarketPortfolio(address?: string | null, pollingMs?: numb
 
     setLoading(true)
     setError(null)
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), 12_000)
     try {
-      const res = await fetch(`${API_BASE}/portfolio/${address}`, {
-        cache: "no-store",
-        signal: controller.signal,
-      })
-      const rawPayload = await res.text()
-      const payload = rawPayload
-        ? (() => {
-            try {
-              return JSON.parse(rawPayload)
-            } catch {
-              return { error: rawPayload }
-            }
-          })()
-        : {}
-      if (!res.ok) throw new Error(payload?.error ?? payload?.message ?? `Portfolio API returned ${res.status}`)
-      const normalized = normalizePortfolioResponse(payload as PortfolioResponse)
-      dataRef.current = normalized
-      setData(normalized)
-      setLastUpdated(new Date())
-      if (normalized.partial) {
-        setError("Some portfolio details are still syncing. Showing the latest available data.")
-      }
+      applyEntry(await fetchPortfolioEntry(address))
     } catch (err: any) {
       const hadData = Boolean(dataRef.current)
       if (!hadData) setData(null)
@@ -280,22 +346,42 @@ export function usePolymarketPortfolio(address?: string | null, pollingMs?: numb
             : err?.message ?? "Portfolio load failed"
       )
     } finally {
-      window.clearTimeout(timeoutId)
       setLoading(false)
     }
-  }
+  }, [address, applyEntry, enabled])
 
   useEffect(() => {
-    refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address])
+    if (!enabled || !address) {
+      dataRef.current = null
+      setData(null)
+      setError(null)
+      setLastUpdated(null)
+      return
+    }
+
+    const cached = getPortfolioCacheEntry(address)
+    if (cached) {
+      applyEntry(cached)
+      if (Date.now() - cached.fetchedAt < PORTFOLIO_FRESH_MS) return
+    }
+
+    const timer = window.setTimeout(() => {
+      const fresh = getPortfolioCacheEntry(address, PORTFOLIO_FRESH_MS)
+      if (fresh) {
+        applyEntry(fresh)
+        return
+      }
+      void refresh()
+    }, initialDelayMs)
+
+    return () => window.clearTimeout(timer)
+  }, [address, applyEntry, enabled, initialDelayMs, refresh])
 
   useEffect(() => {
-    if (!pollingMs || !address) return
+    if (!enabled || !pollingMs || !address) return
     const id = setInterval(() => void refresh(), pollingMs)
     return () => clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, pollingMs])
+  }, [address, enabled, pollingMs, refresh])
 
   const summary = useMemo(() => {
     const value = firstValueRecord(data?.value)

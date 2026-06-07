@@ -106,6 +106,7 @@ function formatPusd(value?: number | null) {
 }
 
 function NavbarBalanceBreakdown() {
+  const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [fundingOpen, setFundingOpen] = useState(false)
   const [fundingInitialTab, setFundingInitialTab] = useState<"deposit" | "withdraw">("deposit")
@@ -119,10 +120,15 @@ function NavbarBalanceBreakdown() {
     polymarketDepositWallet.address ? "deposit" : undefined
   )
   const tradingWalletAddress = tradingProfile.profile?.tradingWalletAddress ?? null
-  const portfolio = usePolymarketPortfolio(tradingWalletAddress)
+  const accountSyncDelayMs = pathname === "/" ? 6500 : 0
+  const portfolio = usePolymarketPortfolio(tradingWalletAddress, undefined, {
+    initialDelayMs: accountSyncDelayMs,
+  })
   const readiness = useTradeReadiness({
     connectedWalletAddress: walletAddress,
     profile: tradingProfile.profile,
+  }, {
+    initialDelayMs: accountSyncDelayMs,
   })
   const positions = portfolio.data?.positions ?? []
   const valueRecord = firstValueRecord(portfolio.data?.value)

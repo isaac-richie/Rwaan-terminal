@@ -47,15 +47,21 @@ export default function PrivacyPage() {
             <ul className="mt-3 space-y-2 list-disc list-inside">
               <li>
                 <span className="text-foreground font-medium">Wallet addresses</span> — Public EVM addresses you
-                connect to the Platform. These are public on-chain identifiers.
+                connect to the Platform. These are public on-chain identifiers and are shared with Polymarket, Ondo Finance, and PancakeSwap for routing and compliance.
               </li>
               <li>
                 <span className="text-foreground font-medium">Trading profile data</span> — Deposit address mappings
-                and trading wallet configuration required for CLOB order routing.
+                and trading wallet configuration required for CLOB order routing and stock token transfers.
               </li>
               <li>
-                <span className="text-foreground font-medium">Reward/points events</span> — Trade activity recorded for
-                the points programme (wallet, amount, timestamp). No personal identification.
+                <span className="text-foreground font-medium">Prediction market activity</span> — Order history, fills, balances recorded for Polymarket integration. These records are used for points and rewards tracking.
+              </li>
+              <li>
+                <span className="text-foreground font-medium">Stock trading activity</span> — Token swap requests and holdings tracked via PancakeSwap and Ondo Finance smart contracts. Recorded for points and rewards tracking.
+              </li>
+              <li>
+                <span className="text-foreground font-medium">Reward/points events</span> — All trade activity recorded for
+                the points programme (wallet, amount, timestamp, asset type). No personal identification.
               </li>
               <li>
                 <span className="text-foreground font-medium">Referral links</span> — If you use a referral link, we
@@ -84,8 +90,18 @@ export default function PrivacyPage() {
             <div className="mt-3 space-y-3">
               <ThirdParty
                 name="Polymarket"
-                purpose="Liquidity, order routing, and geoblock checks. Polymarket may process your IP address to determine eligibility."
+                purpose="Prediction market liquidity, order routing, and geoblock checks. Polymarket may process your IP address and wallet address to determine eligibility and for compliance."
                 url="https://polymarket.com/privacy-policy"
+              />
+              <ThirdParty
+                name="Ondo Finance"
+                purpose="Issuer of tokenized equity tokens (rTokens). Ondo processes trading and redemption requests. Your wallet address and trading activity may be logged by Ondo for compliance and audit purposes."
+                url="https://ondo.finance/privacy"
+              />
+              <ThirdParty
+                name="PancakeSwap"
+                purpose="Decentralized exchange for rToken trading. PancakeSwap processes swap requests and may log your wallet address and transaction data. Subject to PancakeSwap's privacy policy."
+                url="https://pancakeswap.finance/privacy"
               />
               <ThirdParty
                 name="Privy"
@@ -94,7 +110,7 @@ export default function PrivacyPage() {
               />
               <ThirdParty
                 name="BNB Chain / Polygon"
-                purpose="Public blockchains. All on-chain activity is publicly visible by nature."
+                purpose="Public blockchains. All on-chain activity is publicly visible by nature. Your wallet address and all transactions are permanently recorded on-chain."
                 url={null}
               />
             </div>

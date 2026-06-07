@@ -69,6 +69,9 @@ export default function TermsPage() {
               By using the Platform, you represent and warrant that you are eligible to do so under the laws of your
               jurisdiction. Rawli Analytics reserves the right to restrict access from any region at any time.
             </p>
+            <p className="mt-3">
+              You must be at least 18 years of age and not a restricted person under US law, OFAC sanctions, or the laws of your jurisdiction.
+            </p>
           </Section>
 
           <Section title="4. Non-Custodial Nature">
@@ -79,18 +82,64 @@ export default function TermsPage() {
             </p>
           </Section>
 
-          <Section title="5. Risk Disclosure">
+          <Section title="5. Tokenized Stocks and Securities Disclosure">
+            <p>
+              Stocks traded on Rawli are tokenized equity tokens (rTokens) issued by Ondo Finance and routed through
+              PancakeSwap on BNB Chain. These tokens represent real US equities and are classified as securities under
+              applicable law.
+            </p>
+            <ul className="mt-3 space-y-1.5 list-disc list-inside">
+              <li>
+                <span className="text-foreground font-medium">Ondo Finance</span> is the issuer of rTokens and has
+                regulatory engagement with securities regulators.
+              </li>
+              <li>
+                <span className="text-foreground font-medium">Rawli Analytics</span> is a non-custodial routing interface
+                only. We do not issue, custody, or manage these tokens.
+              </li>
+              <li>
+                <span className="text-foreground font-medium">PancakeSwap</span> is a decentralized exchange where rToken
+                trading occurs on-chain.
+              </li>
+              <li>
+                You hold price exposure only — you do not receive voting rights, dividends, or other shareholder benefits.
+              </li>
+              <li>
+                All rToken transactions are final and irreversible once confirmed on-chain.
+              </li>
+            </ul>
+            <p className="mt-3">
+              By trading tokenized stocks on Rawli, you acknowledge that you understand the regulatory nature of these
+              instruments and accept the terms set by Ondo Finance and PancakeSwap.
+            </p>
+          </Section>
+
+          <Section title="7. Risks — Prediction Markets">
             <p>Prediction market trading involves substantial risk. You may lose all funds you trade. Specifically:</p>
             <ul className="mt-3 space-y-1.5 list-disc list-inside">
               <li>Prediction market outcomes are binary — you may lose 100% of your position.</li>
               <li>On-chain transactions are irreversible.</li>
-              <li>Smart contract bugs, oracle failures, or liquidity issues may result in loss.</li>
+              <li>Smart contract bugs, oracle failures, or liquidity issues may result in loss of funds.</li>
               <li>Market prices reflect crowd sentiment, not guaranteed outcomes.</li>
-              <li>AI-generated analysis provided by the Platform is not financial advice.</li>
+              <li>Events may resolve unexpectedly or be contested, resulting in delayed or disputed payouts.</li>
+              <li>AI-generated analysis provided by the Platform is not financial advice and may be inaccurate.</li>
             </ul>
           </Section>
 
-          <Section title="6. Fees">
+          <Section title="8. Risks — Tokenized Stocks">
+            <p>Tokenized stock trading involves risks distinct from prediction markets:</p>
+            <ul className="mt-3 space-y-1.5 list-disc list-inside">
+              <li>Stock prices can move continuously, and you may experience unlimited losses if the company fails or the stock price falls to zero.</li>
+              <li>Smart contract bugs in Ondo Finance or PancakeSwap may result in loss of funds or inability to withdraw.</li>
+              <li>BNB Chain validator risks, network outages, or blockchain reorganization may prevent or delay transactions.</li>
+              <li>rToken token redemption may be subject to conditions or delays set by Ondo Finance.</li>
+              <li>You do not hold actual shares — you hold tokenized exposure only, which may differ in treatment from traditional stock ownership.</li>
+              <li>Regulatory changes affecting tokenized securities may impact your ability to trade or the value of your holdings.</li>
+              <li>Market liquidity for rTokens on PancakeSwap may be limited, resulting in wider spreads and slippage.</li>
+            </ul>
+          </Section>
+
+          <Section title="9. Fees">
             <p>
               The Platform charges a platform fee on trades (currently 0.5%, subject to change). Premium intelligence
               reports are free during the current testing phase. If pricing returns later, all fees will be disclosed
@@ -98,30 +147,56 @@ export default function TermsPage() {
             </p>
           </Section>
 
-          <Section title="7. Intellectual Property">
+          <Section title="10. KYC / AML and Compliance">
+            <p>
+              Rawli Analytics does not directly perform Know-Your-Customer (KYC) or Anti-Money-Laundering (AML) screening.
+              However:
+            </p>
+            <ul className="mt-3 space-y-1.5 list-disc list-inside">
+              <li>
+                <span className="text-foreground font-medium">Polymarket</span> performs geoblock checks and applies
+                restrictions to certain regions.
+              </li>
+              <li>
+                <span className="text-foreground font-medium">PancakeSwap</span> (for tokenized stock trading) may have
+                its own compliance and access restrictions.
+              </li>
+              <li>
+                You are responsible for understanding and complying with the laws of your jurisdiction regarding prediction
+                market and securities trading.
+              </li>
+              <li>
+                Rawli reserves the right to restrict access or suspend accounts that appear to violate sanctions, OFAC
+                rules, or applicable securities laws.
+              </li>
+            </ul>
+          </Section>
+
+          <Section title="11. Intellectual Property">
             <p>
               All Platform content, design, code, and branding are proprietary to Rawli Analytics. You may not
               reproduce, distribute, or create derivative works without express written permission.
             </p>
           </Section>
 
-          <Section title="8. Disclaimer of Warranties">
+          <Section title="12. Disclaimer of Warranties">
             <p>
-              THE PLATFORM IS PROVIDED &quot;AS IS&quot; WITHOUT WARRANTIES OF ANY KIND. RAWLI ANALYTIC MAKES NO
+              THE PLATFORM IS PROVIDED &quot;AS IS&quot; WITHOUT WARRANTIES OF ANY KIND. RAWLI ANALYTICS MAKES NO
               WARRANTY THAT THE PLATFORM WILL BE UNINTERRUPTED, ERROR-FREE, OR SECURE. MARKET DATA IS PROVIDED FOR
-              INFORMATIONAL PURPOSES ONLY AND MAY NOT BE ACCURATE OR TIMELY.
+              INFORMATIONAL PURPOSES ONLY AND MAY NOT BE ACCURATE OR TIMELY. RAWLI ASSUMES NO LIABILITY FOR LOSSES
+              ARISING FROM TRADING DECISIONS BASED ON PLATFORM DATA OR ANALYSIS.
             </p>
           </Section>
 
-          <Section title="9. Limitation of Liability">
+          <Section title="13. Limitation of Liability">
             <p>
-              TO THE MAXIMUM EXTENT PERMITTED BY LAW, RAWLI ANALYTIC SHALL NOT BE LIABLE FOR ANY INDIRECT,
-              INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE PLATFORM OR ANY
-              PREDICTION MARKET TRADING ACTIVITY.
+              TO THE MAXIMUM EXTENT PERMITTED BY LAW, RAWLI ANALYTICS SHALL NOT BE LIABLE FOR ANY INDIRECT,
+              INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE PLATFORM, ANY
+              PREDICTION MARKET TRADING ACTIVITY, OR TOKENIZED STOCK TRADING.
             </p>
           </Section>
 
-          <Section title="10. Modifications">
+          <Section title="14. Modifications">
             <p>
               We reserve the right to modify these Terms at any time. Continued use of the Platform after changes
               constitutes acceptance of the revised Terms. Material changes will be communicated via the Platform
@@ -129,7 +204,7 @@ export default function TermsPage() {
             </p>
           </Section>
 
-          <Section title="11. Governing Law">
+          <Section title="15. Governing Law">
             <p>
               These Terms shall be governed by and construed in accordance with applicable international commercial law,
               without regard to any specific jurisdiction&apos;s conflict of law provisions.

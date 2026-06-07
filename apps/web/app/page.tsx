@@ -1,7 +1,7 @@
 "use client"
 
-import { Suspense, useEffect, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { MarketHero } from "@/components/market-hero"
 import { CategoriesBar } from "@/components/categories-bar"
@@ -12,11 +12,13 @@ import { OnboardingSheet } from "@/components/onboarding-sheet"
 import { fetchRwaAssets, fetchRwaQuotes } from "@/lib/rwa"
 
 function HomeContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [category, setCategory] = useState("all")
   const [sortBy, setSortBy] = useState("trending")
   const edgeRef = useRef<HTMLDivElement | null>(null)
   const [edgeVisible, setEdgeVisible] = useState(false)
+  const [marketStable, setMarketStable] = useState(false)
 
   // Derive search query reactively from URL — handles both initial load
   // and client-side router.push("/?q=...") from the navbar search modal.
@@ -26,11 +28,25 @@ function HomeContent() {
     if (searchQuery) setCategory("all")
   }, [searchQuery])
 
+  const markMarketStable = useCallback(() => {
+    setMarketStable(true)
+  }, [])
+
   // ── Pre-fetch stocks data after the first market view is already painted ──
   useEffect(() => {
+    if (!marketStable) return
+    let cancelled = false
+    let idleHandle: number | null = null
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
     async function prefetchStocks() {
       try {
+        if (cancelled) return
         const assets = await fetchRwaAssets("NG")
+        if (cancelled) return
         const symbols = assets.assets
           .filter(a => a.quoteSymbol)
           .slice(0, 20)
@@ -45,10 +61,30 @@ function HomeContent() {
     }
 
     const timer = window.setTimeout(() => {
+      if (idleWindow.requestIdleCallback) {
+        idleHandle = idleWindow.requestIdleCallback(() => {
+          void prefetchStocks()
+        }, { timeout: 6_000 })
+        return
+      }
       void prefetchStocks()
-    }, 7000)
+    }, 1_500)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+      if (idleHandle !== null) idleWindow.cancelIdleCallback?.(idleHandle)
+    }
+  }, [marketStable])
+
+  useEffect(() => {
+    if (!marketStable) return
+    const timer = window.setTimeout(() => {
+      router.prefetch("/stocks")
+      router.prefetch("/portfolio")
+    }, 1_000)
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [marketStable, router])
 
   useEffect(() => {
     if (edgeVisible || searchQuery) return
@@ -112,7 +148,7 @@ function HomeContent() {
         <CategoriesBar selected={category} onSelect={setCategory} sortBy={sortBy} onSortChange={setSortBy} />
 
         <div className="pt-4 sm:pt-5">
-          <MarketsGrid category={category} sortBy={sortBy} search={searchQuery} />
+          <MarketsGrid category={category} sortBy={sortBy} search={searchQuery} onFirstData={markMarketStable} />
         </div>
 
         {/* ── Edge Scanner / Market Intelligence ───────────────────── */}

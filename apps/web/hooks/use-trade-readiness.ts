@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import type { TradeReadinessResponse, TradingProfile } from "@smartmarket/types"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"
@@ -22,15 +22,22 @@ type TradeReadinessArgs = {
   createClobSessionHeaders?: () => Promise<Record<string, string> | null>
 }
 
-export function useTradeReadiness(args: TradeReadinessArgs): TradeReadinessState {
+type TradeReadinessOptions = {
+  enabled?: boolean
+  initialDelayMs?: number
+}
+
+export function useTradeReadiness(args: TradeReadinessArgs, options: TradeReadinessOptions = {}): TradeReadinessState {
   const [readiness, setReadiness] = useState<TradeReadinessResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const enabled = options.enabled ?? true
+  const initialDelayMs = options.initialDelayMs ?? 0
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setError(null)
 
-    if (!args.connectedWalletAddress) {
+    if (!enabled || !args.connectedWalletAddress) {
       setReadiness(null)
       return
     }
@@ -65,11 +72,29 @@ export function useTradeReadiness(args: TradeReadinessArgs): TradeReadinessState
     } finally {
       setLoading(false)
     }
-  }
+  }, [
+    args.amountUsd,
+    args.clobSessionStatus,
+    args.connectedWalletAddress,
+    args.createClobSessionHeaders,
+    args.marketId,
+    args.profile?.depositAddress?.evm,
+    args.profile?.tradingWalletAddress,
+    args.profile?.tradingWalletKind,
+    args.tokenId,
+    enabled,
+  ])
 
   useEffect(() => {
-    refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!enabled || !args.connectedWalletAddress) {
+      setReadiness(null)
+      setError(null)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      void refresh()
+    }, initialDelayMs)
+    return () => window.clearTimeout(timer)
   }, [
     args.connectedWalletAddress,
     args.profile?.tradingWalletAddress,
@@ -78,6 +103,9 @@ export function useTradeReadiness(args: TradeReadinessArgs): TradeReadinessState
     args.marketId,
     args.amountUsd,
     args.clobSessionStatus,
+    enabled,
+    initialDelayMs,
+    refresh,
   ])
 
   return { readiness, loading, error, refresh }
