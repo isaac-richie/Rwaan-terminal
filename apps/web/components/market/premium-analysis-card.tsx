@@ -185,7 +185,7 @@ function ModelVsMarketStrip({ pm }: { pm: NonNullable<PremiumAnalysis["probabili
   const dir = edgePts > 0 ? "underpricing" : "overpricing"
   const edgeColor = strong ? AMBER : "var(--muted-foreground)"
   const edgeSummary = strong
-    ? `Our model puts YES ${Math.abs(edgePts)}pts ${edgePts > 0 ? "above" : "below"} the market — a potential ${dir} of YES.`
+    ? `Our model puts YES ${Math.abs(edgePts)}pts ${edgePts > 0 ? "above" : "below"} the market, signaling potential YES ${dir}.`
     : smallEdge
       ? `Small ${Math.abs(edgePts)}pt pricing edge, but not enough for a standalone trade.`
       : "Model and market are broadly aligned, so edge is limited."
@@ -1176,7 +1176,7 @@ function FundamentalPanel({ fa }: { fa: PremiumFundamentalAnalysis }) {
       {fa.priceEfficiency === "potentially_mispriced" && (
         <div className="rounded-md p-2.5 bg-[oklch(0.58_0.2_25_/_0.08)] border border-[oklch(0.58_0.2_25_/_0.2)]">
           <p className="text-[10px]" style={{ color: RED }}>
-            ⚠ News sentiment diverges from market price — potential mispricing detected
+            ⚠ News sentiment diverges from market price. Potential mispricing detected.
           </p>
         </div>
       )}

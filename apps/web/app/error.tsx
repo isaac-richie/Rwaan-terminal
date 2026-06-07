@@ -25,7 +25,7 @@ export default function GlobalError({
         <div>
           <h1 className="text-lg font-bold text-foreground">Something went wrong</h1>
           <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-            An unexpected error occurred. Your wallet and positions are safe — this is a display issue only.
+            An unexpected error occurred. Your wallet and positions are safe. This is a display issue only.
           </p>
           {error?.digest && (
             <p className="text-[10px] font-mono text-muted-foreground/50 mt-2">

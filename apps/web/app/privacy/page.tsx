@@ -46,29 +46,29 @@ export default function PrivacyPage() {
             <p>We collect the minimum data necessary to operate the Platform:</p>
             <ul className="mt-3 space-y-2 list-disc list-inside">
               <li>
-                <span className="text-foreground font-medium">Wallet addresses</span> — Public EVM addresses you
+                <span className="text-foreground font-medium">Wallet addresses</span>: Public EVM addresses you
                 connect to the Platform. These are public on-chain identifiers and are shared with Polymarket, Ondo Finance, and PancakeSwap for routing and compliance.
               </li>
               <li>
-                <span className="text-foreground font-medium">Trading profile data</span> — Deposit address mappings
+                <span className="text-foreground font-medium">Trading profile data</span>: Deposit address mappings
                 and trading wallet configuration required for CLOB order routing and stock token transfers.
               </li>
               <li>
-                <span className="text-foreground font-medium">Prediction market activity</span> — Order history, fills, balances recorded for Polymarket integration. These records are used for points and rewards tracking.
+                <span className="text-foreground font-medium">Prediction market activity</span>: Order history, fills, balances recorded for Polymarket integration. These records are used for points and rewards tracking.
               </li>
               <li>
-                <span className="text-foreground font-medium">Stock trading activity</span> — Token swap requests and holdings tracked via PancakeSwap and Ondo Finance smart contracts. Recorded for points and rewards tracking.
+                <span className="text-foreground font-medium">Stock trading activity</span>: Token swap requests and holdings tracked via PancakeSwap and Ondo Finance smart contracts. Recorded for points and rewards tracking.
               </li>
               <li>
-                <span className="text-foreground font-medium">Reward/points events</span> — All trade activity recorded for
+                <span className="text-foreground font-medium">Reward/points events</span>: All trade activity recorded for
                 the points programme (wallet, amount, timestamp, asset type). No personal identification.
               </li>
               <li>
-                <span className="text-foreground font-medium">Referral links</span> — If you use a referral link, we
+                <span className="text-foreground font-medium">Referral links</span>: If you use a referral link, we
                 record the referring and referred wallet addresses.
               </li>
               <li>
-                <span className="text-foreground font-medium">Analysis generation</span> — Market IDs and timestamps
+                <span className="text-foreground font-medium">Analysis generation</span>: Market IDs and timestamps
                 for generated premium intelligence reports. When report fees are enabled, transaction hashes may also be
                 stored to prevent replay.
               </li>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
               <li>No names, email addresses, or government identifiers</li>
               <li>No IP addresses stored persistently</li>
               <li>No browser fingerprints or cross-site tracking</li>
-              <li>No private keys — ever</li>
+              <li>No private keys at any time</li>
               <li>No payment card data</li>
             </ul>
           </Section>

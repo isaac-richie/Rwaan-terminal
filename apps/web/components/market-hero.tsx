@@ -467,8 +467,8 @@ export function MarketHero() {
               </div>
               <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
                 {PREMIUM_ANALYSIS_FEE_ENABLED
-                  ? "Deep AI reports per market — live context, structural drivers, and a definitive YES/NO verdict. Unlock for $1 USDT."
-                  : "Free testing-phase AI reports per market — live context, structural drivers, and a definitive YES/NO verdict."}
+                  ? "Deep AI reports per market with live context, structural drivers, and a definitive YES/NO verdict. Unlock for $1 USDT."
+                  : "Free testing-phase AI reports per market with live context, structural drivers, and a definitive YES/NO verdict."}
               </p>
               <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-[oklch(0.78_0.16_82)]">
                 <span className="h-1 w-1 rounded-full bg-[oklch(0.78_0.16_82)]" />

@@ -102,7 +102,7 @@ export default function TermsPage() {
                 trading occurs on-chain.
               </li>
               <li>
-                You hold price exposure only — you do not receive voting rights, dividends, or other shareholder benefits.
+                You hold price exposure only. You do not receive voting rights, dividends, or other shareholder benefits.
               </li>
               <li>
                 All rToken transactions are final and irreversible once confirmed on-chain.
@@ -114,10 +114,10 @@ export default function TermsPage() {
             </p>
           </Section>
 
-          <Section title="7. Risks — Prediction Markets">
+          <Section title="7. Risks: Prediction Markets">
             <p>Prediction market trading involves substantial risk. You may lose all funds you trade. Specifically:</p>
             <ul className="mt-3 space-y-1.5 list-disc list-inside">
-              <li>Prediction market outcomes are binary — you may lose 100% of your position.</li>
+              <li>Prediction market outcomes are binary, and you may lose 100% of your position.</li>
               <li>On-chain transactions are irreversible.</li>
               <li>Smart contract bugs, oracle failures, or liquidity issues may result in loss of funds.</li>
               <li>Market prices reflect crowd sentiment, not guaranteed outcomes.</li>
@@ -126,14 +126,14 @@ export default function TermsPage() {
             </ul>
           </Section>
 
-          <Section title="8. Risks — Tokenized Stocks">
+          <Section title="8. Risks: Tokenized Stocks">
             <p>Tokenized stock trading involves risks distinct from prediction markets:</p>
             <ul className="mt-3 space-y-1.5 list-disc list-inside">
               <li>Stock prices can move continuously, and you may experience unlimited losses if the company fails or the stock price falls to zero.</li>
               <li>Smart contract bugs in Ondo Finance or PancakeSwap may result in loss of funds or inability to withdraw.</li>
               <li>BNB Chain validator risks, network outages, or blockchain reorganization may prevent or delay transactions.</li>
               <li>rToken token redemption may be subject to conditions or delays set by Ondo Finance.</li>
-              <li>You do not hold actual shares — you hold tokenized exposure only, which may differ in treatment from traditional stock ownership.</li>
+              <li>You do not hold actual shares. You hold tokenized exposure only, which may differ in treatment from traditional stock ownership.</li>
               <li>Regulatory changes affecting tokenized securities may impact your ability to trade or the value of your holdings.</li>
               <li>Market liquidity for rTokens on PancakeSwap may be limited, resulting in wider spreads and slippage.</li>
             </ul>

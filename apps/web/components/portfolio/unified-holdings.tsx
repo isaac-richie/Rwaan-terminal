@@ -406,7 +406,7 @@ function EmptyHoldings({ filter }: { filter: FilterType }) {
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
           {filter === "stocks"
-            ? "Buy US stocks on the Stocks page — they'll appear here instantly."
+            ? "Buy US stocks on the Stocks page. They'll appear here instantly."
             : filter === "predictions"
             ? "Trade on any market to open a position."
             : "Your positions and stock holdings will appear here."

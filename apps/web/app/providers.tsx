@@ -2,6 +2,7 @@
 
 import { PrivyProvider } from "@privy-io/react-auth";
 import { polygon, bsc } from "viem/chains";
+import { PrivyBackdropPatch } from "@/components/privy-backdrop-patch";
 import { ReferralTracker } from "@/components/referral-tracker";
 import { Toaster } from "@/components/ui/sonner";
 import type { ReactNode } from "react";
@@ -20,6 +21,7 @@ export default function Providers({ children }: { children: ReactNode }) {
   const content = (
     <>
       {children}
+      <PrivyBackdropPatch />
       <Toaster
         position="bottom-right"
         toastOptions={{
@@ -41,9 +43,10 @@ export default function Providers({ children }: { children: ReactNode }) {
       appId={appId}
       config={{
         loginMethods: ["wallet", "email"],
-        // Polygon is the CLOB signing chain; BNB is the funding/deposit chain.
-        defaultChain: polygon,
-        supportedChains: [polygon, bsc],
+        // BNB is the user-facing default for funding, stock swaps, and report payments.
+        // Prediction orders switch to Polygon only when the CLOB flow needs it.
+        defaultChain: bsc,
+        supportedChains: [bsc, polygon],
         appearance: {
           theme: "dark",
           accentColor: "#f0b90b",

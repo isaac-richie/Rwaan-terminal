@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation"
 import {
   ChevronDown, Copy, Menu, Search, Wallet, X, Briefcase,
   TrendingUp, ArrowUpRight, Activity, Award, Bell, CircleDollarSign,
-  Check, LogOut, Plus, Building2
+  Check, LogOut, Plus, Building2, AlertTriangle
 } from "lucide-react"
 import { usePrivy, type ConnectedWallet } from "@privy-io/react-auth"
 import { BnbFundingModal } from "@/components/funding/bnb-funding-modal"
@@ -65,6 +65,159 @@ function walletActionError(err: any, fallback: string) {
   if (normalized.includes("user rejected") || normalized.includes("rejected")) return "Request cancelled in wallet."
   if (normalized.includes("connector")) return "Wallet connector did not respond. Reopen the wallet and try again."
   return message && message !== "[object Object]" ? message.slice(0, 180) : fallback
+}
+
+type Eip1193Provider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
+}
+
+type NavbarNetworkKey = "bsc" | "polygon"
+
+const NAVBAR_NETWORKS: Record<NavbarNetworkKey, {
+  id: number
+  hex: `0x${string}`
+  label: string
+  params: {
+    chainId: `0x${string}`
+    chainName: string
+    nativeCurrency: { name: string; symbol: string; decimals: number }
+    rpcUrls: string[]
+    blockExplorerUrls: string[]
+  }
+}> = {
+  bsc: {
+    id: 56,
+    hex: "0x38",
+    label: "BNB Chain",
+    params: {
+      chainId: "0x38",
+      chainName: "BNB Smart Chain",
+      nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+      rpcUrls: ["https://bsc-dataseed.binance.org", "https://bsc.publicnode.com"],
+      blockExplorerUrls: ["https://bscscan.com"],
+    },
+  },
+  polygon: {
+    id: 137,
+    hex: "0x89",
+    label: "Polygon",
+    params: {
+      chainId: "0x89",
+      chainName: "Polygon",
+      nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
+      rpcUrls: [process.env.NEXT_PUBLIC_POLYGON_RPC_URL ?? "https://polygon-rpc.com", "https://polygon-bor.publicnode.com"],
+      blockExplorerUrls: ["https://polygonscan.com"],
+    },
+  },
+}
+
+const RAWLI_SUPPORTED_CHAIN_IDS = new Set(Object.values(NAVBAR_NETWORKS).map((network) => network.id))
+
+function parseWalletChainId(chainId?: string | number | null) {
+  if (typeof chainId === "number" && Number.isFinite(chainId)) return chainId
+  if (!chainId) return null
+  const raw = String(chainId).trim()
+  const caip2 = raw.match(/^eip155:(\d+)$/i)
+  if (caip2) return Number(caip2[1])
+  if (raw.toLowerCase().startsWith("0x")) {
+    const parsed = Number.parseInt(raw, 16)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  const numeric = Number(raw)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+function chainLabel(chainId?: number | null) {
+  if (!chainId) return "Unknown network"
+  if (chainId === 56) return "BNB Chain"
+  if (chainId === 137) return "Polygon"
+  if (chainId === 324) return "ZKsync Era"
+  if (chainId === 1) return "Ethereum"
+  if (chainId === 10) return "Optimism"
+  if (chainId === 42161) return "Arbitrum"
+  if (chainId === 8453) return "Base"
+  if (chainId === 43114) return "Avalanche"
+  return `chain ${chainId}`
+}
+
+async function switchNavbarNetwork(wallet: ConnectedWallet | null, targetKey: NavbarNetworkKey) {
+  if (!wallet) throw new Error("Connect a wallet first.")
+  const target = NAVBAR_NETWORKS[targetKey]
+  const switchable = wallet as ConnectedWallet & {
+    switchChain?: (chainId: number) => Promise<void>
+    getEthereumProvider?: () => Promise<Eip1193Provider>
+  }
+
+  if (typeof switchable.switchChain === "function") {
+    try {
+      await switchable.switchChain(target.id)
+      return
+    } catch {
+      // Some injected wallets expose switchChain but fail inside mobile browsers.
+      // Fall back to EIP-1193 so MetaMask/WalletConnect still get a native prompt.
+    }
+  }
+
+  const provider = await switchable.getEthereumProvider?.()
+  if (!provider) throw new Error("Open your wallet and switch networks manually.")
+  try {
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: target.hex }],
+    })
+  } catch (err: any) {
+    const code = Number(err?.code ?? err?.data?.code)
+    if (code !== 4902) throw err
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [target.params],
+    })
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: target.hex }],
+    })
+  }
+}
+
+function UnsupportedNetworkNotice({
+  chainId,
+  onSwitchNetwork,
+  compact = false,
+}: {
+  chainId: number | null
+  onSwitchNetwork: (target: NavbarNetworkKey) => void
+  compact?: boolean
+}) {
+  return (
+    <div className={cn(
+      "rounded-xl border border-[oklch(0.58_0.2_25/0.40)] bg-[oklch(0.18_0.055_25/0.34)] text-[oklch(0.82_0.12_25)]",
+      compact ? "m-2 p-3" : "mx-2 mb-2 p-3"
+    )}>
+      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em]">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        Wrong network
+      </div>
+      <p className="mt-1.5 text-[11px] leading-5 text-[oklch(0.78_0.04_75)]">
+        You are on {chainLabel(chainId)}. Use BNB Chain for stocks and funding, or Polygon for prediction orders.
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onSwitchNetwork("bsc")}
+          className="h-8 rounded-lg bg-[oklch(0.78_0.16_82)] text-[10px] font-bold uppercase tracking-[0.12em] text-[oklch(0.10_0.012_260)]"
+        >
+          BNB Chain
+        </button>
+        <button
+          type="button"
+          onClick={() => onSwitchNetwork("polygon")}
+          className="h-8 rounded-lg border border-[oklch(0.38_0.02_255)] bg-[oklch(0.13_0.013_255)] text-[10px] font-bold uppercase tracking-[0.12em] text-foreground"
+        >
+          Polygon
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function numericValue(...values: any[]) {
@@ -380,6 +533,8 @@ function PrivyDesktopWallet() {
   const walletAddress = activePrivyWallet.walletAddress
   const shortAddress = shortWalletAddress(walletAddress)
   const walletOptions = activePrivyWallet.wallets.filter(isNavbarEthereumWallet)
+  const currentChainId = parseWalletChainId(activePrivyWallet.wallet?.chainId)
+  const unsupportedNetwork = Boolean(currentChainId && !RAWLI_SUPPORTED_CHAIN_IDS.has(currentChainId))
 
   useEffect(() => {
     if (!walletMenuOpen) return
@@ -433,6 +588,15 @@ function PrivyDesktopWallet() {
     }
   }
 
+  const handleSwitchNetwork = async (target: NavbarNetworkKey) => {
+    setWalletError(null)
+    try {
+      await switchNavbarNetwork(activePrivyWallet.wallet, target)
+    } catch (err: any) {
+      setWalletError(walletActionError(err, `Open your wallet and switch to ${NAVBAR_NETWORKS[target].label}.`))
+    }
+  }
+
   const handleDisconnect = async () => {
     setDisconnecting(true)
     setWalletError(null)
@@ -477,6 +641,9 @@ function PrivyDesktopWallet() {
             style={{ background: walletGradient(walletAddress) }}
           />
           <span className="text-[11px] font-mono font-semibold text-foreground">{shortAddress}</span>
+          {unsupportedNetwork ? (
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[oklch(0.65_0.18_25)]" />
+          ) : null}
           <ChevronDown className={cn(
             "w-3 h-3 text-muted-foreground transition-transform duration-200",
             walletMenuOpen && "rotate-180"
@@ -496,6 +663,13 @@ function PrivyDesktopWallet() {
                 <p className="text-[9px] text-muted-foreground mt-0.5">Connected</p>
               </div>
             </div>
+
+            {unsupportedNetwork ? (
+              <UnsupportedNetworkNotice
+                chainId={currentChainId}
+                onSwitchNetwork={handleSwitchNetwork}
+              />
+            ) : null}
 
             <div className="py-1">
               <button
@@ -587,6 +761,8 @@ function PrivyMobileWallet({ onDone }: { onDone: () => void }) {
   const walletAddress = activePrivyWallet.walletAddress
   const shortAddress = shortWalletAddress(walletAddress)
   const walletOptions = activePrivyWallet.wallets.filter(isNavbarEthereumWallet)
+  const currentChainId = parseWalletChainId(activePrivyWallet.wallet?.chainId)
+  const unsupportedNetwork = Boolean(currentChainId && !RAWLI_SUPPORTED_CHAIN_IDS.has(currentChainId))
 
   const handleConnect = async () => {
     setWalletError(null)
@@ -629,6 +805,15 @@ function PrivyMobileWallet({ onDone }: { onDone: () => void }) {
       onDone()
     } catch (err: any) {
       setWalletError(walletActionError(err, "Wallet switch failed. Try again."))
+    }
+  }
+
+  const handleSwitchNetwork = async (target: NavbarNetworkKey) => {
+    setWalletError(null)
+    try {
+      await switchNavbarNetwork(activePrivyWallet.wallet, target)
+    } catch (err: any) {
+      setWalletError(walletActionError(err, `Open your wallet and switch to ${NAVBAR_NETWORKS[target].label}.`))
     }
   }
 
@@ -686,8 +871,19 @@ function PrivyMobileWallet({ onDone }: { onDone: () => void }) {
           </span>
           <span className="block truncate font-mono text-sm font-semibold text-foreground">{shortAddress}</span>
         </span>
+        {unsupportedNetwork ? (
+          <AlertTriangle className="h-4 w-4 shrink-0 text-[oklch(0.65_0.18_25)]" />
+        ) : null}
         <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", walletMenuOpen && "rotate-180")} />
       </button>
+
+      {unsupportedNetwork ? (
+        <UnsupportedNetworkNotice
+          chainId={currentChainId}
+          compact
+          onSwitchNetwork={handleSwitchNetwork}
+        />
+      ) : null}
 
       {walletMenuOpen ? (
         <div className="border-t border-[oklch(0.22_0.015_255/0.8)] py-1">

@@ -343,10 +343,10 @@ function BalanceLedgerCard({
   const statusTone = allowanceNeedsApproval ? "gold" : collateralError ? "red" : healthyBalanceRoute ? "green" : "muted";
   const statusMessage = missingTradingWallet
     ? "Connect your wallet to see your balance."
-    : allowanceNeedsApproval ? "Funds loaded — enable trading to place your next order."
+    : allowanceNeedsApproval ? "Funds loaded. Enable trading to place your next order."
     : collateralError ? collateralError
     : awaitingBalance ? "Sync your account to see your balance."
-    : "All good — your account is up to date.";
+    : "All good. Your account is up to date.";
 
   return (
     <div className="surface-card rounded-2xl p-5 sm:p-6">
@@ -700,7 +700,7 @@ function PortfolioContent() {
         title: clobSession.openOrders.length ? "Open orders loaded" : "No open orders",
         detail: clobSession.openOrders.length
           ? `${clobSession.openOrders.length} active order${clobSession.openOrders.length !== 1 ? "s" : ""}. ${formatPortfolioMoney(openOrderSummary.totalValue)} reserved.`
-          : "Session active — no orders pending.",
+          : "Session active. No orders pending.",
         meta: "Orders", tone: clobSession.openOrders.length ? "gold" : "green", icon: Lock });
     }
     trades.slice(0, 6).forEach((trade: any, i: number) => {

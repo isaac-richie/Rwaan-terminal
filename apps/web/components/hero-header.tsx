@@ -97,7 +97,7 @@ export function HeroHeader() {
         >
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[oklch(0.22_0.04_82)] border border-[oklch(0.78_0.16_82/0.25)] text-[oklch(0.78_0.16_82)] text-xs font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.78_0.16_82)] pulse-dot" />
-            Live markets — $1.24B+ Total Volume Traded
+            Live markets. $1.24B+ Total Volume Traded
             <ArrowUpRight className="w-3 h-3" />
           </div>
         </div>

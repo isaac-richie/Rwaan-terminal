@@ -78,7 +78,7 @@ function LegalSheet({
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/70 sm:backdrop-blur-sm"
         onClick={onClose}
       />
       {/* Sheet */}
@@ -143,11 +143,11 @@ const TERMS_CONTENT = (
     <LegalSection title="5. Risk Disclosure">
       <p>Prediction market trading carries substantial financial risk. By using this Platform, you acknowledge:</p>
       <ul className="mt-2 space-y-1.5 list-disc list-inside text-muted-foreground/80">
-        <li>Prediction market outcomes are binary — you may lose 100% of any position</li>
+        <li>Prediction market outcomes are binary, and you may lose 100% of any position</li>
         <li>On-chain transactions are irreversible once submitted</li>
         <li>Smart contract bugs, oracle failures, or liquidity gaps may cause losses</li>
         <li>Market prices reflect crowd probability estimates, not guaranteed outcomes</li>
-        <li>AI analysis on this Platform is for informational purposes only — not financial advice</li>
+        <li>AI analysis on this Platform is for informational purposes only, not financial advice</li>
         <li>Gas fees and platform fees are non-refundable</li>
       </ul>
     </LegalSection>
@@ -199,7 +199,7 @@ const PRIVACY_CONTENT = (
     <LegalSection title="1. What We Collect">
       <p>Rawli Analytics collects minimal data to operate the Platform:</p>
       <ul className="mt-2 space-y-1.5 list-disc list-inside text-muted-foreground/80">
-        <li>Wallet addresses (public on-chain identifiers — never private keys)</li>
+        <li>Wallet addresses (public on-chain identifiers, never private keys)</li>
         <li>Trading activity you initiate through the Platform (logged for rewards tracking)</li>
         <li>Referral codes you use or share</li>
         <li>
@@ -213,7 +213,7 @@ const PRIVACY_CONTENT = (
     <LegalSection title="2. What We Do Not Collect">
       <ul className="mt-2 space-y-1.5 list-disc list-inside text-muted-foreground/80">
         <li>Name, email, or any personally identifiable information unless you volunteer it</li>
-        <li>Private keys or wallet seed phrases — ever</li>
+        <li>Private keys or wallet seed phrases at any time</li>
         <li>IP addresses stored long-term</li>
         <li>Browser fingerprints or device identifiers</li>
       </ul>
@@ -266,24 +266,24 @@ const DOCS: Array<{
     icon: BarChart3,
     color: "oklch(0.78 0.16 82)",
     title: "Prediction Markets",
-    body: "Trade on real-world event outcomes. Every market resolves YES or NO — you buy shares at 0–100¢ and collect $1 if you're right.",
+    body: "Trade on real-world event outcomes. Every market resolves YES or NO. Buy shares at 0–100¢ and collect $1 if you're right.",
     detail: (
       <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
-        <p>Prediction markets let you trade on the probability of real-world events. Every market has exactly two outcomes — YES and NO. Shares trade between 0¢ and 100¢, where the price represents the crowd's collective probability estimate.</p>
+        <p>Prediction markets let you trade on the probability of real-world events. Every market has exactly two outcomes: YES and NO. Shares trade between 0¢ and 100¢, where the price represents the crowd's collective probability estimate.</p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.78_0.16_82)]">How payouts work</p>
           <p>Buy YES at 62¢ → If the event happens, each share pays $1.00 (38¢ profit). If not, shares expire worthless. Buy NO at 38¢ → inverse payout.</p>
         </div>
-        <p>Rawli routes all order execution directly through Polymarket's Central Limit Order Book (CLOB) on Polygon. This means you trade against real liquidity from thousands of global participants — not a market maker or internal pool.</p>
+        <p>Rawli routes all order execution directly through Polymarket's Central Limit Order Book (CLOB) on Polygon. This means you trade against real liquidity from thousands of global participants, not a market maker or internal pool.</p>
         <p>Markets resolve based on real-world data from verified oracles. Once resolved, winning shares are automatically redeemable for $1.00 USDC each.</p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.78_0.16_82)]">Market types on Rawli</p>
           <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
-            <li>24-Hour crypto markets — fast resolution, high velocity</li>
-            <li>Geopolitical events — elections, treaties, summits</li>
-            <li>Sports outcomes — match results, tournament winners</li>
-            <li>Africa & emerging market events — exclusive focus</li>
-            <li>Economic indicators — inflation, rate decisions, GDP</li>
+            <li>24-Hour crypto markets: fast resolution and high velocity</li>
+            <li>Geopolitical events: elections, treaties, and summits</li>
+            <li>Sports outcomes: match results and tournament winners</li>
+            <li>Africa & emerging market events: focused regional coverage</li>
+            <li>Economic indicators: inflation, rate decisions, and GDP</li>
           </ul>
         </div>
       </div>
@@ -324,7 +324,7 @@ const DOCS: Array<{
           </p>
           <p>
             {PREMIUM_ANALYSIS_FEE_ENABLED
-              ? "Payment happens entirely on-chain. Your wallet sends 1 USDT on BNB Chain to Rawli's receiver address. The backend verifies the transaction directly via BSC JSON-RPC before generating your report — no intermediaries, no subscriptions."
+              ? "Payment happens entirely on-chain. Your wallet sends 1 USDT on BNB Chain to Rawli's receiver address. The backend verifies the transaction directly via BSC JSON-RPC before generating your report. No intermediaries, no subscriptions."
               : "Reports generate directly from Rawli's backend without a wallet payment while we tune the product for production. Future pricing, if re-enabled, will be shown before signing any transaction."}
           </p>
         </div>
@@ -336,10 +336,10 @@ const DOCS: Array<{
     icon: Coins,
     color: "oklch(0.68 0.18 155)",
     title: "BNB-Native Funding",
-    body: "Fund your trading wallet with USDT on BNB Chain. Bridged to Polygon automatically — no manual steps needed.",
+    body: "Fund your trading wallet with USDT on BNB Chain. Rawli bridges to Polygon automatically.",
     detail: (
       <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
-        <p>Rawli is built for BNB Chain users. You can fund your prediction market wallet using USDT on BNB Chain (BSC) — no need to manually bridge to Polygon first.</p>
+        <p>Rawli is built for BNB Chain users. You can fund your prediction market wallet using USDT on BNB Chain (BSC) without manually bridging to Polygon first.</p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">Funding flow</p>
           <ol className="space-y-1.5 list-decimal list-inside text-muted-foreground/80">
@@ -350,14 +350,14 @@ const DOCS: Array<{
           </ol>
         </div>
         <p>On Polygon, gas fees are extremely low (fractions of a cent per transaction). Qualifying wallets also benefit from gas assistance for CLOB order approvals so you can start trading without holding MATIC.</p>
-        <p>Withdrawals follow the same path in reverse — USDC from Polygon can be withdrawn back to your BNB Chain wallet as USDT.</p>
+        <p>Withdrawals follow the same path in reverse. USDC from Polygon can be withdrawn back to your BNB Chain wallet as USDT.</p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.68_0.18_155)]">Supported networks</p>
           <ul className="space-y-1 list-disc list-inside text-muted-foreground/80">
             <li>
-              BNB Chain (BSC) — {PREMIUM_ANALYSIS_FEE_ENABLED ? "deposits, withdrawals, and AI report payments" : "deposits and withdrawals"}
+              BNB Chain (BSC): {PREMIUM_ANALYSIS_FEE_ENABLED ? "deposits, withdrawals, and AI report payments" : "deposits and withdrawals"}
             </li>
-            <li>Polygon — live order execution</li>
+            <li>Polygon: live order execution</li>
           </ul>
         </div>
       </div>
@@ -367,7 +367,7 @@ const DOCS: Array<{
     icon: Lock,
     color: "oklch(0.74 0.14 25)",
     title: "Non-Custodial & Self-Sovereign",
-    body: "Your keys, your funds. Every order is signed locally — Rawli never holds assets or touches your private key.",
+    body: "Your keys, your funds. Every order is signed locally. Rawli never holds assets or touches your private key.",
     detail: (
       <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
         <p>Rawli is fully non-custodial. This means the platform never holds your funds, never has access to your private key, and cannot freeze, move, or recover your assets under any circumstances.</p>
@@ -375,16 +375,16 @@ const DOCS: Array<{
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.74_0.14_25)]">What non-custodial means for you</p>
           <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
             <li>Every trade order is signed in your wallet before submission</li>
-            <li>Rawli servers only see the signed order — never your key</li>
+            <li>Rawli servers only see the signed order, never your key</li>
             <li>Your funds sit in your own Polygon wallet at all times</li>
             <li>You can verify every single transaction on-chain independently</li>
             <li>If Rawli goes offline, your funds remain safely in your wallet</li>
           </ul>
         </div>
-        <p>Wallet connections are handled by Privy — a battle-tested authentication layer that lets you connect with embedded wallets, MetaMask, WalletConnect, and more. Rawli only ever receives your public wallet address from this process.</p>
+        <p>Wallet connections are handled by Privy, a battle-tested authentication layer that lets you connect with embedded wallets, MetaMask, WalletConnect, and more. Rawli only ever receives your public wallet address from this process.</p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.74_0.14_25)]">Order execution security</p>
-          <p>When you place a trade, your wallet signs an EIP-712 typed order off-chain. This signature is submitted to the CLOB. The exchange verifies the signature cryptographically — Rawli is simply the courier, never the custodian.</p>
+          <p>When you place a trade, your wallet signs an EIP-712 typed order off-chain. This signature is submitted to the CLOB. The exchange verifies the signature cryptographically. Rawli is simply the courier, never the custodian.</p>
         </div>
       </div>
     ),
@@ -400,14 +400,14 @@ const DOCS: Array<{
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.72_0.18_45)]">How you earn points</p>
           <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
-            <li>Base trade points — awarded on every executed order</li>
-            <li>24h market bonus — higher velocity = higher multiplier</li>
-            <li>Crypto market bonus — extra points on crypto prediction trades</li>
-            <li>Premium Analysis bonus — points for using AI reports to inform trades</li>
-            <li>Referral activity — earn when users you refer trade</li>
+            <li>Base trade points: awarded on every executed order</li>
+            <li>24h market bonus: higher velocity means a higher multiplier</li>
+            <li>Crypto market bonus: extra points on crypto prediction trades</li>
+            <li>Premium Analysis bonus: points for using AI reports to inform trades</li>
+            <li>Referral activity: earn when users you refer trade</li>
           </ul>
         </div>
-        <p>Points are tracked on-chain and stored alongside your wallet address. They cannot be transferred, sold, or forfeited — they reflect your authentic activity on the platform.</p>
+        <p>Points are tracked on-chain and stored alongside your wallet address. They cannot be transferred, sold, or forfeited. They reflect your authentic activity on the platform.</p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.72_0.18_45)]">Future rewards</p>
           <p>Points will unlock future platform rewards including fee discounts, exclusive market access, and token allocations. The points system is designed to reward early, active traders most generously.</p>
@@ -420,25 +420,25 @@ const DOCS: Array<{
     icon: Zap,
     color: "oklch(0.78 0.16 82)",
     title: "Live Market Feed",
-    body: "Hundreds of active markets filtered through Rawli's Crypto-first lanes — Crypto, Africa, Sports, Entertainment, World, and Macro.",
+    body: "Hundreds of active markets filtered through Rawli's Crypto-first lanes: Crypto, Africa, Sports, Entertainment, World, and Macro.",
     detail: (
       <div className="space-y-5 text-[13px] leading-7 text-muted-foreground">
         <p>The Rawli market feed aggregates hundreds of live prediction markets and applies a smart ranking algorithm to surface the highest-quality trading opportunities first.</p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.78_0.16_82)]">Feed categories</p>
           <ul className="space-y-1.5 list-disc list-inside text-muted-foreground/80">
-            <li>🪙 Crypto — BTC, ETH, SOL price & event markets</li>
-            <li>🌍 Africa — Nigerian elections, AFCON, African markets</li>
-            <li>⚽ Sports — football, basketball, tennis, F1</li>
-            <li>✨ Entertainment — music, film, celebrity, awards, and culture markets</li>
-            <li>🌐 World — politics, legal, geopolitics, and breaking events</li>
-            <li>📈 Macro — rate decisions, inflation, GDP, commodities, and equities</li>
+            <li>🪙 Crypto: BTC, ETH, SOL price & event markets</li>
+            <li>🌍 Africa: Nigerian elections, AFCON, African markets</li>
+            <li>⚽ Sports: football, basketball, tennis, F1</li>
+            <li>✨ Entertainment: music, film, celebrity, awards, and culture markets</li>
+            <li>🌐 World: politics, legal, geopolitics, and breaking events</li>
+            <li>📈 Macro: rate decisions, inflation, GDP, commodities, and equities</li>
           </ul>
         </div>
-        <p>24-hour crypto markets are pinned to the top of the feed — these markets resolve within a day, giving you fast feedback loops and high trading frequency opportunities.</p>
+        <p>24-hour crypto markets are pinned to the top of the feed. These markets resolve within a day, giving you fast feedback loops and high trading frequency opportunities.</p>
         <div className="rounded-xl border border-[oklch(0.22_0.015_255)] bg-black/20 p-4 space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.78_0.16_82)]">Smart badges</p>
-          <p>Each market card displays contextual badges — 24h Crypto, Deep Liquidity, Hot Volume, Closes Today — so you can assess opportunity quality at a glance without opening the market detail page.</p>
+          <p>Each market card displays contextual badges like 24h Crypto, Deep Liquidity, Hot Volume, and Closes Today, so you can assess opportunity quality at a glance without opening the market detail page.</p>
         </div>
         <p>The feed updates in real time. Market prices, volume, and liquidity are refreshed continuously from live order book data.</p>
       </div>
@@ -483,7 +483,7 @@ export function Footer() {
         />
 
         <div className="relative bg-[oklch(0.09_0.011_260)]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-[calc(var(--rawli-mobile-nav-height)+6rem)] sm:pb-10">
 
             {/* ── How it works / Docs drawer ── */}
             <div className="mb-10">
@@ -576,7 +576,7 @@ export function Footer() {
                 </Link>
 
                 <p className="max-w-sm text-[12px] leading-6 text-muted-foreground/70">
-                  Live prediction markets, AI-powered intelligence, and self-custody trading — from anywhere in the world.
+                  Live prediction markets, AI-powered intelligence, and self-custody trading from anywhere in the world.
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -646,12 +646,12 @@ export function Footer() {
             </div>
 
             {/* ── Bottom bar ── */}
-            <div className="mt-10 pt-5 border-t border-[oklch(0.16_0.013_260)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="mt-10 pt-5 border-t border-[oklch(0.16_0.013_260)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 sm:gap-3">
               <p className="text-[11px] text-muted-foreground/40">
                 © {new Date().getFullYear()} Rawli Analytics. Not financial advice. Trade responsibly.
               </p>
-              <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground/30">
-                <div className="flex items-center gap-2">
+              <div className="flex w-full flex-col items-start gap-3 text-[10px] text-muted-foreground/35 sm:w-auto sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2.5">
                   {SOCIAL_LINKS.map(({ label, href, icon: Icon }) => (
                     <a
                       key={label}

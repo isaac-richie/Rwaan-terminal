@@ -278,13 +278,13 @@ export default function PointsPage() {
         <section className="pt-4 sm:pt-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.30)] bg-[oklch(0.78_0.16_82/0.08)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.20em] text-[oklch(0.82_0.16_82)]">
             <Award className="h-3 w-3" />
-            Season 1 — Pre-launch
+            Season 1: Pre-launch
           </div>
           <h1 className="mt-3 sm:mt-5 max-w-2xl text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
             Edge compounds over time.
           </h1>
           <p className="mt-2 sm:mt-3 max-w-xl text-[13px] sm:text-sm leading-relaxed text-muted-foreground">
-            Trade smart, unlock intelligence, refer traders — every action earns you points and future rewards.
+            Trade smart, unlock intelligence, and refer traders. Every action earns you points and future rewards.
           </p>
         </section>
 
@@ -532,7 +532,7 @@ export default function PointsPage() {
 
             {!leaderboardLoading && (!leaderboard || leaderboard.length === 0) && (
               <div className="flex items-center justify-center gap-2 py-10 text-xs text-muted-foreground">
-                <Trophy className="h-3.5 w-3.5" /> No traders yet — be the first.
+                <Trophy className="h-3.5 w-3.5" /> No traders yet. Be the first.
               </div>
             )}
 

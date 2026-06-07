@@ -689,7 +689,7 @@ export default function StocksPage() {
                 Real Stocks. Live Prices.
               </h1>
               <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-lg">
-                Browse and trade top US stocks and ETFs with real-time pricing — from anywhere in the world.
+                Browse and trade top US stocks and ETFs with real-time pricing from anywhere in the world.
               </p>
             </div>
             <button
@@ -1840,7 +1840,7 @@ function RwaTradeModal({
                         : `Fee ${(quote.fee / 10_000).toFixed(2)}%`} · {(quote.roundTripBps / 100).toFixed(1)}% efficiency
                     </span>
                     <span className="font-semibold">
-                      {quoteStale ? "Quote expired — refresh" : `${30 - quoteAge}s`}
+                      {quoteStale ? "Quote expired. Refresh" : `${30 - quoteAge}s`}
                     </span>
                   </div>
                 )}

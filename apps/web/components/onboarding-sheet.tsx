@@ -13,7 +13,7 @@ const STEPS = [
     iconBg: "oklch(0.78 0.16 82 / 0.12)",
     badge: "Step 1 of 4",
     title: "Pick an event",
-    body: "Browse hundreds of live markets — sports, crypto, politics, and more. Each market asks a simple Yes or No question.",
+    body: "Browse live markets in sports, crypto, politics, and more. Each market asks one simple Yes or No question.",
     hint: null,
   },
   {
@@ -40,7 +40,7 @@ const STEPS = [
     iconBg: "oklch(0.74 0.14 25 / 0.12)",
     badge: "Step 4 of 4",
     title: "Your money stays yours",
-    body: "Rawli never holds your funds. Your wallet, your keys, your control. If Rawli went offline tomorrow, your money is still safe.",
+    body: "Rawli never holds your funds. Your wallet keeps control of every asset and every signature.",
     hint: null,
   },
 ]
@@ -147,7 +147,7 @@ export function OnboardingSheet() {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         className={cn(
-          "absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-350",
+          "absolute inset-0 bg-black/60 transition-opacity duration-350 sm:backdrop-blur-sm",
           mounted ? "opacity-100" : "opacity-0"
         )}
         onClick={dismiss}

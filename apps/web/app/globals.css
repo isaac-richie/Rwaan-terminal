@@ -429,7 +429,7 @@
      ambient glow pseudo-element, and card entrance animations. */
   /* iOS safe area for bottom nav */
   .pt-safe-top {
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: min(env(safe-area-inset-top, 0px), 12px);
   }
   .pb-safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -438,7 +438,7 @@
     height: env(safe-area-inset-bottom, 0px);
   }
   .rawli-page-top {
-    padding-top: calc(var(--rawli-navbar-height) + env(safe-area-inset-top, 0px) + 16px);
+    padding-top: calc(var(--rawli-navbar-height) + min(env(safe-area-inset-top, 0px), 12px) + 10px);
   }
   .rawli-page-bottom {
     padding-bottom: calc(var(--rawli-mobile-nav-height) + 20px);
@@ -462,5 +462,18 @@
     .card-enter { animation: none; opacity: 1; transform: none; }
     .hero-enter  { animation: none; opacity: 1; transform: none; }
     /* ticker-scroll intentionally kept active on mobile — rolling on both viewports */
+  }
+}
+
+@media (max-width: 639px) {
+  #privy-dialog-backdrop {
+    background: oklch(0.04 0.01 260 / 0.72) !important;
+    backdrop-filter: blur(0px) !important;
+    -webkit-backdrop-filter: blur(0px) !important;
+    transition: opacity 120ms ease !important;
+  }
+  body:has(#privy-dialog-backdrop) .terminal-grid-bg::before,
+  body:has(#privy-dialog-backdrop) .ambient-glow::before {
+    display: none;
   }
 }
