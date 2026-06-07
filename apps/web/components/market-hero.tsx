@@ -173,48 +173,36 @@ export function MarketHero() {
   return (
     <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 rawli-page-top pb-4 sm:pb-7 relative z-[1]">
 
-      {/* ── Hero headline — hidden on mobile to keep it light ── */}
-      <div className="mb-8 hidden sm:block">
-        {/* Live badge */}
-        <div
-          className="hero-enter inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.07)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[oklch(0.82_0.16_82)]"
-          style={{ animationDelay: "0ms" }}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
-          Live markets · updated now
+      {/* ── Hero headline — compact single row on desktop ── */}
+      <div className="mb-4 hidden sm:flex sm:items-center sm:justify-between sm:gap-6">
+        {/* Left: badge + tight headline */}
+        <div className="hero-enter min-w-0" style={{ animationDelay: "0ms" }}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.25)] bg-[oklch(0.78_0.16_82/0.07)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[oklch(0.82_0.16_82)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.68_0.18_155)] pulse-dot" />
+              Live markets · updated now
+            </div>
+          </div>
+          <h1 className="mt-2 font-bold tracking-tight text-foreground">
+            <span className="text-2xl leading-tight sm:text-3xl lg:text-4xl">
+              Trade the signal{" "}
+              <span className="text-[oklch(0.55_0.02_255)]">before it becomes</span>{" "}
+              consensus<span className="text-[oklch(0.78_0.16_82)]">.</span>
+            </span>
+          </h1>
         </div>
-
-        {/* Main heading — three visual lines */}
-        <h1
-          className="hero-enter mt-4 font-bold tracking-tight text-foreground"
+        {/* Right: short sub-copy */}
+        <p
+          className="hero-enter shrink-0 max-w-[220px] text-right text-[12px] leading-relaxed text-muted-foreground"
           style={{ animationDelay: "80ms" }}
         >
-          <span className="block text-4xl leading-[1.02] sm:text-5xl lg:text-6xl">
-            Trade the signal
-          </span>
-          <span className="block text-4xl leading-[1.02] text-[oklch(0.55_0.02_255)] sm:text-5xl lg:text-6xl">
-            before it becomes
-          </span>
-          <span className="block text-4xl leading-[1.02] sm:text-5xl lg:text-6xl">
-            consensus
-            <span className="text-[oklch(0.78_0.16_82)]">.</span>
-          </span>
-        </h1>
-
-        {/* Sub-row: description */}
-        <div
-          className="hero-enter mt-5"
-          style={{ animationDelay: "160ms" }}
-        >
-          <p className="text-sm leading-relaxed text-muted-foreground max-w-sm">
-            Live prediction markets with real-time pricing and non-custodial trading.
-          </p>
-        </div>
+          Real-time prediction markets.<br />Non-custodial. Always live.
+        </p>
       </div>
 
       {/* ── Main two-column layout ───────────────────────── */}
       <div
-        className="hero-enter grid items-start gap-4 lg:grid-cols-[1fr_minmax(320px,0.48fr)]"
+        className="hero-enter grid items-stretch gap-4 lg:grid-cols-[1fr_minmax(300px,0.44fr)]"
         style={{ animationDelay: "240ms" }}
       >
         {/* Featured market card */}
@@ -242,10 +230,11 @@ export function MarketHero() {
                   alt=""
                   fill
                   priority
-                  quality={95}
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 900px"
+                  quality={100}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 960px"
                   data-image-sharp
-                  className="scale-[1.01] object-cover brightness-[1.05] sm:brightness-[1.18] lg:brightness-[1.20] contrast-[1.16] saturate-[1.24]"
+                  className="scale-[1.01] object-cover brightness-[1.08] sm:brightness-[1.22] lg:brightness-[1.25] contrast-[1.20] saturate-[1.28]"
+                  style={{ imageRendering: "crisp-edges" }}
                 />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_48%_42%,transparent_0%,transparent_36%,oklch(0.08_0.012_260/0.10)_72%)]" />
               </div>
@@ -405,7 +394,7 @@ export function MarketHero() {
 
         {/* ── Breaking news sidebar — desktop only ── */}
         <aside
-          className="hidden lg:flex flex-col max-h-[480px] rounded-2xl border border-[oklch(0.20_0.014_255/0.8)] bg-[oklch(0.118_0.012_260/0.96)] overflow-hidden hero-card-glow"
+          className="hidden lg:flex flex-col rounded-2xl border border-[oklch(0.20_0.014_255/0.8)] bg-[oklch(0.118_0.012_260/0.96)] overflow-hidden hero-card-glow self-stretch"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[oklch(0.18_0.014_255)] px-4 py-3">
@@ -419,8 +408,8 @@ export function MarketHero() {
             </span>
           </div>
 
-          {/* News list */}
-          <div className="flex-1 overflow-y-auto no-scrollbar">
+          {/* News list — scrollable within sidebar */}
+          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
             {breaking.map((market, i) => {
               const price = getPrimaryPrice(market)
               const isHigh = price >= 55
