@@ -245,6 +245,23 @@ function walletErrorMessage(err: unknown, fallback: string, context: "deposit" |
     return "Wallet connector could not complete the withdrawal. Reopen your wallet, approve the Polygon network switch and signature, then try again."
   }
 
+  if (
+    normalized.includes("missing revert data") ||
+    normalized.includes("estimategas") ||
+    normalized.includes("execution reverted") ||
+    normalized.includes("call exception")
+  ) {
+    return context === "deposit"
+      ? "No transfer was sent. Check the amount, token balance, and BNB gas in your wallet, then try again."
+      : "No withdrawal was sent. Check your available pUSD balance, wallet network, and Polygon gas, then try again."
+  }
+
+  if (normalized.includes("insufficient funds") || normalized.includes("exceeds balance") || normalized.includes("transfer amount exceeds balance")) {
+    return context === "deposit"
+      ? "No transfer was sent. Your wallet does not have enough balance or BNB gas for this deposit."
+      : "No withdrawal was sent. Your trading wallet does not have enough withdrawable pUSD or Polygon gas."
+  }
+
   if (normalized.includes("chain") || normalized.includes("network")) {
     return "Rawli could not activate the required wallet network. Approve the network switch in your wallet, then try again."
   }
@@ -523,7 +540,8 @@ export function BnbFundingModal({
       fundingStatus.refresh()
     } catch (err: any) {
       setSendStatus("idle")
-      setError(walletErrorMessage(err, "Failed to send transaction", "deposit"))
+      setError(null)
+      setNotice(walletErrorMessage(err, "No transfer was sent. Check your wallet and try again.", "deposit"))
     }
   }
 
@@ -845,8 +863,8 @@ export function BnbFundingModal({
                     Refresh your balance before entering a withdrawal amount.
                   </p>
                 ) : withdrawBalanceAmount <= 0 ? (
-                  <p className="text-[11px] leading-snug text-[oklch(0.74_0.14_25)]">
-                    No withdrawable pUSD balance is currently loaded for this trading wallet.
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    No pUSD is available to withdraw right now. If you just withdrew, your balance has already moved into the bridge route.
                   </p>
                 ) : !canSubmitWithdrawTransfer ? (
                   <p className="text-[11px] leading-snug text-[oklch(0.74_0.14_25)]">
