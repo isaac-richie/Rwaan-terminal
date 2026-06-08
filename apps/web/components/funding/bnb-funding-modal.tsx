@@ -5,6 +5,7 @@ import { BrowserProvider } from "ethers"
 import { Copy, Fuel, Loader2, RefreshCw, Route, Send, Wallet } from "lucide-react"
 import type { ConnectedWallet } from "@privy-io/react-auth"
 import type { BridgeQuoteResponse, TradingProfile } from "@smartmarket/types"
+import { toast } from "sonner"
 import { encodeErc20Transfer } from "@/lib/abi"
 
 import { Button } from "@/components/ui/button"
@@ -535,6 +536,10 @@ export function BnbFundingModal({
       await tx.wait(1)
 
       setNotice(`Sent! TX: ${tx.hash.slice(0, 10)}...${tx.hash.slice(-6)}`)
+      toast.success("Deposit sent", {
+        description: "We’ll track it and update your balance shortly.",
+        duration: 3000,
+      })
       setSendStatus("idle")
       onFundingSent?.()
       fundingStatus.refresh()
@@ -656,6 +661,10 @@ export function BnbFundingModal({
         })
         setWithdrawStatus("done")
         setWithdrawAmount("")
+        toast.success("Withdrawal submitted", {
+          description: "Your funds are moving back to your BNB wallet.",
+          duration: 3000,
+        })
         await onRefreshCollateralBalance?.()
         scheduleAccountRefresh({ reason: "withdrawal_submitted", address: tradingWalletAddr })
         onFundingSent?.()   // trigger full account refresh (profile, portfolio, funding status)
@@ -691,6 +700,10 @@ export function BnbFundingModal({
       })
       setWithdrawStatus("done")
       setWithdrawAmount("")
+      toast.success("Withdrawal submitted", {
+        description: "Your funds are moving back to your BNB wallet.",
+        duration: 3000,
+      })
       await onRefreshCollateralBalance?.()
       scheduleAccountRefresh({ reason: "withdrawal_submitted", address: tradingWalletAddr })
       onFundingSent?.()   // trigger full account refresh (profile, portfolio, funding status)
