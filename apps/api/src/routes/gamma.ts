@@ -40,10 +40,9 @@ const PREWARM_TAG_IDS = [
 
 // CRITICAL: these params must byte-for-byte match what the web client sends for a
 // category switch, because `buildCacheKey` hashes the full param set (limit included).
-// The default category feed uses limit=96; crypto uses a deeper limit=240 so
-// SOL/BNB/XRP/DOGE/altcoin markets are not crowded out by BTC/ETH.
-const CATEGORY_EVENT_LIMIT = "96";
-const CRYPTO_EVENT_LIMIT = "240";
+// See apps/web/lib/polymarket.ts fetchLimit: default category = 72, crypto = 120.
+const CATEGORY_EVENT_LIMIT = "72";
+const CRYPTO_EVENT_LIMIT = "120";
 const CRYPTO_PREWARM_TAG_IDS = ["21", "235", "101611", "1312"];
 const FEED_PREWARM_QUERIES: Array<Record<string, string>> = [
   ...PREWARM_TAG_IDS.map((tagId) => ({
