@@ -534,8 +534,8 @@ export function BnbFundingModal({
       setSendStatus("confirming")
       await tx.wait(1)
 
-      setSendStatus("sent")
       setNotice(`Sent! TX: ${tx.hash.slice(0, 10)}...${tx.hash.slice(-6)}`)
+      setSendStatus("idle")
       onFundingSent?.()
       fundingStatus.refresh()
     } catch (err: any) {
