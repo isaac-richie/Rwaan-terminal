@@ -1568,35 +1568,37 @@ function RwaTradeModal({
       }
       if (!activeQuote) throw new Error("Could not get a price right now. Please try again.")
 
-      // Step 1 — check balance + allowance
+      // Step 1 — check balance + allowance BEFORE touching any tokens
       setStatus("checking")
       const amountInRaw = BigInt(activeQuote.amountInRaw)
       const feeRaw = activeQuote.platformFee ? BigInt(activeQuote.platformFee.amountRaw) : 0n
-      const totalRequired = amountInRaw  // amountInRaw already includes fee (API deducts from swap)
+      const swapAmountInRaw = BigInt(activeQuote.swapAmountInRaw ?? activeQuote.amountInRaw)
 
       const inputToken = new Contract(activeQuote.tokenIn.address, ERC20_ABI, signer)
-      const balance = await inputToken.balanceOf(signerAddress) as bigint
-      if (balance < totalRequired) {
+      const [balance, allowance] = await Promise.all([
+        inputToken.balanceOf(signerAddress) as Promise<bigint>,
+        inputToken.allowance(signerAddress, activeQuote.spender) as Promise<bigint>,
+      ])
+
+      if (balance < amountInRaw) {
         throw new Error(`Not enough ${activeQuote.tokenIn.symbol} in your wallet for this trade.`)
       }
 
-      // Step 1.5 — collect platform fee in the input token.
-      if (activeQuote.platformFee && feeRaw > 0n) {
-        setStatus("checking")
+      // Step 2 — approve swap amount if needed. The fee transfer stays separate
+      // and happens only after required approvals/signatures are complete.
+      if (allowance < swapAmountInRaw) {
+        setStatus("approving")
+        const approvalTx = await inputToken.approve(activeQuote.spender, swapAmountInRaw)
+        await approvalTx.wait(1)
+      }
+
+      const collectPlatformFee = async () => {
+        if (!activeQuote?.platformFee || feeRaw <= 0n) return
         const feeTx = await (inputToken as any).transfer(
           activeQuote.platformFee.receiver,
           feeRaw
         )
         await feeTx.wait(1)
-      }
-
-      // Step 2 — approve if needed (approve only the swap amount, not incl. fee already sent)
-      const swapAmountInRaw = BigInt(activeQuote.swapAmountInRaw ?? activeQuote.amountInRaw)
-      const allowance = await inputToken.allowance(signerAddress, activeQuote.spender) as bigint
-      if (allowance < swapAmountInRaw) {
-        setStatus("approving")
-        const approvalTx = await inputToken.approve(activeQuote.spender, swapAmountInRaw)
-        await approvalTx.wait(1)
       }
 
       if (activeQuote.execution?.kind === "pcsx") {
@@ -1608,6 +1610,7 @@ function RwaTradeModal({
           permitData.values as any
         )
 
+        await collectPlatformFee()
         setStatus("submitting")
         const submitted = await submitRwaSwapOrder({
           chainId: activeQuote.chainId,
@@ -1621,7 +1624,8 @@ function RwaTradeModal({
         return
       }
 
-      // Step 3 — execute swap (using post-fee amount)
+      // Step 3 — collect fee, then execute swap using post-fee amount
+      await collectPlatformFee()
       setStatus("swapping")
       const router = new Contract(activeQuote.router, PANCAKE_V3_ROUTER_ABI, signer)
       const deadline = Math.floor(Date.now() / 1000) + 10 * 60

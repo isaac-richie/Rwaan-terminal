@@ -307,14 +307,24 @@ function marketDetailFromCache(cached: CachedMarketDetail): MarketDetail {
 }
 
 const PUSD_DECIMALS = 6;
+const CONDITIONAL_TOKEN_DECIMALS = 6;
 
-function collateralAmount(raw?: string | null) {
+function scaledAmount(raw: string | null | undefined, decimals: number) {
   if (!raw) return 0;
   const trimmed = String(raw).trim();
   const value = Number(trimmed);
   if (!Number.isFinite(value)) return 0;
-  if (trimmed.includes(".")) return value;
-  return Math.abs(value) >= 1_000 ? value / 10 ** PUSD_DECIMALS : value;
+  const isIntegerLike = /^-?\d+(?:\.0+)?$/.test(trimmed);
+  if (isIntegerLike && Math.abs(value) >= 1_000) return value / 10 ** decimals;
+  return value;
+}
+
+function collateralAmount(raw?: string | null) {
+  return scaledAmount(raw, PUSD_DECIMALS);
+}
+
+function shareAmount(raw?: string | null) {
+  return scaledAmount(raw, CONDITIONAL_TOKEN_DECIMALS);
 }
 
 function formatPusd(raw?: string | null) {
@@ -372,8 +382,10 @@ function positionTokenGate(balanceAllowance: { balance: string; allowance: strin
     };
   }
 
-  const balance = collateralAmount(balanceAllowance.balance);
-  const allowance = collateralAmount(balanceAllowance.allowance);
+  // Conditional token balances may arrive as human-readable shares or 6-decimal
+  // base units depending on the source. Parse separately from pUSD wording.
+  const balance = shareAmount(balanceAllowance.balance);
+  const allowance = shareAmount(balanceAllowance.allowance);
   const required = Number(shares);
 
   if (!Number.isFinite(balance) || !Number.isFinite(allowance)) {
@@ -676,7 +688,7 @@ export default function MarketDetailPage() {
       if (activeTokenId) {
         for (let attempt = 0; attempt < 5; attempt += 1) {
           const refreshed = await clobSession.refreshConditionalBalanceAllowance(activeTokenId);
-          const refreshedAllowance = refreshed ? collateralAmount(refreshed.allowance) : 0;
+          const refreshedAllowance = refreshed ? shareAmount(refreshed.allowance) : 0;
           if (refreshedAllowance >= amountNumber) break;
           await new Promise((resolve) => setTimeout(resolve, 900));
         }
@@ -729,9 +741,9 @@ export default function MarketDetailPage() {
     ? Math.min(collateralAmount(effectiveBalanceAllowance.balance), collateralAmount(effectiveBalanceAllowance.allowance))
     : null;
   const remainingPusd = availablePusd === null ? null : Math.max(0, availablePusd - (tradeSide === "buy" ? amountNumber : 0));
-  const positionShares = clobSession.conditionalBalanceAllowance ? collateralAmount(clobSession.conditionalBalanceAllowance.balance) : null;
+  const positionShares = clobSession.conditionalBalanceAllowance ? shareAmount(clobSession.conditionalBalanceAllowance.balance) : null;
   const sellableShares = clobSession.conditionalBalanceAllowance
-    ? Math.min(collateralAmount(clobSession.conditionalBalanceAllowance.balance), collateralAmount(clobSession.conditionalBalanceAllowance.allowance))
+    ? Math.min(shareAmount(clobSession.conditionalBalanceAllowance.balance), shareAmount(clobSession.conditionalBalanceAllowance.allowance))
     : null;
   const remainingShares = positionShares === null ? null : Math.max(0, positionShares - (tradeSide === "sell" ? amountNumber : 0));
   const sellReferenceShares =
@@ -905,8 +917,10 @@ export default function MarketDetailPage() {
       return;
     }
 
-    if (amountNumber < 1) {
-      setPreviewError("Minimum order size is $1.00.");
+    // Minimum $1 applies only to buys (USD amount). Sells use share count, and
+    // value/min-size validation is handled by the preview/orderbook response.
+    if (tradeSide === "buy" && amountNumber < 1) {
+      setPreviewError("Minimum buy order size is $1.00.");
       return;
     }
 
@@ -1097,8 +1111,9 @@ export default function MarketDetailPage() {
         }
       }, 8000);
 
-      if (side === "SELL" && marketId) {
-        router.replace(`/markets/${encodeURIComponent(String(marketId))}`, { scroll: false });
+      // Use the resolved Gamma market.id (not the raw URL param which could be a slug/tokenId)
+      if (side === "SELL" && (market?.id ?? marketId)) {
+        router.replace(`/markets/${encodeURIComponent(String(market?.id ?? marketId))}`, { scroll: false });
       }
       const orderId = submission.orderId ? ` · ${submission.orderId.slice(0, 8)}…` : "";
       const rewardHeaders = submission.orderId ? await clobSession.createOrderLookupHeaders(submission.orderId) : null;

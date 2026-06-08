@@ -246,8 +246,8 @@ function collateralAmount(raw?: string | null) {
   const trimmed = String(raw).trim()
   const value = Number(trimmed)
   if (!Number.isFinite(value)) return 0
-  if (trimmed.includes(".")) return value
-  return Math.abs(value) >= 1_000 ? value / 10 ** PUSD_DECIMALS : value
+  const isIntegerLike = /^-?\d+(?:\.0+)?$/.test(trimmed)
+  return isIntegerLike && Math.abs(value) >= 1_000 ? value / 10 ** PUSD_DECIMALS : value
 }
 
 function formatPusd(value?: number | null) {
