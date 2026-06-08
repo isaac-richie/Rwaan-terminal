@@ -546,6 +546,7 @@ export function BnbFundingModal({
   }
 
   const sendDisabled = !wallet || !depositAddress || !selectedAsset || !amountBaseUnit || amountBaseUnit === "0" || invalidAmount || amountBelowMin || sendStatus !== "idle"
+  const sendBusy = sendStatus === "switching" || sendStatus === "sending" || sendStatus === "confirming"
   const sendLabel = sendStatus === "switching" ? "Switching to BSC..." : sendStatus === "sending" ? "Approve in wallet..." : sendStatus === "confirming" ? "Confirming..." : sendStatus === "sent" ? "Sent!" : "Send from wallet"
 
   const handleWithdraw = async () => {
@@ -1095,16 +1096,24 @@ export function BnbFundingModal({
                 </Button>
               ) : (
                 <>
-                  <Button onClick={handleSendFromWallet} disabled={sendDisabled} className="gap-2">
-                    {sendStatus === "sending" || sendStatus === "confirming" || sendStatus === "switching" ? (
-                      <Loader2 key="spin" className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send key="send" className="w-4 h-4" />
+                  <button
+                    type="button"
+                    onClick={handleSendFromWallet}
+                    disabled={sendDisabled}
+                    aria-busy={sendBusy}
+                    className={cn(
+                      "inline-flex h-10 w-full select-none items-center justify-center gap-2 overflow-hidden rounded-md bg-[oklch(0.78_0.16_82)] px-4 py-2 text-sm font-semibold text-[oklch(0.12_0.01_255)] shadow-none transition-colors [-webkit-tap-highlight-color:transparent] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.78_0.16_82/0.45)] sm:w-auto",
+                      "hover:bg-[oklch(0.82_0.16_82)] active:bg-[oklch(0.74_0.16_82)] disabled:pointer-events-none",
+                      sendDisabled && !sendBusy && "opacity-60",
                     )}
-                    {/* keyed span → React swaps the node on label change so in-app
-                        browsers repaint cleanly instead of ghosting the old text */}
-                    <span key={sendLabel}>{sendLabel}</span>
-                  </Button>
+                  >
+                    {sendBusy ? (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin bg-transparent" />
+                    ) : (
+                      <Send className="h-4 w-4 shrink-0 bg-transparent" />
+                    )}
+                    <span className="block bg-transparent leading-none">{sendLabel}</span>
+                  </button>
                   <Button onClick={copyDepositAddress} variant="secondary" className="gap-2">
                     <Copy className="w-4 h-4" />
                     Copy address
