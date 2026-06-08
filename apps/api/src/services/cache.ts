@@ -16,6 +16,17 @@ export type JsonCacheHit<T> = {
   state: "fresh" | "stale";
 };
 
+type CacheReadOptions = {
+  includeRedisStale?: boolean;
+};
+
+type CacheWriteOptions = {
+  staleTtlSeconds?: number;
+  persistStaleToRedis?: boolean;
+};
+
+const staleKey = (key: string) => `${key}:stale`;
+
 const getClient = () => {
   if (!REDIS_URL) return null;
   if (!redisClient) {
@@ -42,7 +53,10 @@ export const buildCacheKey = (prefix: string, query: Record<string, string | num
   return suffix ? `${prefix}?${suffix}` : prefix;
 };
 
-export const getJsonCacheEntry = async <T>(key: string): Promise<JsonCacheHit<T> | null> => {
+export const getJsonCacheEntry = async <T>(
+  key: string,
+  options: CacheReadOptions = {},
+): Promise<JsonCacheHit<T> | null> => {
   const memoryEntry = memoryCache.get(key);
   if (memoryEntry) {
     const now = Date.now();
@@ -59,10 +73,16 @@ export const getJsonCacheEntry = async <T>(key: string): Promise<JsonCacheHit<T>
     const client = getClient();
     if (!client) return null;
     const cached = await client.get(key);
-    if (!cached) return null;
     const now = Date.now();
-    memoryCache.set(key, { value: cached, expiresAt: now + 5_000, staleUntil: now + 5_000 });
-    return { value: JSON.parse(cached) as T, state: "fresh" };
+    if (cached) {
+      memoryCache.set(key, { value: cached, expiresAt: now + 5_000, staleUntil: now + 5_000 });
+      return { value: JSON.parse(cached) as T, state: "fresh" };
+    }
+    if (!options.includeRedisStale) return null;
+    const staleCached = await client.get(staleKey(key));
+    if (!staleCached) return null;
+    memoryCache.set(key, { value: staleCached, expiresAt: now - 1, staleUntil: now + 5_000 });
+    return { value: JSON.parse(staleCached) as T, state: "stale" };
   } catch {
     return null;
   }
@@ -77,7 +97,7 @@ export const setJsonCache = async (
   key: string,
   value: unknown,
   ttlSeconds: number,
-  options: { staleTtlSeconds?: number } = {},
+  options: CacheWriteOptions = {},
 ): Promise<void> => {
   const serialized = JSON.stringify(value);
   const now = Date.now();
@@ -92,6 +112,9 @@ export const setJsonCache = async (
     const client = getClient();
     if (!client) return;
     await client.set(key, serialized, "EX", ttlSeconds);
+    if (options.persistStaleToRedis && staleTtlSeconds > 0) {
+      await client.set(staleKey(key), serialized, "EX", ttlSeconds + staleTtlSeconds);
+    }
   } catch {
     // ignore cache failures
   }

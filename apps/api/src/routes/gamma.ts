@@ -4,19 +4,17 @@ import { getGamma } from "../services/polymarket.js";
 import { buildCacheKey, getJsonCache, getJsonCacheEntry, setJsonCache } from "../services/cache.js";
 
 const gammaQuerySchema = z.record(z.string()).default({});
-// Serve fresh data for 3/5 min; honour stale data for 1 hour while revalidating.
-// Prewarm runs every 90s — tighter than the 2-min TTLs so cache NEVER goes cold.
-// Old: prewarm every 120s with 180s TTL meant 60s cold windows (5-7s loads).
-// New: prewarm every 90s with 180s TTL means cache is always warm when users hit it.
-const MARKET_CACHE_TTL_SECONDS = 180;  // 3 min fresh
-const EVENT_CACHE_TTL_SECONDS  = 180;  // 3 min fresh (was 5min — matched to prewarm cycle)
-const FEED_STALE_TTL_SECONDS   = 60 * 60; // 1 h stale-while-revalidate
-const FEED_PREWARM_INTERVAL_MS = 90_000;  // prewarm every 90s (was 120s)
+// Gamma is high-latency from the VPS region, so keep it on its own generous
+// cache cadence: users get fast feed data while live books/quotes stay separate.
+const MARKET_CACHE_TTL_SECONDS = 300;  // 5 min fresh
+const EVENT_CACHE_TTL_SECONDS  = 300;  // 5 min fresh
+const FEED_STALE_TTL_SECONDS   = 6 * 60 * 60; // 6 h stale-while-revalidate
+const FEED_PREWARM_INTERVAL_MS = 120_000; // refreshed well before the 5-min TTL
 
 // Browser / CDN cache headers for gamma feed responses.
-// max-age=60 lets browsers serve from their local cache for 60 s;
-// stale-while-revalidate=3600 lets CDN edges serve stale while fetching fresh.
-const FEED_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=3600";
+// max-age lets browsers avoid repeated same-page pulls; stale-while-revalidate
+// lets CDN/browser edges serve immediately while the API refreshes in the back.
+const FEED_CACHE_CONTROL = "public, max-age=90, stale-while-revalidate=21600";
 
 // Union of every tag ID the web client requests across all categories.
 // Keep in sync with `categoryFeedTagIds` + `FAST_ALL_TAG_IDS` in
@@ -64,6 +62,12 @@ const ALL_FEED_MARKETS_QUERY: Record<string, string> = {
   active: "true", closed: "false", limit: "24", offset: "0",
   order: "volume_24hr", ascending: "false",
 };
+const COMMON_MARKETS_PREWARM_QUERIES: Array<Record<string, string>> = [
+  ALL_FEED_MARKETS_QUERY,
+  // The production sitrep and lightweight health probes use this exact query.
+  // Keeping it warm avoids a misleading 8s "Gamma is slow" signal.
+  { limit: "1" },
+];
 
 const inFlightRefreshes = new Map<string, Promise<unknown>>();
 
@@ -193,7 +197,10 @@ async function refreshCacheOnce<T>(
 
   const refresh = load()
     .then(async (value) => {
-      await setJsonCache(cacheKey, value, ttlSeconds, { staleTtlSeconds });
+      await setJsonCache(cacheKey, value, ttlSeconds, {
+        staleTtlSeconds,
+        persistStaleToRedis: cacheKey.startsWith("gamma:"),
+      });
       return value;
     })
     .finally(() => {
@@ -223,7 +230,7 @@ async function getCachedOrRefresh<T>(
   ttlSeconds: number,
   staleTtlSeconds = 0,
 ): Promise<T> {
-  const cached = await getJsonCacheEntry<T>(cacheKey);
+  const cached = await getJsonCacheEntry<T>(cacheKey, { includeRedisStale: cacheKey.startsWith("gamma:") });
   if (cached?.state === "fresh") return cached.value;
   if (cached?.state === "stale") {
     void refreshCacheOnce(cacheKey, load, ttlSeconds, staleTtlSeconds).catch(() => undefined);
@@ -239,7 +246,7 @@ async function getCachedOrRefresh<T>(
     );
   } catch (err) {
     // Timeout or fetch error — check if we have anything stale at all
-    const staleEntry = await getJsonCacheEntry<T>(cacheKey).catch(() => null);
+    const staleEntry = await getJsonCacheEntry<T>(cacheKey, { includeRedisStale: cacheKey.startsWith("gamma:") }).catch(() => null);
     if (staleEntry?.value) return staleEntry.value;
     throw err;
   }
@@ -261,15 +268,18 @@ function prewarmGammaFeeds(app: FastifyInstance) {
       );
     });
 
-    // The default "all" feed loads through the Gamma markets index.
-    const allFeedRefresh = getCachedOrRefresh(
-      buildCacheKey("gamma:markets", ALL_FEED_MARKETS_QUERY),
-      () => getGamma("/markets", ALL_FEED_MARKETS_QUERY),
-      MARKET_CACHE_TTL_SECONDS,
-      FEED_STALE_TTL_SECONDS,
+    // The default "all" feed and lightweight probes load through the Gamma
+    // markets index. Prewarm these separately from event tags.
+    const marketRefreshes = COMMON_MARKETS_PREWARM_QUERIES.map((query) =>
+      getCachedOrRefresh(
+        buildCacheKey("gamma:markets", query),
+        () => getGamma("/markets", query),
+        MARKET_CACHE_TTL_SECONDS,
+        FEED_STALE_TTL_SECONDS,
+      )
     );
 
-    void Promise.allSettled([...eventRefreshes, allFeedRefresh]).then((results) => {
+    void Promise.allSettled([...eventRefreshes, ...marketRefreshes]).then((results) => {
       const failed = results.filter((result) => result.status === "rejected").length;
       if (failed > 0) app.log.warn({ failed }, "gamma feed prewarm had failed requests");
     });
