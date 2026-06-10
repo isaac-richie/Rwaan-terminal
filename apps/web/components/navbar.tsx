@@ -9,7 +9,15 @@ import {
   Check, LogOut, Plus, Building2, AlertTriangle
 } from "lucide-react"
 import { usePrivy, type ConnectedWallet } from "@privy-io/react-auth"
-import { BnbFundingModal } from "@/components/funding/bnb-funding-modal"
+import dynamic from "next/dynamic"
+
+// Lazy-loaded: the funding modal pulls in the full `ethers` library (~2MB raw JS).
+// Deferring it keeps transaction-signing code out of the initial bundle on every
+// page — it only downloads the first time a user opens "Manage funds".
+const BnbFundingModal = dynamic(
+  () => import("@/components/funding/bnb-funding-modal").then((m) => m.BnbFundingModal),
+  { ssr: false }
+)
 import {
   formatPortfolioMoney,
   formatPortfolioPnl,
@@ -262,6 +270,9 @@ function NavbarBalanceBreakdown() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [fundingOpen, setFundingOpen] = useState(false)
+  // Latches true on first open and stays true — keeps the lazily-loaded modal
+  // mounted afterwards so close animations and in-flight sends survive.
+  const [fundingEverOpened, setFundingEverOpened] = useState(false)
   const [fundingInitialTab, setFundingInitialTab] = useState<"deposit" | "withdraw">("deposit")
   const panelRef = useRef<HTMLDivElement>(null)
   const { walletAddress, wallet: connectedWallet } = useActivePrivyWallet()
@@ -308,6 +319,7 @@ function NavbarBalanceBreakdown() {
   const realizedPositive = realized >= 0
   const openFundingModal = (tab: "deposit" | "withdraw" = pUsdBalance && pUsdBalance > 0 ? "withdraw" : "deposit") => {
     setFundingInitialTab(tab)
+    setFundingEverOpened(true)
     setFundingOpen(true)
   }
 
@@ -455,6 +467,7 @@ function NavbarBalanceBreakdown() {
           </div>
         </div>
       ) : null}
+      {fundingEverOpened && (
       <BnbFundingModal
         open={fundingOpen}
         onOpenChange={setFundingOpen}
@@ -473,6 +486,7 @@ function NavbarBalanceBreakdown() {
           void portfolio.refresh()
         }}
       />
+      )}
     </div>
   )
 }

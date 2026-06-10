@@ -27,20 +27,35 @@ import { edgeScannerRoutes } from "./routes/edgeScanner.js";
 import { rwaRoutes } from "./routes/rwa.js";
 import { recordBackendError } from "./services/errorLog.js";
 
+type ApiError = Error & {
+  code?: string;
+  statusCode?: number;
+  error?: string;
+  message?: string;
+  retryAfter?: string;
+};
+
 export function buildServer() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: true,
+    trustProxy: true,
+  });
   const loggedErrorRequests = new Set<string>();
 
-  // Global rate limiting — generous limits, mainly to stop hammering
+  // Global rate limiting — production baseline, mainly to stop hammering.
+  // `trustProxy` is required behind Caddy so different users do not share
+  // the same 127.0.0.1 rate-limit bucket.
   app.register(rateLimit, {
     global: true,
-    max: 120,          // 120 requests per minute per IP (2 req/s baseline)
+    max: 300,
     timeWindow: "1 minute",
     // Premium / analysis routes get tighter limits set per-route
-    errorResponseBuilder: () => ({
+    errorResponseBuilder: (_req, context) => ({
+      statusCode: context.statusCode ?? 429,
       ok: false,
       error: "rate_limited",
-      message: "Too many requests. Please slow down.",
+      message: `Too many requests. Please wait ${context.after} and try again.`,
+      retryAfter: context.after,
     }),
   });
 
@@ -117,10 +132,21 @@ export function buildServer() {
     });
   });
 
-  app.setErrorHandler((err: Error & { code?: string; statusCode?: number }, req, reply) => {
-    const statusCode = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
+  app.setErrorHandler((err: ApiError, req, reply) => {
+    const isRateLimited =
+      err.statusCode === 429 ||
+      err.code === "FST_ERR_RATE_LIMIT" ||
+      err.error === "rate_limited";
+    const statusCode = isRateLimited ? 429 : err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
     const isServerError = statusCode >= 500;
-    const publicError = isServerError ? "internal_error" : (err.code ?? "request_error");
+    const publicError = isRateLimited
+      ? "rate_limited"
+      : isServerError
+        ? "internal_error"
+        : (err.code ?? err.error ?? "request_error");
+    const publicMessage = isServerError
+      ? undefined
+      : err.message || (isRateLimited ? "Too many requests. Please wait a few seconds and try again." : undefined);
     const event = recordBackendError({
       level: isServerError ? "error" : "warn",
       message: err.message || publicError,
@@ -135,7 +161,13 @@ export function buildServer() {
     loggedErrorRequests.add(String(req.id));
 
     app.log[isServerError ? "error" : "warn"]({ err, errorEventId: event.id }, "Request failed");
-    reply.status(statusCode).send({ ok: false, error: publicError, errorId: event.id });
+    reply.status(statusCode).send({
+      ok: false,
+      error: publicError,
+      message: publicMessage,
+      retryAfter: err.retryAfter,
+      errorId: event.id,
+    });
   });
 
   return app;

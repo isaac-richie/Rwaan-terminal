@@ -2727,18 +2727,50 @@ export type CryptoPriceQuestion = {
 };
 
 function parseTargetPrice(question: string): number | null {
-  const q = question.replace(/,/g, "");
-  // Prefer an explicit $-prefixed figure; otherwise require a k/m suffix so we don't
-  // accidentally match years ("2025") or ordinals.
-  const dollar = q.match(/\$\s?(\d+(?:\.\d+)?)\s*([kKmM])?/);
-  const bare = dollar ? null : q.match(/\b(\d+(?:\.\d+)?)\s*([kKmM])\b/);
-  const m = dollar ?? bare;
-  if (!m) return null;
-  let val = parseFloat(m[1]);
-  const suffix = (m[2] ?? "").toLowerCase();
-  if (suffix === "k") val *= 1_000;
-  else if (suffix === "m") val *= 1_000_000;
-  return Number.isFinite(val) && val > 0 ? val : null;
+  const stripped = question.replace(/,/g, "");
+
+  // 1. Explicit $-prefixed figure — strongest signal ("$72,000", "$1m", "$0.55").
+  const dollar = stripped.match(/\$\s?(\d+(?:\.\d+)?)\s*([kKmM])?/);
+  if (dollar) {
+    let val = parseFloat(dollar[1]);
+    const suffix = (dollar[2] ?? "").toLowerCase();
+    if (suffix === "k") val *= 1_000;
+    else if (suffix === "m") val *= 1_000_000;
+    return Number.isFinite(val) && val > 0 ? val : null;
+  }
+
+  // 2. Comma-thousands number on the ORIGINAL string ("63,600", "2,400") — the
+  //    thousands separator marks it as a price, never a year or date. This is the
+  //    exact format of Polymarket's hourly/daily threshold markets, which omit "$".
+  const commaNum = question.match(/\b(\d{1,3}(?:,\d{3})+(?:\.\d+)?)\b/);
+  if (commaNum) {
+    const val = parseFloat(commaNum[1].replace(/,/g, ""));
+    if (Number.isFinite(val) && val > 0) return val;
+  }
+
+  // 3. Bare number with k/m suffix ("100k", "1m").
+  const suffixed = stripped.match(/\b(\d+(?:\.\d+)?)\s*([kKmM])\b/);
+  if (suffixed) {
+    let val = parseFloat(suffixed[1]);
+    const suffix = suffixed[2].toLowerCase();
+    if (suffix === "k") val *= 1_000;
+    else if (suffix === "m") val *= 1_000_000;
+    return Number.isFinite(val) && val > 0 ? val : null;
+  }
+
+  // 4. Bare number directly after a price comparator ("reach 200", "above 63600").
+  //    Year guard: a bare 1900-2100 with no $/comma/suffix is almost certainly a
+  //    date ("by 2026"), not a strike — skip those.
+  const comparatorAdjacent = stripped.match(
+    /(?:above|over|below|under|beneath|exceed|exceeds|surpass|surpasses|reach|reaches|hit|hits|touch|touches|tag|tags|cross|crosses|at least)\s+(\d{2,9}(?:\.\d+)?)\b/i
+  );
+  if (comparatorAdjacent) {
+    const val = parseFloat(comparatorAdjacent[1]);
+    const looksLikeYear = Number.isInteger(val) && val >= 1900 && val <= 2100;
+    if (Number.isFinite(val) && val > 0 && !looksLikeYear) return val;
+  }
+
+  return null;
 }
 
 // Subjects that mention a crypto asset + directional word but are NOT about the

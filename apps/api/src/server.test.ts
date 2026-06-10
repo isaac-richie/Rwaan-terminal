@@ -61,6 +61,29 @@ describe("api routes", () => {
     expect(res.json()).toEqual({ ok: true });
   });
 
+  it("rate limits per forwarded client and returns a 429 payload", async () => {
+    const app = buildServer();
+    const headers = { "x-forwarded-for": "203.0.113.10" };
+    for (let i = 0; i < 300; i += 1) {
+      const res = await app.inject({ method: "GET", url: "/health", headers });
+      expect(res.statusCode).toBe(200);
+    }
+
+    const limited = await app.inject({ method: "GET", url: "/health", headers });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toMatchObject({
+      ok: false,
+      error: "rate_limited"
+    });
+
+    const differentClient = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { "x-forwarded-for": "203.0.113.11" }
+    });
+    expect(differentClient.statusCode).toBe(200);
+  });
+
   it("records backend errors behind the ops endpoint", async () => {
     const originalToken = process.env.OPS_TOKEN;
     process.env.OPS_TOKEN = "test-ops-token";

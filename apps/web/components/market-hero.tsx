@@ -150,6 +150,11 @@ export function MarketHero() {
         setTrending(hotMarkets)
         if (!cachedBreaking?.length) setBreaking(hotMarkets.slice(0, 8))
         setLoading(false)
+        // The Breaking sidebar only renders on lg+ viewports (hidden lg:flex).
+        // Skip its dedicated fetch on phones — the trending fallback above
+        // already populates `breaking` if the layout ever needs it.
+        const isDesktop = window.matchMedia("(min-width: 1024px)").matches
+        if (!isDesktop) return
         const newsMarkets = await fetchMarkets("World", 14, "newest", 0).catch(() => [])
         if (cancelled || !newsMarkets.length) return
         setBreaking(newsMarkets)

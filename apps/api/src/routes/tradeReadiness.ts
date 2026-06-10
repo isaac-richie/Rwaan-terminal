@@ -123,49 +123,61 @@ async function readOnChainCollateral(wallet: string): Promise<BalanceAllowanceSn
 }
 
 export async function tradeReadinessRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/trade/readiness", async (req, reply) => {
-    const parsed = readinessSchema.safeParse(req.body ?? null);
-    if (!parsed.success) {
-      reply.status(400);
-      return { ok: false, error: "invalid_readiness_payload", issues: parsed.error.issues };
-    }
-
-    const body = parsed.data;
-    const clobSessionHeaders = extractClobSessionHeaders(req.headers as Record<string, string | string[] | undefined>);
-    let collateral: BalanceAllowanceSnapshot | undefined;
-
-    if (clobSessionHeaders) {
-      try {
-        const rawCollateral = await getClobAuthenticated(
-          "/balance-allowance",
-          {
-            asset_type: "COLLATERAL",
-            signature_type: signatureType(body.tradingWalletKind)
-          },
-          clobSessionHeaders
-        );
-        collateral = normalizeBalanceAllowance(rawCollateral) ?? undefined;
-      } catch (err) {
-        req.log.warn({ err }, "Authenticated CLOB balance/allowance check failed");
+  app.post(
+    "/trade/readiness",
+    {
+      config: {
+        rateLimit: {
+          groupId: "trade-readiness",
+          max: 360,
+          timeWindow: "1 minute"
+        }
       }
-    }
-
-    if (body.tradingWalletAddress && (!collateral || isZeroOrMissingAllowance(collateral))) {
-      try {
-        collateral = await readOnChainCollateral(body.tradingWalletAddress);
-      } catch (err) {
-        req.log.warn({ err, tradingWalletAddress: body.tradingWalletAddress }, "On-chain pUSD balance/allowance check failed");
+    },
+    async (req, reply) => {
+      const parsed = readinessSchema.safeParse(req.body ?? null);
+      if (!parsed.success) {
+        reply.status(400);
+        return { ok: false, error: "invalid_readiness_payload", issues: parsed.error.issues };
       }
-    }
 
-    return buildTradeReadiness({
-      connectedWalletAddress: body.connectedWalletAddress,
-      tradingWalletAddress: body.tradingWalletAddress,
-      tradingWalletKind: body.tradingWalletKind,
-      depositAddress: body.depositAddress,
-      amountUsd: body.amountUsd,
-      clobSessionHeaders,
-      collateral
-    });
-  });
+      const body = parsed.data;
+      const clobSessionHeaders = extractClobSessionHeaders(req.headers as Record<string, string | string[] | undefined>);
+      let collateral: BalanceAllowanceSnapshot | undefined;
+
+      if (clobSessionHeaders) {
+        try {
+          const rawCollateral = await getClobAuthenticated(
+            "/balance-allowance",
+            {
+              asset_type: "COLLATERAL",
+              signature_type: signatureType(body.tradingWalletKind)
+            },
+            clobSessionHeaders
+          );
+          collateral = normalizeBalanceAllowance(rawCollateral) ?? undefined;
+        } catch (err) {
+          req.log.warn({ err }, "Authenticated CLOB balance/allowance check failed");
+        }
+      }
+
+      if (body.tradingWalletAddress && (!collateral || isZeroOrMissingAllowance(collateral))) {
+        try {
+          collateral = await readOnChainCollateral(body.tradingWalletAddress);
+        } catch (err) {
+          req.log.warn({ err, tradingWalletAddress: body.tradingWalletAddress }, "On-chain pUSD balance/allowance check failed");
+        }
+      }
+
+      return buildTradeReadiness({
+        connectedWalletAddress: body.connectedWalletAddress,
+        tradingWalletAddress: body.tradingWalletAddress,
+        tradingWalletKind: body.tradingWalletKind,
+        depositAddress: body.depositAddress,
+        amountUsd: body.amountUsd,
+        clobSessionHeaders,
+        collateral
+      });
+    }
+  );
 }

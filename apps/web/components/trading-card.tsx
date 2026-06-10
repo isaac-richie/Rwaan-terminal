@@ -67,8 +67,7 @@ export function TradingCard({ market, index }: TradingCardProps) {
           {/* Thumbnail */}
           <div className="relative h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-[oklch(0.16_0.014_255)] overflow-hidden flex-shrink-0 border border-[oklch(0.22_0.015_255/0.7)] group-hover:scale-[1.06] transition-transform duration-300 ease-out">
             {imgSrc && !imgError ? (
-              <Image src={imgSrc} alt="" fill quality={90} sizes="44px"
-                unoptimized
+              <Image src={imgSrc} alt="" fill quality={85} sizes="44px"
                 className="object-contain p-1" onError={() => setImgError(true)} />
             ) : (
               <div className="h-full w-full flex items-center justify-center"
