@@ -1700,7 +1700,10 @@ export async function rwaRoutes(app: FastifyInstance): Promise<void> {
         return {
           ok: false,
           error: "rwa_route_unavailable",
-          message: "No executable PancakeSwap buy and sell route is available for this stock right now.",
+          message:
+            query.data.side === "sell"
+              ? "No executable sell quote is available for that size right now. Try a larger amount."
+              : "No executable buy quote is available for that size right now. Try a larger amount.",
         };
       }
 
@@ -1708,7 +1711,14 @@ export async function rwaRoutes(app: FastifyInstance): Promise<void> {
     } catch (err) {
       req.log.warn({ err, symbol: query.data.symbol, side: query.data.side }, "rwa swap quote unavailable");
       reply.status(502);
-      return { ok: false, error: "rwa_swap_quote_unavailable" };
+      return {
+        ok: false,
+        error: "rwa_swap_quote_unavailable",
+        message:
+          query.data.side === "sell"
+            ? "Could not price that sell right now. Try Max or a slightly larger amount."
+            : "Could not price that buy right now. Try a slightly larger amount.",
+      };
     }
   });
 

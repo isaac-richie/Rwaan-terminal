@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useState, useCallback, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { BrowserProvider, Contract, formatUnits as formatTokenUnits } from "ethers"
+import { BrowserProvider, Contract, JsonRpcProvider, formatUnits as formatTokenUnits } from "ethers"
 import { usePrivy, type ConnectedWallet } from "@privy-io/react-auth"
 import { ComponentErrorBoundary } from "@/components/ui/error-boundary"
 import {
@@ -102,6 +102,11 @@ const BSC_CHAIN_PARAMS = {
   rpcUrls: ["https://bsc-dataseed.binance.org", "https://bsc.publicnode.com"],
   blockExplorerUrls: ["https://bscscan.com"],
 }
+const BSC_USDT = {
+  symbol: "USDT",
+  address: "0x55d398326f99059fF775485246999027B3197955",
+  decimals: 18,
+} as const
 
 const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
@@ -132,6 +137,18 @@ function rawToHuman(raw?: string | null, decimals = 18, max = 6) {
     return value.toLocaleString("en-US", { maximumFractionDigits: max })
   } catch {
     return "--"
+  }
+}
+
+function rawToInputAmount(raw: bigint | string, decimals = 18, max = 6) {
+  try {
+    const value = formatTokenUnits(raw, decimals)
+    if (!value.includes(".")) return value
+    const [whole, fraction = ""] = value.split(".")
+    const trimmed = fraction.slice(0, max).replace(/0+$/, "")
+    return trimmed ? `${whole}.${trimmed}` : whole
+  } catch {
+    return ""
   }
 }
 
@@ -1593,6 +1610,13 @@ function RwaTradeModal({
   const [status, setStatus] = useState<TradeStatus>("idle")
   const [error, setError] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
+  const [inputBalance, setInputBalance] = useState<{
+    raw: bigint
+    amount: string
+    symbol: string
+    decimals: number
+  } | null>(null)
+  const [balanceLoading, setBalanceLoading] = useState(false)
 
   const asset = request?.asset ?? null
   const side = request?.side ?? "buy"
@@ -1601,7 +1625,36 @@ function RwaTradeModal({
   const inputSymbol = side === "buy" ? "USDT" : (asset?.route?.token.symbol ?? asset?.displaySymbol ?? "Stock")
   const outputSymbol = side === "buy" ? (asset?.route?.token.symbol ?? asset?.displaySymbol ?? "Stock") : "USDT"
   const title = side === "buy" ? `Buy ${asset?.displaySymbol ?? ""}` : `Sell ${asset?.displaySymbol ?? ""}`
-  const quickAmounts = side === "buy" ? QUICK_BUY : QUICK_SELL
+  const inputTokenForBalance = useMemo(() => {
+    if (!asset) return null
+    if (side === "buy") return BSC_USDT
+    const token = asset.route?.token
+    if (!token?.address || token.decimals == null) return null
+    return {
+      symbol: token.symbol ?? asset.displaySymbol,
+      address: token.address,
+      decimals: token.decimals,
+    }
+  }, [asset, side])
+  const quickAmounts = useMemo(() => {
+    const maxAmount = inputBalance?.amount
+    if (side === "buy") {
+      return [
+        ...QUICK_BUY.map((value) => ({ label: `$${value}`, value })),
+        ...(maxAmount && Number(maxAmount) > 0 ? [{ label: "Max", value: maxAmount }] : []),
+      ]
+    }
+
+    if (inputBalance?.raw && inputBalance.raw > 0n && inputTokenForBalance) {
+      const half = rawToInputAmount(inputBalance.raw / 2n, inputTokenForBalance.decimals, 6)
+      return [
+        ...(half && Number(half) > 0 ? [{ label: "50%", value: half }] : []),
+        { label: "Max", value: maxAmount ?? "" },
+      ].filter((item) => item.value)
+    }
+
+    return QUICK_SELL.map((value) => ({ label: value, value }))
+  }, [inputBalance, inputTokenForBalance, side])
   const quoteStale = quoteAge > 30
   const execSteps = rwaQuoteExecutionKind(quote) === "pcsx" ? PCSX_EXEC_STEPS : V3_EXEC_STEPS
 
@@ -1614,7 +1667,57 @@ function RwaTradeModal({
     setStatus("idle")
     setError(null)
     setTxHash(null)
+    setInputBalance(null)
+    setBalanceLoading(false)
   }, [request?.asset.id, request?.side])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadInputBalance() {
+      setInputBalance(null)
+      if (!request || !walletAddress || !inputTokenForBalance?.address) return
+
+      setBalanceLoading(true)
+      try {
+        const provider = new JsonRpcProvider(BSC_CHAIN_PARAMS.rpcUrls[0], BSC_CHAIN_ID, { staticNetwork: true })
+        const token = new Contract(inputTokenForBalance.address, ERC20_ABI, provider)
+        const raw = await token.balanceOf(walletAddress) as bigint
+        if (cancelled) return
+        setInputBalance({
+          raw,
+          amount: rawToInputAmount(raw, inputTokenForBalance.decimals, side === "buy" ? 4 : 6),
+          symbol: inputTokenForBalance.symbol,
+          decimals: inputTokenForBalance.decimals,
+        })
+      } catch {
+        if (!cancelled) setInputBalance(null)
+      } finally {
+        if (!cancelled) setBalanceLoading(false)
+      }
+    }
+
+    void loadInputBalance()
+    return () => {
+      cancelled = true
+    }
+  }, [inputTokenForBalance, request, side, walletAddress])
+
+  useEffect(() => {
+    if (side !== "sell" || !inputBalance) return
+    const current = Number(amount || "0")
+    const available = Number(inputBalance.amount || "0")
+    if (!Number.isFinite(available) || available <= 0) return
+    if (amount === "0.1" && available < 0.1) {
+      setAmount(inputBalance.amount)
+      setQuote(null)
+      setQuoteAge(0)
+    } else if ((!amount || current <= 0) && available > 0) {
+      setAmount(inputBalance.amount)
+      setQuote(null)
+      setQuoteAge(0)
+    }
+  }, [amount, inputBalance, side])
 
   // Age the quote so user knows when it's going stale
   useEffect(() => {
@@ -1630,6 +1733,16 @@ function RwaTradeModal({
     setQuote(null)
     setQuoteAge(0)
     if (status === "error") { setStatus("idle"); setError(null) }
+  }
+
+  const quoteErrorMessage = (err: unknown) => {
+    const raw = friendlyErrorMessage(err, "Could not get a price right now. Please try again.", "trade")
+    if (/quote|route|price|liquidity|unavailable/i.test(raw)) {
+      return side === "sell"
+        ? `No sell quote for this size. Try Max or a larger ${inputSymbol} amount.`
+        : "No buy quote for this size. Try a larger USDT amount or refresh the route."
+    }
+    return raw
   }
 
   const getQuote = async () => {
@@ -1654,7 +1767,7 @@ function RwaTradeModal({
     } catch (err) {
       setQuote(null)
       setStatus("error")
-      setError(friendlyErrorMessage(err, "Could not get a price right now. Please try again.", "trade"))
+      setError(quoteErrorMessage(err))
     }
   }
 
@@ -1680,14 +1793,18 @@ function RwaTradeModal({
 
       if (needsWalletBoundQuote) {
         setStatus("quoting")
-        activeQuote = await fetchRwaSwapQuote({
-          symbol: asset.displaySymbol,
-          side,
-          amount,
-          slippageBps: 200,
-          swapper: signerAddress,
-          recipient: signerAddress,
-        })
+        try {
+          activeQuote = await fetchRwaSwapQuote({
+            symbol: asset.displaySymbol,
+            side,
+            amount,
+            slippageBps: 200,
+            swapper: signerAddress,
+            recipient: signerAddress,
+          })
+        } catch (err) {
+          throw new Error(quoteErrorMessage(err))
+        }
         setQuote(activeQuote)
         setQuoteAge(0)
       }
@@ -1884,23 +2001,23 @@ function RwaTradeModal({
                       You pay
                     </label>
                     <div className="flex items-center gap-1">
-                      {quickAmounts.map((q) => (
+                      {quickAmounts.map((preset) => (
                         <button
-                          key={q}
+                          key={`${side}-${preset.label}-${preset.value}`}
                           type="button"
-                          disabled={status === "quoting"}
+                          disabled={status === "quoting" || balanceLoading}
                           onClick={() => {
-                            setAmount(q)
+                            setAmount(preset.value)
                             clearQuote()
                           }}
                           className={cn(
                             "h-6 rounded-lg px-2 text-[10px] font-bold transition-all",
-                            amount === q
+                            amount === preset.value
                               ? "bg-[oklch(0.78_0.16_82/0.18)] text-[oklch(0.82_0.16_82)] border border-[oklch(0.78_0.16_82/0.35)]"
                               : "border border-[oklch(0.22_0.015_255)] text-muted-foreground hover:text-foreground"
                           )}
                         >
-                          {side === "buy" ? `$${q}` : q}
+                          {preset.label}
                         </button>
                       ))}
                     </div>
@@ -1917,6 +2034,18 @@ function RwaTradeModal({
                     <div className="flex h-12 min-w-[80px] items-center justify-center rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.12_0.012_260)] px-3 font-mono text-sm font-bold text-foreground">
                       {inputSymbol}
                     </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>{side === "buy" ? "Wallet balance" : "Available to sell"}</span>
+                    <span className="font-mono text-foreground/85">
+                      {balanceLoading
+                        ? "Loading..."
+                        : inputBalance
+                        ? `${inputBalance.amount} ${inputBalance.symbol}`
+                        : walletAddress
+                        ? `-- ${inputSymbol}`
+                        : "Connect wallet"}
+                    </span>
                   </div>
                 </div>
 
