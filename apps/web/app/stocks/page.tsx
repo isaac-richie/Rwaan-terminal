@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils"
 import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet"
 import { usePremiumAnalysis } from "@/hooks/use-premium-analysis"
 import { friendlyErrorMessage } from "@/lib/friendly-errors"
+import { scheduleAccountRefresh } from "@/lib/account-events"
 import {
   fetchRwaAssets, fetchRwaQuotes, fetchRelatedMarkets, fetchRwaRouteHealth, fetchRwaSwapQuote, submitRwaSwapOrder,
   type RwaAsset, type RwaQuote, type RelatedMarket, type RwaSwapQuote,
@@ -1863,6 +1864,7 @@ function RwaTradeModal({
 
         setTxHash(submitted.hash)
         setStatus("done")
+        scheduleAccountRefresh({ reason: `stock_${side}_completed`, address: signerAddress })
         return
       }
 
@@ -1887,6 +1889,7 @@ function RwaTradeModal({
       const receipt = await swapTx.wait(1)
       setTxHash(receipt?.hash ?? swapTx.hash)
       setStatus("done")
+      scheduleAccountRefresh({ reason: `stock_${side}_completed`, address: signerAddress })
     } catch (err) {
       setStatus("error")
       setError(friendlyErrorMessage(err, "Trade failed. Check your balance and try again.", "trade"))

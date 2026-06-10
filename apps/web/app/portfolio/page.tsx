@@ -599,9 +599,10 @@ function PortfolioContent() {
       fundingStatus.refresh(),
       readiness.refresh(),
       clobSession.refreshBalanceAllowance(),
+      Promise.resolve(stockHoldings.refresh()),
     ]);
     scheduleAccountRefresh({ reason: "settled_position_claimed", address: tradingWalletAddress });
-  }, [clobSession, fundingStatus, portfolio, readiness, tradingWalletAddress]);
+  }, [clobSession, fundingStatus, portfolio, readiness, stockHoldings, tradingWalletAddress]);
 
   const settledClaims = useSettledPositionClaims({
     wallet: connectedWallet,
@@ -640,6 +641,7 @@ function PortfolioContent() {
   const accountRefreshRef = useRef({
     portfolioRefresh: portfolio.refresh, fundingRefresh: fundingStatus.refresh,
     readinessRefresh: readiness.refresh, openOrdersRefresh: clobSession.refreshOpenOrders,
+    stockRefresh: stockHoldings.refresh,
     clobStatus: clobSession.status, tradingWalletAddress,
   });
 
@@ -647,6 +649,7 @@ function PortfolioContent() {
     accountRefreshRef.current = {
       portfolioRefresh: portfolio.refresh, fundingRefresh: fundingStatus.refresh,
       readinessRefresh: readiness.refresh, openOrdersRefresh: clobSession.refreshOpenOrders,
+      stockRefresh: stockHoldings.refresh,
       clobStatus: clobSession.status, tradingWalletAddress,
     };
   });
@@ -659,6 +662,7 @@ function PortfolioContent() {
       void current.portfolioRefresh();
       void current.fundingRefresh();
       void current.readinessRefresh();
+      void current.stockRefresh();
       if (current.clobStatus === "ready") void current.openOrdersRefresh();
     });
   }, []);
@@ -766,6 +770,7 @@ function PortfolioContent() {
     portfolio.refresh();
     fundingStatus.refresh();
     readiness.refresh();
+    stockHoldings.refresh();
     if (clobSession.status === "ready") void clobSession.refreshOpenOrders();
   };
 
@@ -774,6 +779,7 @@ function PortfolioContent() {
     void fundingStatus.refresh();
     void readiness.refresh();
     void portfolio.refresh();
+    void stockHoldings.refresh();
   };
 
   useEffect(() => {
