@@ -856,6 +856,39 @@ async function quotePancakeExactInput(
   };
 }
 
+async function quoteBestPancakeV3ExactInput(
+  tokenIn: { address: Address; decimals: number; symbol: string },
+  tokenOut: { address: Address; decimals: number; symbol: string },
+  amountIn: bigint,
+  slippageBps: number
+) {
+  const candidates = await Promise.all(
+    PANCAKE_V3_FEES.map(async (fee) => {
+      try {
+        const pool = await getPancakePool(tokenIn.address, tokenOut.address, fee);
+        if (!pool) return null;
+        const quoted = await quotePancakeExactInput(tokenIn.address, tokenOut.address, amountIn, fee);
+        if (quoted.amountOut <= 0n) return null;
+        const amountOutMinimumRaw = (quoted.amountOut * BigInt(10_000 - slippageBps)) / 10_000n;
+        return {
+          fee,
+          pool,
+          quoted,
+          amountOutMinimumRaw,
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return (
+    candidates
+      .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate))
+      .sort((a, b) => Number(b.quoted.amountOut - a.quoted.amountOut))[0] ?? null
+  );
+}
+
 async function quotePancakeXExactInput(
   tokenIn: { address: Address; decimals: number; symbol: string },
   tokenOut: { address: Address; decimals: number; symbol: string },
@@ -1444,70 +1477,88 @@ async function buildSwapQuote(
   } : null;
 
   if (route.kind === "pcsx") {
-    const orderSwapper = swapper ?? ZERO_ADDRESS;
-    const orderRecipient = recipient ?? orderSwapper;
-    const quoted = await quotePancakeXExactInput(
-      tokenIn,
-      tokenOut,
-      swapAmountInRaw,   // post-fee amount sent to DEX
-      slippageBps,
-      orderSwapper,
-      orderRecipient
-    );
+    try {
+      const orderSwapper = swapper ?? ZERO_ADDRESS;
+      const orderRecipient = recipient ?? orderSwapper;
+      const quoted = await quotePancakeXExactInput(
+        tokenIn,
+        tokenOut,
+        swapAmountInRaw,
+        slippageBps,
+        orderSwapper,
+        orderRecipient
+      );
 
-    return {
-      symbol: asset.displaySymbol,
-      side,
-      venue: "PancakeSwapX",
-      chainId: BNB_CHAIN_ID,
-      router: PANCAKEX_V3_REACTOR,
-      spender: PANCAKEX_PERMIT2,
-      quoter: PANCAKEX_PRICE_ENDPOINT,
-      factory: "",
-      fee: 0,
-      pool: "Signed order",
-      slippageBps,
-      roundTripBps: route.roundTripBps,
-      lowLiquidity: route.lowLiquidity,
-      platformFee,       // null when fee receiver not configured
-      tokenIn: {
-        symbol: tokenIn.symbol,
-        address: tokenIn.address,
-        decimals: tokenIn.decimals,
-      },
-      tokenOut: {
-        symbol: tokenOut.symbol,
-        address: tokenOut.address,
-        decimals: tokenOut.decimals,
-      },
-      amountInRaw: amountInRaw.toString(),           // total user pays (incl. fee)
-      amountInHuman: formatUnits(amountInRaw, tokenIn.decimals),
-      swapAmountInRaw: swapAmountInRaw.toString(),   // amount actually swapped
-      swapAmountInHuman: formatUnits(swapAmountInRaw, tokenIn.decimals),
-      amountOutRaw: quoted.amountOut.toString(),
-      amountOutHuman: formatUnits(quoted.amountOut, tokenOut.decimals),
-      amountOutMinimumRaw: quoted.amountOutMinimum.toString(),
-      amountOutMinimumHuman: formatUnits(quoted.amountOutMinimum, tokenOut.decimals),
-      gasEstimate: "0",
-      generatedAt: new Date().toISOString(),
-      execution: {
-        kind: "pcsx",
-        orderType: "DUTCH_LIMIT",
-        quoteId: quoted.quoteId,
-        encodedOrder: quoted.encodedOrder,
-        orderHash: quoted.orderHash,
-        permitData: quoted.permitData,
-        orderInfo: quoted.orderInfo,
-        permit2: PANCAKEX_PERMIT2,
-        reactor: PANCAKEX_V3_REACTOR,
-        swapper: orderSwapper,
-        recipient: orderRecipient,
-      },
-    };
+      return {
+        symbol: asset.displaySymbol,
+        side,
+        venue: "PancakeSwapX",
+        chainId: BNB_CHAIN_ID,
+        router: PANCAKEX_V3_REACTOR,
+        spender: PANCAKEX_PERMIT2,
+        quoter: PANCAKEX_PRICE_ENDPOINT,
+        factory: "",
+        fee: 0,
+        pool: "Signed order",
+        slippageBps,
+        roundTripBps: route.roundTripBps,
+        lowLiquidity: route.lowLiquidity,
+        platformFee,
+        tokenIn: {
+          symbol: tokenIn.symbol,
+          address: tokenIn.address,
+          decimals: tokenIn.decimals,
+        },
+        tokenOut: {
+          symbol: tokenOut.symbol,
+          address: tokenOut.address,
+          decimals: tokenOut.decimals,
+        },
+        amountInRaw: amountInRaw.toString(),
+        amountInHuman: formatUnits(amountInRaw, tokenIn.decimals),
+        swapAmountInRaw: swapAmountInRaw.toString(),
+        swapAmountInHuman: formatUnits(swapAmountInRaw, tokenIn.decimals),
+        amountOutRaw: quoted.amountOut.toString(),
+        amountOutHuman: formatUnits(quoted.amountOut, tokenOut.decimals),
+        amountOutMinimumRaw: quoted.amountOutMinimum.toString(),
+        amountOutMinimumHuman: formatUnits(quoted.amountOutMinimum, tokenOut.decimals),
+        gasEstimate: "0",
+        generatedAt: new Date().toISOString(),
+        execution: {
+          kind: "pcsx",
+          orderType: "DUTCH_LIMIT",
+          quoteId: quoted.quoteId,
+          encodedOrder: quoted.encodedOrder,
+          orderHash: quoted.orderHash,
+          permitData: quoted.permitData,
+          orderInfo: quoted.orderInfo,
+          permit2: PANCAKEX_PERMIT2,
+          reactor: PANCAKEX_V3_REACTOR,
+          swapper: orderSwapper,
+          recipient: orderRecipient,
+        },
+      };
+    } catch {
+      // PancakeSwapX can reject micro-orders even when the asset is tradable.
+      // Fall through to V3 so small exits can still quote when an on-chain pool exists.
+    }
   }
 
-  const quoted = await quotePancakeExactInput(tokenIn.address, tokenOut.address, swapAmountInRaw, route.fee);
-  const amountOutMinimumRaw = (quoted.amountOut * BigInt(10_000 - slippageBps)) / 10_000n;
+  const v3Quote =
+    route.kind === "v3"
+      ? (() => {
+          const amountOutPromise = quotePancakeExactInput(tokenIn.address, tokenOut.address, swapAmountInRaw, route.fee);
+          return amountOutPromise.then((quoted) => ({
+            fee: route.fee,
+            pool: route.pool,
+            quoted,
+            amountOutMinimumRaw: (quoted.amountOut * BigInt(10_000 - slippageBps)) / 10_000n,
+          }));
+        })()
+      : quoteBestPancakeV3ExactInput(tokenIn, tokenOut, swapAmountInRaw, slippageBps);
+
+  const resolvedV3 = await v3Quote;
+  if (!resolvedV3) return null;
 
   return {
     symbol: asset.displaySymbol,
@@ -1518,8 +1569,8 @@ async function buildSwapQuote(
     spender: PANCAKE_V3_SWAP_ROUTER,
     quoter: PANCAKE_V3_QUOTER_V2,
     factory: PANCAKE_V3_FACTORY,
-    fee: route.fee,
-    pool: route.pool,
+    fee: resolvedV3.fee,
+    pool: resolvedV3.pool,
     slippageBps,
     roundTripBps: route.roundTripBps,
     lowLiquidity: route.lowLiquidity,
@@ -1538,11 +1589,11 @@ async function buildSwapQuote(
     amountInHuman: formatUnits(amountInRaw, tokenIn.decimals),
     swapAmountInRaw: swapAmountInRaw.toString(),   // amount actually swapped
     swapAmountInHuman: formatUnits(swapAmountInRaw, tokenIn.decimals),
-    amountOutRaw: quoted.amountOut.toString(),
-    amountOutHuman: formatUnits(quoted.amountOut, tokenOut.decimals),
-    amountOutMinimumRaw: amountOutMinimumRaw.toString(),
-    amountOutMinimumHuman: formatUnits(amountOutMinimumRaw, tokenOut.decimals),
-    gasEstimate: quoted.gasEstimate.toString(),
+    amountOutRaw: resolvedV3.quoted.amountOut.toString(),
+    amountOutHuman: formatUnits(resolvedV3.quoted.amountOut, tokenOut.decimals),
+    amountOutMinimumRaw: resolvedV3.amountOutMinimumRaw.toString(),
+    amountOutMinimumHuman: formatUnits(resolvedV3.amountOutMinimumRaw, tokenOut.decimals),
+    gasEstimate: resolvedV3.quoted.gasEstimate.toString(),
     generatedAt: new Date().toISOString(),
     execution: {
       kind: "v3",
