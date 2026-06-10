@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react"
 import type { ConnectedWallet } from "@privy-io/react-auth"
-import { RelayClient } from "@polymarket/builder-relayer-client"
-import { createWalletClient, custom } from "viem"
-import { polygon } from "viem/chains"
 
 const POLYGON_CHAIN_ID = 137
 const DEFAULT_RELAYER_URL = "https://relayer-v2.polymarket.com"
@@ -31,6 +28,16 @@ export function usePolymarketDepositWallet(wallet?: ConnectedWallet | null): Dep
     setLoading(true)
     setError(null)
     try {
+      // Runtime imports: @polymarket/builder-relayer-client carries its own
+      // ethers v5 dependency (~1.7MB raw JS). The navbar mounts this hook on
+      // every page, so importing eagerly would ship that bundle to every
+      // visitor — including ones who never connect a wallet. Deferring the
+      // import means it only downloads once a wallet address is present.
+      const [{ RelayClient }, { createWalletClient, custom }, { polygon }] = await Promise.all([
+        import("@polymarket/builder-relayer-client"),
+        import("viem"),
+        import("viem/chains"),
+      ])
       const provider = await wallet.getEthereumProvider()
       const walletClient = createWalletClient({
         account: wallet.address as `0x${string}`,

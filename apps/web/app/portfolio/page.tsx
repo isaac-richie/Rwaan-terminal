@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -30,7 +31,6 @@ import {
 import { usePrivy } from "@privy-io/react-auth";
 
 import { Footer } from "@/components/footer";
-import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
 import { ComponentErrorBoundary } from "@/components/ui/error-boundary";
 import { Navbar } from "@/components/navbar";
 import { ActivityFeed } from "@/components/portfolio/activity-feed";
@@ -65,6 +65,11 @@ import { addAccountRefreshListener, scheduleAccountRefresh } from "@/lib/account
 import { friendlyErrorMessage } from "@/lib/friendly-errors";
 import { cachePortfolioPositionForDetail } from "@/lib/market-detail-cache";
 import { cn } from "@/lib/utils";
+
+const BnbFundingModal = dynamic(
+  () => import("@/components/funding/bnb-funding-modal").then((m) => m.BnbFundingModal),
+  { ssr: false }
+);
 
 const PRIVY_ENABLED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
 

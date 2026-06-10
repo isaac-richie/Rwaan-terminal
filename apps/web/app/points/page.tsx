@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Award, BarChart3, CheckCircle2, ChevronRight, Copy,
   Crown, Link2, Loader2, Lock, Sparkles, Star, Target,
@@ -8,7 +9,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Footer } from "@/components/footer";
-import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
 import { Navbar } from "@/components/navbar";
 import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet";
 import { usePolymarketDepositWallet } from "@/hooks/use-polymarket-deposit-wallet";
@@ -16,6 +16,11 @@ import { useReferral } from "@/hooks/use-referral";
 import { useTradeReadiness } from "@/hooks/use-trade-readiness";
 import { useTradingProfile } from "@/hooks/use-trading-profile";
 import { cn } from "@/lib/utils";
+
+const BnbFundingModal = dynamic(
+  () => import("@/components/funding/bnb-funding-modal").then((m) => m.BnbFundingModal),
+  { ssr: false }
+);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const PREMIUM_ANALYSIS_FEE_ENABLED =

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -39,7 +40,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { BnbFundingModal } from "@/components/funding/bnb-funding-modal";
 import { useActivePrivyWallet } from "@/hooks/use-active-privy-wallet";
 import { GasAssistButton } from "@/components/funding/gas-assist-button";
 import { useClobSession } from "@/hooks/use-clob-session";
@@ -56,6 +56,11 @@ import { readCachedMarketDetail, type CachedMarketDetail } from "@/lib/market-de
 import { cn } from "@/lib/utils";
 import { CryptoAssetChart, detectCryptoAsset } from "@/components/charts/CryptoAssetChart";
 import { PremiumAnalysisCard } from "@/components/market/premium-analysis-card";
+
+const BnbFundingModal = dynamic(
+  () => import("@/components/funding/bnb-funding-modal").then((m) => m.BnbFundingModal),
+  { ssr: false }
+);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
