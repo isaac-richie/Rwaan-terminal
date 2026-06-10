@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useCallback, useRef } from "react"
+import { useEffect, useId, useMemo, useState, useCallback, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { BrowserProvider, Contract, formatUnits as formatTokenUnits } from "ethers"
@@ -208,17 +208,34 @@ function AssetMark({ asset, size = "md" }: { asset: RwaAsset; size?: "sm" | "md"
 
 // ─── Mini sparkline (decorative) ─────────────────────────────────────────────
 function MiniSpark({ positive, accent }: { positive: boolean; accent: string }) {
+  const gradId = useId()
   const pts = positive
     ? [6, 5, 7, 4, 8, 5, 9, 6, 10, 7, 12]
     : [12, 10, 11, 8, 9, 6, 8, 5, 7, 4, 5]
-  const w = 44, h = 18
-  const xs = pts.map((_, i) => (i / (pts.length - 1)) * w)
+  const w = 56, h = 22
+  const pad = 2
+  const xs = pts.map((_, i) => pad + (i / (pts.length - 1)) * (w - pad * 2))
   const min = Math.min(...pts), max = Math.max(...pts)
-  const ys = pts.map(p => h - ((p - min) / (max - min)) * h)
-  const path = xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ")
+  const ys = pts.map(p => pad + (h - pad * 2) - ((p - min) / (max - min)) * (h - pad * 2))
+  // Smooth the line with quadratic midpoint curves instead of hard segments
+  let line = `M${xs[0].toFixed(1)},${ys[0].toFixed(1)}`
+  for (let i = 1; i < xs.length; i++) {
+    const mx = ((xs[i - 1] + xs[i]) / 2).toFixed(1)
+    const my = ((ys[i - 1] + ys[i]) / 2).toFixed(1)
+    line += ` Q${xs[i - 1].toFixed(1)},${ys[i - 1].toFixed(1)} ${mx},${my}`
+  }
+  line += ` L${xs[xs.length - 1].toFixed(1)},${ys[ys.length - 1].toFixed(1)}`
+  const area = `${line} L${xs[xs.length - 1].toFixed(1)},${h} L${xs[0].toFixed(1)},${h} Z`
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fill="none" className="shrink-0 opacity-80">
-      <path d={path} stroke={accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fill="none" className="shrink-0">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={accent} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={accent} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gradId})`} />
+      <path d={line} stroke={accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="2" fill={accent} />
     </svg>
   )
@@ -236,67 +253,96 @@ function AssetCard({ asset, quote, selected, onSelect }: {
       type="button"
       onClick={onSelect}
       className={cn(
-        "group w-full rounded-2xl border p-3.5 sm:p-4 text-left transition-all duration-200 active:scale-[0.98]",
+        "group w-full overflow-hidden rounded-2xl border text-left transition-all duration-200 active:scale-[0.98]",
         "bg-[oklch(0.12_0.012_260/0.88)]",
         selected
           ? "border-[oklch(0.78_0.16_82/0.55)] shadow-[0_0_0_1px_oklch(0.78_0.16_82/0.16),0_16px_48px_oklch(0_0_0/0.28)]"
-          : "border-[oklch(0.22_0.015_255/0.72)] hover:border-[oklch(0.78_0.16_82/0.30)]"
+          : positive
+          ? "border-[oklch(0.22_0.015_255/0.72)] hover:border-[oklch(0.68_0.18_155/0.35)] hover:shadow-[0_8px_28px_oklch(0_0_0/0.25)]"
+          : "border-[oklch(0.22_0.015_255/0.72)] hover:border-[oklch(0.62_0.18_25/0.35)] hover:shadow-[0_8px_28px_oklch(0_0_0/0.25)]"
       )}
     >
-      <div className="flex items-start gap-3">
-        <AssetMark asset={asset} size="sm" />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="font-mono text-sm font-bold text-foreground">{asset.displaySymbol}</div>
-              <div className="truncate text-[11px] text-muted-foreground mt-0.5">{asset.name}</div>
+      <div className="p-3.5 sm:p-4">
+        {/* Identity row */}
+        <div className="flex items-start gap-3">
+          <AssetMark asset={asset} size="sm" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-sm font-bold text-foreground">{asset.displaySymbol}</span>
+              <span className={cn(
+                "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+                asset.assetClass === "etf"
+                  ? "bg-[oklch(0.62_0.17_250/0.12)] text-[oklch(0.72_0.16_250)]"
+                  : "bg-[oklch(0.78_0.16_82/0.12)] text-[oklch(0.82_0.16_82)]"
+              )}>
+                {asset.assetClass === "etf" ? "ETF" : "Stock"}
+              </span>
             </div>
+            <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{asset.name}</div>
+          </div>
+        </div>
+
+        {/* Price row — change rendered as a directional pill */}
+        <div className="mt-3.5 flex items-end justify-between gap-2">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="font-mono text-lg sm:text-xl font-semibold leading-none text-foreground">
+              {formatMoney(quote?.price, quote?.currency)}
+            </span>
             <span className={cn(
-              "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide",
-              asset.assetClass === "etf"
-                ? "bg-[oklch(0.62_0.17_250/0.12)] text-[oklch(0.72_0.16_250)]"
-                : "bg-[oklch(0.78_0.16_82/0.12)] text-[oklch(0.82_0.16_82)]"
+              "shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums",
+              positive
+                ? "bg-[oklch(0.68_0.18_155/0.12)] text-[oklch(0.72_0.18_155)]"
+                : "bg-[oklch(0.62_0.18_25/0.12)] text-[oklch(0.68_0.18_25)]"
             )}>
-              {asset.assetClass === "etf" ? "ETF" : "Stock"}
+              {formatPct(quote?.changePct)}
             </span>
           </div>
+          <MiniSpark positive={positive} accent={accent} />
+        </div>
 
-          <div className="mt-3 flex items-end justify-between gap-2">
-            <div>
-              <div className="font-mono text-lg sm:text-xl font-semibold text-foreground leading-none">
-                {formatMoney(quote?.price, quote?.currency)}
-              </div>
-              <div className={cn(
-                "mt-1 text-[11px] font-bold tabular-nums",
-                positive ? "text-[oklch(0.68_0.18_155)]" : "text-[oklch(0.62_0.18_25)]"
-              )}>
-                {formatPct(quote?.changePct)}
-              </div>
-            </div>
-            <MiniSpark positive={positive} accent={accent} />
-          </div>
+        {/* Meta row */}
+        <div className="mt-2.5 flex items-center gap-1.5 text-[10px]">
+          <span className="truncate font-medium text-muted-foreground/60">{asset.sector}</span>
+          {asset.risk === "high" && (
+            <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-bold bg-[oklch(0.62_0.18_25/0.12)] text-[oklch(0.68_0.18_25)]">
+              Volatile
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-1.5">
-        <span className="text-[10px] text-muted-foreground/60 font-medium">{asset.sector}</span>
-        {asset.risk === "high" && (
-          <span className="rounded px-1 py-0.5 text-[9px] font-bold bg-[oklch(0.62_0.18_25/0.12)] text-[oklch(0.68_0.18_25)]">
-            Volatile
-          </span>
-        )}
-        <span
-          className={cn(
-            "ml-auto rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
-            tone === "positive"
-              ? "bg-[oklch(0.68_0.18_155/0.12)] text-[oklch(0.68_0.18_155)]"
-              : tone === "danger"
-              ? "bg-[oklch(0.60_0.18_25/0.12)] text-[oklch(0.68_0.18_25)]"
-              : "bg-[oklch(0.78_0.16_82/0.12)] text-[oklch(0.82_0.16_82)]"
-          )}
-        >
+      {/* Status footer — route state as a quiet strip instead of a boxy badge */}
+      <div className={cn(
+        "flex items-center gap-1.5 border-t px-3.5 sm:px-4 py-2",
+        tone === "positive"
+          ? "border-[oklch(0.68_0.18_155/0.14)] bg-[oklch(0.68_0.18_155/0.05)]"
+          : tone === "danger"
+          ? "border-[oklch(0.60_0.18_25/0.14)] bg-[oklch(0.60_0.18_25/0.05)]"
+          : "border-[oklch(0.78_0.16_82/0.14)] bg-[oklch(0.78_0.16_82/0.04)]"
+      )}>
+        <span className={cn(
+          "h-1.5 w-1.5 rounded-full",
+          tone === "positive"
+            ? "bg-[oklch(0.68_0.18_155)] pulse-dot"
+            : tone === "danger"
+            ? "bg-[oklch(0.62_0.18_25)]"
+            : "bg-[oklch(0.78_0.16_82)]"
+        )} />
+        <span className={cn(
+          "text-[9px] font-bold uppercase tracking-wide",
+          tone === "positive"
+            ? "text-[oklch(0.68_0.18_155)]"
+            : tone === "danger"
+            ? "text-[oklch(0.68_0.18_25)]"
+            : "text-[oklch(0.82_0.16_82)]"
+        )}>
           {routeLabel(asset.route)}
         </span>
+        {tone === "positive" && (
+          <span className="ml-auto text-[9px] font-semibold text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100">
+            Tap to trade →
+          </span>
+        )}
       </div>
     </button>
   )
@@ -371,7 +417,10 @@ const STOCK_SORTS: Array<{ key: StockSortKey; label: string; icon: LucideIcon }>
   { key: "live", label: "Live First", icon: Activity },
 ]
 
-const STOCK_BATCH_SIZE = 12
+// 6 per batch — the only count that fills complete rows on every breakpoint:
+// 6×1 (mobile), 3×2 (sm/xl two-col), 2×3 (lg three-col). 8 would leave a
+// ragged 2-card row on the lg grid with every load.
+const STOCK_BATCH_SIZE = 6
 
 function matchesStockFilter(asset: RwaAsset, filter: StockFilterKey) {
   switch (filter) {
@@ -426,6 +475,7 @@ export default function StocksPage() {
   const [sortBy, setSortBy] = useState<StockSortKey>("smart")
   const [sortOpen, setSortOpen] = useState(false)
   const [visibleAssetCount, setVisibleAssetCount] = useState(STOCK_BATCH_SIZE)
+  const [moversPaused, setMoversPaused] = useState(false)
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -671,6 +721,23 @@ export default function StocksPage() {
   const currentSort = STOCK_SORTS.find((sort) => sort.key === sortBy) ?? STOCK_SORTS[0]
   const CurrentSortIcon = currentSort.icon
 
+  // Biggest absolute movers across every priced stock — powers the market
+  // pulse strip. Quotes for the full catalog already refresh every 60s, so
+  // this is pure client-side computation with no extra requests.
+  const topMovers = useMemo(() => {
+    return assets
+      .map((asset) => ({ asset, quote: quotes[asset.quoteSymbol] }))
+      .filter((m): m is { asset: RwaAsset; quote: RwaQuote } =>
+        Boolean(
+          m.quote &&
+          Number.isFinite(m.quote.changePct ?? NaN) &&
+          Number.isFinite(m.quote.price ?? NaN)
+        )
+      )
+      .sort((a, b) => Math.abs(b.quote.changePct ?? 0) - Math.abs(a.quote.changePct ?? 0))
+      .slice(0, 8)
+  }, [assets, quotes])
+
   return (
     <div className="terminal-grid-bg min-h-screen bg-background flex flex-col ambient-glow">
       <Navbar />
@@ -680,77 +747,130 @@ export default function StocksPage() {
         {/* ── Header ────────────────────────────────────────────────────── */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.24)] bg-[oklch(0.78_0.16_82/0.08)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.82_0.16_82)]">
-                <Zap className="h-3 w-3" />
-                Stocks · Beta
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.16_82/0.24)] bg-[oklch(0.78_0.16_82/0.08)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[oklch(0.82_0.16_82)]">
+                  <Zap className="h-3 w-3" />
+                  Stocks · Beta
+                </div>
+                {assets.length > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(0.22_0.015_255)] bg-[oklch(0.13_0.012_260)] px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+                    {assets.length} markets · on-chain settlement
+                  </span>
+                )}
               </div>
               <h1 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-                Real Stocks. Live Prices.
+                Real stocks.{" "}
+                <span className="bg-gradient-to-r from-[oklch(0.82_0.16_82)] via-[oklch(0.75_0.17_120)] to-[oklch(0.68_0.18_155)] bg-clip-text text-transparent">
+                  Live prices.
+                </span>
               </h1>
-              <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-lg">
-                Browse and trade top US stocks and ETFs with real-time pricing from anywhere in the world.
+              <p className="mt-2 max-w-lg text-sm sm:text-base text-muted-foreground">
+                Tokenized US equities and ETFs with live market pricing — trade from anywhere, settle on-chain.
               </p>
             </div>
             <button
               type="button"
               onClick={() => load(true)}
               disabled={refreshing}
-              className="shrink-0 flex items-center gap-1.5 h-9 px-3 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+              className="shrink-0 flex items-center gap-1.5 h-9 px-3 rounded-xl border border-[oklch(0.22_0.015_255)] bg-[oklch(0.14_0.013_255)] text-xs font-semibold text-muted-foreground hover:border-[oklch(0.78_0.16_82/0.4)] hover:text-foreground disabled:opacity-50 transition-colors"
             >
               <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
           </div>
 
-          {/* Stats strip */}
-          <div className="mt-5 grid grid-cols-3 gap-3 sm:gap-4">
-            {/* Stocks */}
-            <div className="rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)] px-3 sm:px-4 py-4">
-              <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                <TrendingUp className="h-3 w-3" /> Stocks
-              </div>
-              <div className="mt-2 text-2xl sm:text-3xl font-bold text-foreground tabular-nums leading-none">
-                {assets.length > 0 ? assets.length : "--"}
-              </div>
-              <div className="mt-1.5 text-[10px] text-muted-foreground">available</div>
+          {/* ── Market pulse — live status + top movers ─────────────────── */}
+          <div className="mt-5 overflow-hidden rounded-2xl border border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)]">
+            {/* Status line — replaces the old static counter cards */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[oklch(0.18_0.014_255)] px-4 py-2.5">
+              <span className="flex items-center gap-2 text-[11px] font-bold text-foreground">
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    exitVerifiedCount > 0 ? "bg-[oklch(0.68_0.18_155)] pulse-dot" : "bg-[oklch(0.44_0.02_255)]"
+                  )}
+                />
+                {assets.length === 0
+                  ? "Loading markets…"
+                  : exitVerifiedCount > 0
+                  ? `${exitVerifiedCount} of ${assets.length} open to trade`
+                  : "Checking trade routes…"}
+              </span>
+              {mappedCount > 0 && (
+                <span className="text-[10px] text-muted-foreground">
+                  {mappedCount} live prices · refreshes every 60s
+                </span>
+              )}
             </div>
 
-            {/* Available */}
-            <div className={cn(
-              "rounded-2xl border px-3 sm:px-4 py-4",
-              mappedCount > 0
-                ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.06)]"
-                : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)]"
-            )}>
-              <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                <Wallet className="h-3 w-3" /> Priced
-              </div>
-              <div className={cn("mt-2 text-2xl sm:text-3xl font-bold tabular-nums leading-none",
-                mappedCount > 0 ? "text-[oklch(0.68_0.18_155)]" : "text-foreground"
-              )}>
-                {assets.length > 0 ? `${mappedCount}/${assets.length}` : "--"}
-              </div>
-              <div className="mt-1.5 text-[10px] text-muted-foreground">live prices</div>
+            {/* Top movers — tap a chip to open that stock */}
+            <div className="flex items-center justify-between px-4 pb-1 pt-2.5">
+              <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">
+                <Activity className="h-3 w-3" /> Top movers today
+              </span>
             </div>
-
-            {/* Live Now */}
-            <div className={cn(
-              "rounded-2xl border px-3 sm:px-4 py-4",
-              exitVerifiedCount > 0
-                ? "border-[oklch(0.68_0.18_155/0.25)] bg-[oklch(0.68_0.18_155/0.06)]"
-                : "border-[oklch(0.22_0.015_255/0.72)] bg-[oklch(0.10_0.012_260/0.62)]"
-            )}>
-              <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                <Activity className="h-3 w-3" /> Live
-              </div>
-              <div className={cn("mt-2 text-2xl sm:text-3xl font-bold tabular-nums leading-none",
-                exitVerifiedCount > 0 ? "text-[oklch(0.68_0.18_155)]" : "text-foreground"
-              )}>
-                {assets.length > 0 ? exitVerifiedCount : "--"}
-              </div>
-              <div className="mt-1.5 text-[10px] text-muted-foreground">
-                {exitVerifiedCount > 0 ? "open to trade" : "checking routes"}
+            <div
+              className="overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]"
+              onPointerDown={() => setMoversPaused(true)}
+              onPointerUp={() => setMoversPaused(false)}
+              onPointerCancel={() => setMoversPaused(false)}
+              onFocusCapture={() => setMoversPaused(true)}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setMoversPaused(false)
+                }
+              }}
+            >
+              <div
+                className={cn(
+                  "flex min-w-max gap-2 px-4 pb-3.5 pt-1",
+                  topMovers.length > 0 && "ticker-scroll-right",
+                  moversPaused && "ticker-paused"
+                )}
+              >
+                {topMovers.length === 0
+                  ? Array.from({ length: 5 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-[56px] w-[124px] shrink-0 rounded-xl shimmer"
+                        style={{ animationDelay: `${i * 60}ms` }}
+                      />
+                    ))
+                  : /* Duplicated once so the marquee loops seamlessly */
+                    [...topMovers, ...topMovers].map(({ asset, quote }, idx) => {
+                      const up = (quote.changePct ?? 0) >= 0
+                      const price = quote.price ?? 0
+                      return (
+                        <button
+                          key={`${asset.id}-${idx}`}
+                          type="button"
+                          onClick={() => handleSelectAsset(asset.id)}
+                          className={cn(
+                            "shrink-0 rounded-xl border px-3 py-2 text-left transition-all active:scale-[0.97]",
+                            up
+                              ? "border-[oklch(0.68_0.18_155/0.22)] bg-[oklch(0.68_0.18_155/0.05)] hover:bg-[oklch(0.68_0.18_155/0.10)]"
+                              : "border-[oklch(0.58_0.2_25/0.22)] bg-[oklch(0.58_0.2_25/0.05)] hover:bg-[oklch(0.58_0.2_25/0.10)]"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-foreground">{asset.displaySymbol}</span>
+                            <span
+                              className={cn(
+                                "font-mono text-[11px] font-bold tabular-nums",
+                                up ? "text-[oklch(0.72_0.18_155)]" : "text-[oklch(0.68_0.18_25)]"
+                              )}
+                            >
+                              {up ? "+" : ""}
+                              {(quote.changePct ?? 0).toFixed(2)}%
+                            </span>
+                          </div>
+                          <div className="mt-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+                            ${price >= 1000 ? price.toLocaleString("en-US", { maximumFractionDigits: 0 }) : price.toFixed(2)}
+                          </div>
+                        </button>
+                      )
+                    })}
               </div>
             </div>
           </div>
@@ -869,8 +989,8 @@ export default function StocksPage() {
               </div>
 
               {!loading && assets.length > 0 && (
-                <p className="mt-3 text-[11px] leading-5 text-muted-foreground/70">
-                  Rawli tracks {assets.length} tokenized stocks and ETFs. {exitVerifiedCount} are tradable right now because both buy and sell liquidity passed PancakeSwap route checks; the rest stay watch-only until their routes are safe.
+                <p className="mt-3 text-[11px] leading-5 text-muted-foreground/60">
+                  {exitVerifiedCount} of {assets.length} tradable now — the rest unlock once their liquidity routes pass safety checks.
                 </p>
               )}
             </div>
@@ -893,7 +1013,7 @@ export default function StocksPage() {
             {/* Asset grid */}
             <div className="grid gap-2.5 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2">
               {loading
-                ? Array.from({ length: 8 }).map((_, i) => (
+                ? Array.from({ length: STOCK_BATCH_SIZE }).map((_, i) => (
                     <div key={i} className="h-[130px] rounded-2xl shimmer" style={{ animationDelay: `${i * 60}ms` }} />
                   ))
                 : filteredAssets.length === 0

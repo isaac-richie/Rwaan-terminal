@@ -13,6 +13,7 @@ import {
   deriveMarketAwareVerdict,
 } from "../services/ta-engine.js";
 import { computeFundamentalVerdict } from "../services/fundamental-engine.js";
+import { computeStockTechnicals, type StockTechnicals } from "../services/stock-ta.js";
 import { logPrediction, scoreResolvedPredictions, getAccuracy } from "../services/predictionLog.js";
 
 const marketSchema = z.object({
@@ -170,12 +171,18 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       // TA only drives the verdict for crypto PRICE questions ("will X be above $Y?").
       // Non-price crypto questions (ETF approvals, hacks, listings) go to the
       // fundamental/news engine instead — price technicals are irrelevant there.
-      const cryptoSymbol = detectCryptoSymbol(market.question);
+      // Stock markets (id "stock:NVDA") get real price technicals from daily
+      // OHLC data — crypto symbol detection must not run on stock questions
+      // (tickers like SOL/COIN/HOOD collide with crypto names).
+      const stockSymbol = isStockAnalysisMarket(market.id)
+        ? market.id.slice("stock:".length).toUpperCase()
+        : null;
+      const cryptoSymbol = stockSymbol ? null : detectCryptoSymbol(market.question);
       const priceClassification = cryptoSymbol ? classifyCryptoPriceQuestion(market.question) : null;
       const useTA = Boolean(cryptoSymbol && priceClassification?.isPriceQuestion);
 
       // Fetch news + (conditionally) TA signals in parallel
-      const [newsArticles, rawTaResult] = await Promise.all([
+      const [newsArticles, rawTaResult, stockTechnicals] = await Promise.all([
         withFallbackTimeout(
           fetchPremiumNews(market.question, market.category),
           9000,
@@ -188,6 +195,14 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
               14000,
               null,
               () => req.log.warn({ marketId: market.id, cryptoSymbol }, "Premium TA fetch timed out")
+            )
+          : Promise.resolve(null),
+        stockSymbol
+          ? withFallbackTimeout(
+              computeStockTechnicals(stockSymbol).catch(() => null) as Promise<StockTechnicals | null>,
+              9000,
+              null,
+              () => req.log.warn({ marketId: market.id, stockSymbol }, "Stock TA fetch timed out")
             )
           : Promise.resolve(null),
       ]);
@@ -224,9 +239,11 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      // Fundamental verdict for everything the TA engine doesn't drive
+      // Fundamental verdict for everything the TA engine doesn't drive.
+      // For stocks, real price technicals join the weighted vote so the verdict
+      // is anchored to hard market data, not just news-keyword sentiment.
       const fundamentalResult = !taResult
-        ? computeFundamentalVerdict(market, newsArticles)
+        ? computeFundamentalVerdict(market, newsArticles, stockTechnicals?.signals ?? [])
         : null;
 
       const raw = await withFallbackTimeout(
@@ -318,6 +335,24 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
             priceEfficiency: fundamentalResult.priceEfficiency,
             daysToResolution: fundamentalResult.daysToResolution,
             category: fundamentalResult.category,
+          },
+        }),
+        // Real price technicals for tokenized stocks (Yahoo daily OHLC)
+        ...(stockTechnicals && {
+          stockTechnicals: {
+            symbol: stockTechnicals.symbol,
+            price: stockTechnicals.price,
+            sma50: stockTechnicals.sma50,
+            sma200: stockTechnicals.sma200,
+            rsi14: stockTechnicals.rsi14,
+            macd: stockTechnicals.macd,
+            ret1mPct: stockTechnicals.ret1mPct,
+            ret3mPct: stockTechnicals.ret3mPct,
+            realizedVolAnnualPct: stockTechnicals.realizedVolAnnualPct,
+            high52w: stockTechnicals.high52w,
+            low52w: stockTechnicals.low52w,
+            pctFrom52wHigh: stockTechnicals.pctFrom52wHigh,
+            summary: stockTechnicals.summary,
           },
         }),
       };

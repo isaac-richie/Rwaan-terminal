@@ -54,6 +54,17 @@ const PANCAKE_V3_SWAP_ROUTER = "0x1b81D678ffb9C0263b24A97847620C99d213eB14" as A
 const PANCAKE_V3_FEES = [100, 500, 2500, 10000] as const;
 const PANCAKEX_PRICE_ENDPOINT = "https://x.pancakeswap.com/order-price/get-price";
 const PANCAKEX_ORDER_ENDPOINT = "https://x.pancakeswap.com/order-handler/order";
+// PancakeSwap's edge WAF rejects requests without a browser-like User-Agent
+// (Node's default undici UA gets 403'd). Verified 2026-06: identical request
+// succeeds with these headers and fails without them.
+const PANCAKEX_HTTP_HEADERS = {
+  Accept: "application/json",
+  "Content-Type": "application/json",
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
+  Origin: "https://x.pancakeswap.com",
+  Referer: "https://x.pancakeswap.com/",
+} as const;
 const PANCAKEX_PERMIT2 = "0x31c2F6fcFf4F8759b3Bd5Bf0e1084A055615c768" as Address;
 const PANCAKEX_V3_REACTOR = "0xB75BB4c7AaaCFA400758BF024C2FFEfe17C9cBe3" as Address;
 const PANCAKEX_ROUTE_USER = "0x1111111111111111111111111111111111111111" as Address;
@@ -855,7 +866,7 @@ async function quotePancakeXExactInput(
 ): Promise<PancakeXQuote> {
   const res = await fetch(PANCAKEX_PRICE_ENDPOINT, {
     method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    headers: PANCAKEX_HTTP_HEADERS,
     body: JSON.stringify({
       amount: amountIn.toString(),
       type: "EXACT_INPUT",
@@ -905,7 +916,7 @@ async function submitPancakeXOrder(input: {
 }) {
   const res = await fetch(PANCAKEX_ORDER_ENDPOINT, {
     method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    headers: PANCAKEX_HTTP_HEADERS,
     body: JSON.stringify(input),
     signal: AbortSignal.timeout(10_000),
   });
@@ -957,7 +968,9 @@ async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null>
           testTokenOutRaw: buy.amountOut.toString(),
           testSellBackRaw: sellBack.amountOut.toString(),
         };
-        await setJsonCache(cacheKey, route, 60, { staleTtlSeconds: 300 });
+        // Liquidity status is stable on the minutes scale — cache generously so
+        // the 66-asset catalog sweep doesn't hammer the rate-limited RFQ API.
+        await setJsonCache(cacheKey, route, 600, { staleTtlSeconds: 1800 });
         return route;
       }
     }
@@ -998,8 +1011,33 @@ async function findSafeUsdtRoute(token: OndoToken): Promise<RwaSafeRoute | null>
 
   // Only cache successful routes — null means "no pool found yet", which we
   // don't cache so newly listed tokens are picked up on the next check.
-  if (safe) await setJsonCache(cacheKey, safe, 60, { staleTtlSeconds: 300 });
+  if (safe) await setJsonCache(cacheKey, safe, 600, { staleTtlSeconds: 1800 });
   return safe;
+}
+
+/**
+ * Map with bounded concurrency + small stagger. The PancakeSwapX RFQ endpoint
+ * WAF-blocks request bursts, so the 66-asset catalog sweep must trickle —
+ * a flat Promise.all gets most quotes 403'd and the catalog reports nearly
+ * every stock as route_unsafe even when deep RFQ liquidity exists.
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+      // ~150ms stagger between requests per worker keeps us under the WAF radar
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 async function buildRouteHealth(asset: RwaAsset, region?: string): Promise<RwaRouteHealth> {
@@ -1304,6 +1342,17 @@ async function buildCatalogRouteHealth(asset: RwaAsset, region?: string): Promis
     };
   }
 
+  // The background sweep (startCatalogRouteSweep) trickle-verifies every token's
+  // route and warms the cache. If a verified route is already cached, serve the
+  // full live health (instant — findSafeUsdtRoute reads the same cache) so the
+  // catalog reflects every tradable stock, not just the hardcoded prefetch set.
+  const cachedRoute = await getJsonCacheEntry<RwaSafeRoute | null>(
+    buildCacheKey("rwa:pancake:executable-route:v2", { address: token.address.toLowerCase() })
+  );
+  if (cachedRoute?.value) {
+    return buildRouteHealth(asset, region);
+  }
+
   return {
     symbol: asset.displaySymbol,
     status: "watch_only",
@@ -1328,6 +1377,39 @@ async function buildCatalogRouteHealth(asset: RwaAsset, region?: string): Promis
       secondary: "Verifying live buy and sell routes. Check back shortly.",
     },
   };
+}
+
+// ─── Background route discovery sweep ─────────────────────────────────────────
+// Trickles through the whole catalog verifying PancakeSwapX/V3 routes and
+// warming the route cache, pacing requests to stay under PancakeSwap's WAF
+// rate limits. Without this, only the 6 prefetch symbols ever show as live.
+let catalogSweepStarted = false;
+function startCatalogRouteSweep() {
+  if (catalogSweepStarted) return;
+  catalogSweepStarted = true;
+
+  const sweep = async () => {
+    try {
+      const tokenMap = await fetchOndoTokenMap();
+      for (const asset of assets) {
+        const token = tokenMap.get(asset.quoteSymbol.toUpperCase());
+        if (!token) continue;
+        try {
+          await findSafeUsdtRoute(token);
+        } catch {
+          // Individual failures are fine — next sweep retries.
+        }
+        // ~800ms between tokens (each does 2 RFQ quotes) keeps us under the WAF
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      }
+    } catch (err) {
+      console.warn("[smartmarket] catalog route sweep failed:", err);
+    }
+  };
+
+  void sweep();
+  const timer = setInterval(() => void sweep(), 10 * 60_000);
+  timer.unref?.();
 }
 
 async function buildSwapQuote(
@@ -1522,6 +1604,10 @@ async function fetchQuote(symbol: string): Promise<RwaQuote> {
 }
 
 export async function rwaRoutes(app: FastifyInstance): Promise<void> {
+  // Kick off background route discovery so the catalog reflects every
+  // tradable stock shortly after boot (not just the prefetch set).
+  startCatalogRouteSweep();
+
   // Asset catalog with sector groupings
   app.get("/rwa/assets", async (req, reply) => {
     const query = assetQuerySchema.safeParse(req.query ?? {});
@@ -1530,7 +1616,7 @@ export async function rwaRoutes(app: FastifyInstance): Promise<void> {
       return { ok: false, error: "invalid_rwa_asset_query" };
     }
     const region = query.data.region;
-    const routes = await Promise.all(assets.map((asset) => buildCatalogRouteHealth(asset, region)));
+    const routes = await mapWithConcurrency(assets, 4, (asset) => buildCatalogRouteHealth(asset, region));
     const routeBySymbol = new Map(routes.map((route) => [route.symbol, route]));
 
     return {

@@ -240,10 +240,35 @@
   }
   .ticker-scroll {
     animation: ticker 40s linear infinite;
+    will-change: transform;
+    backface-visibility: hidden;
   }
   @keyframes ticker {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
+    0% { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-50%, 0, 0); }
+  }
+  /* Slow left-to-right drift (stocks top-movers strip). Content must be
+     duplicated once so the -50% start lines up seamlessly with the end. */
+  .ticker-scroll-right {
+    animation: tickerRight 55s linear infinite;
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+  .ticker-scroll-right:hover,
+  .ticker-scroll-right:focus-within,
+  .ticker-paused {
+    animation-play-state: paused;
+  }
+  @keyframes tickerRight {
+    0% { transform: translate3d(-50%, 0, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticker-scroll,
+    .ticker-scroll-right {
+      animation: none;
+      transform: none;
+    }
   }
   /* Apple-style frosted glass surface */
   .glass-surface {

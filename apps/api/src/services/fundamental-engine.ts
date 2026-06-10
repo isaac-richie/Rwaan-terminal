@@ -283,10 +283,14 @@ export function computeFundamentalVerdict(
     liquidity?: string;
     endDate?: string;
   },
-  articles: PremiumNewsArticle[]
+  articles: PremiumNewsArticle[],
+  // Domain-specific quantitative signals computed upstream (e.g. stock price
+  // technicals from real OHLC data). They join the weighted vote alongside the
+  // news/consensus signals and anchor the verdict to hard market data.
+  extraSignals: FundamentalSignal[] = []
 ): FundamentalVerdict {
   const category = detectMarketCategory(market.question, market.category);
-  const signals: FundamentalSignal[] = [];
+  const signals: FundamentalSignal[] = [...extraSignals];
 
   // ── 1. Market Consensus Signal (w: 0.22) ──────────────────────────────────
   // The crowd's implied probability is a meaningful prior. But we REDUCE its
