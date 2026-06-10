@@ -44,6 +44,7 @@ Operational fallbacks:
 - `REDIS_URL` is optional for local development. Cache reads/writes are wrapped so the API remains responsive if Redis is unavailable, but production deployments should run Redis for lower upstream load.
 - `TRADING_PROFILE_DB_PATH` should point to persistent storage in production. The default example uses `.data/trading-profiles.sqlite`.
 - `PAYMENT_RECEIVER_ADDRESS` must be your BNB wallet before premium analysis can collect payment.
+- `RAWLI_FEE_RECEIVER_ADDRESS` must be your BNB wallet before tokenized stock swap fees can be collected.
 - `NEXT_PUBLIC_POLYMARKET_BUILDER_CODE` must be the bytes32 builder code from your Polymarket Builder Profile before orders receive builder attribution.
 
 ## Analysis API

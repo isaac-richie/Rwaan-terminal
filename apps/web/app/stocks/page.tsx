@@ -1020,7 +1020,7 @@ function StockAnalysisSection({ asset, quote }: { asset: RwaAsset; quote?: RwaQu
   const { login } = usePrivy()
   const { wallet, authenticated } = useActivePrivyWallet()
   const marketId = `stock:${asset.displaySymbol}`
-  const { status, analysis, unlockAnalysis } = usePremiumAnalysis(marketId)
+  const { status, analysis, error, unlockAnalysis } = usePremiumAnalysis(marketId)
   const walletConnected = Boolean(authenticated && wallet)
 
   const marketObject = {
@@ -1091,6 +1091,11 @@ function StockAnalysisSection({ asset, quote }: { asset: RwaAsset; quote?: RwaQu
             <p className="text-[12px] leading-5 text-muted-foreground">
               Unlock a premium stock report on {asset.displaySymbol}: news, sentiment, route risk, and price catalysts.
             </p>
+            {error && (
+              <div className="mt-3 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-[11px] leading-4 text-destructive">
+                {error}
+              </div>
+            )}
             <button
               type="button"
               onClick={handleAnalyze}

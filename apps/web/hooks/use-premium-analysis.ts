@@ -112,6 +112,20 @@ function premiumErrorMessage(err: any): { title: string; description: string } {
   }
 
   if (
+    rawMessage.includes("report_timeout") ||
+    rawMessage.includes("analysis_timeout") ||
+    rawMessage.includes("unexpected response") ||
+    rawMessage.includes("failed to fetch") ||
+    rawMessage.includes("networkerror") ||
+    rawMessage.includes("connection reset")
+  ) {
+    return {
+      title: "Report took too long",
+      description: "The intelligence engine is still warming up. Try again in a moment.",
+    }
+  }
+
+  if (
     rawMessage.includes("transfer amount exceeds balance") ||
     rawMessage.includes("insufficient funds") ||
     rawMessage.includes("insufficient balance")
@@ -132,6 +146,16 @@ function premiumErrorMessage(err: any): { title: string; description: string } {
   return {
     title: "Couldn't generate the report",
     description: "Something got in the way. Please try again in a moment.",
+  }
+}
+
+async function readJsonResponse(res: Response): Promise<any> {
+  const text = await res.text().catch(() => "")
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { error: text }
   }
 }
 
@@ -180,8 +204,8 @@ export function usePremiumAnalysis(marketId: string) {
         })
 
         if (res.status !== 402) {
+          const data = await readJsonResponse(res)
           if (res.ok) {
-            const data = await res.json()
             if (data.analysis) {
               setAnalysis(data.analysis)
               saveCached(marketId, data.analysis)
@@ -189,10 +213,10 @@ export function usePremiumAnalysis(marketId: string) {
               return
             }
           }
-          throw new Error("Unexpected response from analysis endpoint")
+          throw new Error(data.error ?? data.message ?? "Unexpected response from analysis endpoint")
         }
 
-        const { paymentRequired } = (await res.json()) as {
+        const { paymentRequired } = (await readJsonResponse(res)) as {
           paymentRequired: PaymentRequirement
         }
 
@@ -226,11 +250,11 @@ export function usePremiumAnalysis(marketId: string) {
         })
 
         if (!paidRes.ok) {
-          const err = await paidRes.json().catch(() => ({}))
+          const err = await readJsonResponse(paidRes)
           throw new Error(err.error ?? "Analysis request failed after payment")
         }
 
-        const data = await paidRes.json()
+        const data = await readJsonResponse(paidRes)
         if (!data.analysis) {
           throw new Error("No analysis returned")
         }

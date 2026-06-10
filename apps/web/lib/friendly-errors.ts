@@ -94,6 +94,12 @@ export function friendlyErrorMessage(
     return "This order was already submitted. Sign a fresh order and try again."
   }
 
+  if (normalized.includes("internal_error") || normalized.includes("request_error")) {
+    if (context === "funding") return "Rawli could not complete that funding request. Refresh status and try again."
+    if (context === "trade") return "Rawli could not prepare that trade. Refresh the market and try again."
+    return fallback
+  }
+
   if (normalized.includes("order submission failed") || normalized.includes("could not submit")) {
     return "We could not submit that order. Please check the amount and try again in a moment."
   }

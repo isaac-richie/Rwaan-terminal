@@ -1400,10 +1400,12 @@ function LockedState({
   onUnlock,
   loading,
   walletConnected,
+  error,
 }: {
   onUnlock: () => void
   loading: boolean
   walletConnected: boolean
+  error?: string | null
 }) {
   const feeEnabled = PREMIUM_ANALYSIS_FEE_ENABLED
   const actionLabel = !walletConnected
@@ -1429,6 +1431,12 @@ function LockedState({
       <p className="text-sm text-muted-foreground">
         Real-time news research &bull; 16-signal quant engine &bull; Definitive YES/NO verdict
       </p>
+
+      {error && (
+        <div className="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs leading-5 text-destructive">
+          {error}
+        </div>
+      )}
 
       {/* Feature list */}
       <div className="grid grid-cols-2 gap-2">
@@ -1517,7 +1525,7 @@ function LoadingState({ status }: { status: string }) {
 export function PremiumAnalysisCard({ market }: PremiumAnalysisCardProps) {
   const { login, authenticated } = usePrivy()
   const activePrivyWallet = useActivePrivyWallet()
-  const { status, analysis, unlockAnalysis } = usePremiumAnalysis(market.id)
+  const { status, analysis, error, unlockAnalysis } = usePremiumAnalysis(market.id)
   const walletConnected = Boolean(authenticated && activePrivyWallet.wallet)
 
   const handleUnlock = async () => {
@@ -1539,7 +1547,7 @@ export function PremiumAnalysisCard({ market }: PremiumAnalysisCardProps) {
       ) : walletConnected && isLoading ? (
         <LoadingState status={status} />
       ) : (
-        <LockedState onUnlock={handleUnlock} loading={isLoading} walletConnected={walletConnected} />
+        <LockedState onUnlock={handleUnlock} loading={isLoading} walletConnected={walletConnected} error={error} />
       )}
     </Card>
   )

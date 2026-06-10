@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { generateMarketAnalysis, generatePremiumAnalysis } from "../services/openai.js";
+import { fallbackPremiumAnalysis, generateMarketAnalysis, generatePremiumAnalysis } from "../services/openai.js";
 import { paymentGate } from "../middleware/paymentGate.js";
 import { fetchPremiumNews } from "../services/news.js";
 import { buildPaymentRequirement } from "../services/payment.js";
@@ -41,6 +41,37 @@ function shouldGatePremiumAnalysis(marketId?: string | null): boolean {
   return isStockAnalysisMarket(marketId)
     ? config.payment.stockAnalysisFeeEnabled
     : config.payment.analysisFeeEnabled;
+}
+
+function withFallbackTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallback: T,
+  onTimeout?: () => void
+): Promise<T> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      onTimeout?.();
+      resolve(fallback);
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve(value);
+      })
+      .catch(() => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve(fallback);
+      });
+  });
 }
 
 /**
@@ -145,12 +176,19 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
 
       // Fetch news + (conditionally) TA signals in parallel
       const [newsArticles, rawTaResult] = await Promise.all([
-        fetchPremiumNews(market.question, market.category),
+        withFallbackTimeout(
+          fetchPremiumNews(market.question, market.category),
+          9000,
+          [],
+          () => req.log.warn({ marketId: market.id }, "Premium news fetch timed out")
+        ),
         useTA
-          ? runTechnicalAnalysis(cryptoSymbol!).catch((err) => {
-              console.warn(`[smartmarket] TA engine failed for ${cryptoSymbol}:`, err);
-              return null;
-            })
+          ? withFallbackTimeout(
+              runTechnicalAnalysis(cryptoSymbol!),
+              14000,
+              null,
+              () => req.log.warn({ marketId: market.id, cryptoSymbol }, "Premium TA fetch timed out")
+            )
           : Promise.resolve(null),
       ]);
 
@@ -191,12 +229,18 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         ? computeFundamentalVerdict(market, newsArticles)
         : null;
 
-      const raw = await generatePremiumAnalysis(
-        market,
-        newsArticles,
-        taResult,
-        fundamentalResult,
-        taMappingNote
+      const raw = await withFallbackTimeout(
+        generatePremiumAnalysis(
+          market,
+          newsArticles,
+          taResult,
+          fundamentalResult,
+          taMappingNote,
+          { timeoutMs: 16000 }
+        ),
+        17000,
+        fallbackPremiumAnalysis(taResult, fundamentalResult),
+        () => req.log.warn({ marketId: market.id }, "Premium AI generation timed out")
       );
 
       const generatedAt = new Date().toISOString();

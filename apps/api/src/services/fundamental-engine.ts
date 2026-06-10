@@ -57,7 +57,7 @@ export function detectMarketCategory(
     return "stocks";
 
   if (
-    /politi|elect|president|senator|congress|vote|ballot|democrat|republican|prime minister|parliament|govern/.test(
+    /politi|elect|president|senator|congress|vote|ballot|democrat|republican|prime minister|parliament|govern|peace deal|ceasefire|diplomac|sanction|invad|invasion|annex|war\b|conflict|geopolit|treaty|nato|united nations|un resolution|ambassador|embassy|summit|bilateral|iran|russia|china|ukraine|taiwan|north korea|tariff war|trade war/.test(
       text
     )
   )
@@ -122,6 +122,11 @@ const YES_SIGNALS = [
   "upgrade", "upgraded", "price target raised", "buy rating", "outperform",
   "margin expansion", "record revenue", "revenue growth", "strong demand",
   "buyback", "dividend increase", "free cash flow", "cost cuts",
+  // Sports signals
+  "favored", "favourite", "favorite to win", "dominant", "unbeaten",
+  "winning streak", "strong form", "star player", "fit and available",
+  "home advantage", "top seed", "defending champion", "comeback",
+  "clinched", "qualified", "advanced", "progressed",
 ];
 
 const NO_SIGNALS = [
@@ -135,6 +140,11 @@ const NO_SIGNALS = [
   "cuts guidance", "cut guidance", "misses earnings", "earnings miss",
   "downgraded", "downgrade", "price target cut", "sell rating", "underperform",
   "margin pressure", "revenue decline", "weak demand", "layoffs", "debt concern",
+  // Sports signals
+  "underdog", "eliminated", "knocked out", "upset", "injured",
+  "ruled out", "sidelined", "losing streak", "poor form", "struggling",
+  "disqualified", "suspended", "out of tournament", "group stage exit",
+  "early exit", "relegated",
 ];
 
 function scoreNewsSentiment(
@@ -278,9 +288,11 @@ export function computeFundamentalVerdict(
   const category = detectMarketCategory(market.question, market.category);
   const signals: FundamentalSignal[] = [];
 
-  // ── 1. Market Consensus Signal (w: 0.30) ──────────────────────────────────
-  // The crowd's implied probability is a strong prior — prediction markets
-  // are generally efficient when volume is high.
+  // ── 1. Market Consensus Signal (w: 0.22) ──────────────────────────────────
+  // The crowd's implied probability is a meaningful prior. But we REDUCE its
+  // weight from 0.30 → 0.22 because our product's VALUE is finding edge
+  // beyond what the market already prices in. Over-weighting consensus means
+  // we're just re-confirming the obvious — users already know the market price.
   const yesOutcome = market.outcomes?.find(
     (o) => o.name.toLowerCase() === "yes" || o.name.toLowerCase() === "yes "
   ) ?? market.outcomes?.[0];
@@ -315,7 +327,7 @@ export function computeFundamentalVerdict(
   signals.push({
     name: "Market Consensus",
     direction: consensusDirection,
-    weight: 0.30,
+    weight: 0.22,
     conviction: consensusConviction,
     reason: consensusReason,
   });
@@ -327,7 +339,22 @@ export function computeFundamentalVerdict(
   let baseRateConviction: number;
   let baseRateReason: string;
 
-  if (baseRateGap > 20) {
+  // Guard: at extreme prices (<10% or >90%), the market has strong conviction.
+  // The base rate prior should NOT override extreme market pricing — a 4% YES
+  // market is NOT "historically cheap" just because the base rate is 50%.
+  // In these cases, the crowd has priced in a near-certainty.
+  const isExtremeYes = impliedProbability >= 90;
+  const isExtremeNo = impliedProbability <= 10;
+
+  if (isExtremeYes) {
+    baseRateDirection = "YES";
+    baseRateConviction = 0.75;
+    baseRateReason = `Market strongly prices YES at ${impliedProbability}% — extreme crowd conviction overrides base rate prior of ${baseRate}%`;
+  } else if (isExtremeNo) {
+    baseRateDirection = "NO";
+    baseRateConviction = 0.75;
+    baseRateReason = `Market strongly prices NO at ${100 - impliedProbability}% — extreme crowd conviction overrides base rate prior of ${baseRate}%`;
+  } else if (baseRateGap > 20) {
     // Market is pricing YES well above historical base rate → potential overpricing
     baseRateDirection = "NO";
     baseRateConviction = 0.50;
@@ -359,7 +386,9 @@ export function computeFundamentalVerdict(
     reason: baseRateReason,
   });
 
-  // ── 3. News Sentiment Signal (w: 0.28) ────────────────────────────────────
+  // ── 3. News Sentiment Signal (w: 0.35) ────────────────────────────────────
+  // Increased from 0.28 → 0.35 — our edge comes from news analysis, not
+  // market consensus echo. When we have good news data, it should carry weight.
   const sentiment = scoreNewsSentiment(articles, market.question);
   let sentimentDirection: "YES" | "NO" | "neutral";
   let sentimentConviction: number;
@@ -397,7 +426,7 @@ export function computeFundamentalVerdict(
   signals.push({
     name: "News Sentiment",
     direction: sentimentDirection,
-    weight: 0.28,
+    weight: 0.35,
     conviction: sentimentConviction,
     reason: sentimentReason,
   });
@@ -520,6 +549,10 @@ export function computeFundamentalVerdict(
 
   // Thin market penalty
   if (priceEfficiency === "thin_market") confidence -= 5;
+
+  // No-news penalty — if we found zero articles, our analysis is just echoing
+  // the market price with no original intelligence. Be honest about it.
+  if (sentiment.sampleCount === 0) confidence -= 12;
 
   // Long horizon penalty
   if (daysToResolution !== null && daysToResolution > 90) confidence -= 5;

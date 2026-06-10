@@ -601,7 +601,7 @@ function buildPremiumPrompt(
   ].join("\n");
 }
 
-function fallbackPremiumAnalysis(
+export function fallbackPremiumAnalysis(
   ta?: TechnicalAnalysis | null,
   fundamental?: FundamentalVerdict | null
 ): PremiumAnalysisResult {
@@ -700,14 +700,15 @@ export async function generatePremiumAnalysis(
   articles: PremiumNewsArticle[],
   ta?: TechnicalAnalysis | null,
   fundamental?: FundamentalVerdict | null,
-  marketMappingNote?: string | null
+  marketMappingNote?: string | null,
+  options?: { timeoutMs?: number }
 ): Promise<PremiumAnalysisResult> {
   if (!config.openai.apiKey) {
     return fallbackPremiumAnalysis(ta, fundamental);
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), options?.timeoutMs ?? 30000);
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

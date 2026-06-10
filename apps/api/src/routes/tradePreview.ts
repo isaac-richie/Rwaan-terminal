@@ -111,6 +111,21 @@ function isMissingOrderbookError(err: unknown): boolean {
   return /Request failed:\s*404/i.test(message) || /No orderbook/i.test(message);
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`${label}_timeout`)), timeoutMs);
+    promise
+      .then((value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      })
+      .catch((err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+  });
+}
+
 export async function tradePreviewRoutes(app: FastifyInstance): Promise<void> {
   app.post("/trade/preview", async (req, reply) => {
     const parsed = previewSchema.safeParse(req.body ?? null);
@@ -160,21 +175,25 @@ export async function tradePreviewRoutes(app: FastifyInstance): Promise<void> {
 
     const [bookResult, insightResult] = await Promise.allSettled([
       fetchBookWithRetry(),
-      generateTradeInsight({
-        marketQuestion,
-        category: marketCategory,
-        side,
-        avgPrice: null,
-        amountUsd,
-        bestAsk: null,
-        volume: marketVolume,
-        outcomes: marketOutcomePrices.length >= 2
-          ? [
-              { name: "Yes", price: Number(marketOutcomePrices[0]) * 100 || 0 },
-              { name: "No", price: Number(marketOutcomePrices[1]) * 100 || 0 }
-            ]
-          : undefined
-      })
+      withTimeout(
+        generateTradeInsight({
+          marketQuestion,
+          category: marketCategory,
+          side,
+          avgPrice: null,
+          amountUsd,
+          bestAsk: null,
+          volume: marketVolume,
+          outcomes: marketOutcomePrices.length >= 2
+            ? [
+                { name: "Yes", price: Number(marketOutcomePrices[0]) * 100 || 0 },
+                { name: "No", price: Number(marketOutcomePrices[1]) * 100 || 0 }
+              ]
+            : undefined
+        }),
+        1200,
+        "trade_insight"
+      )
     ]);
 
     if (bookResult.status === "rejected") {
@@ -202,20 +221,26 @@ export async function tradePreviewRoutes(app: FastifyInstance): Promise<void> {
     };
 
     let preview;
-    if (side === "SELL") {
-      const bids = parseBookLevels(book, "bids");
-      preview = buildSellPreview({
-        amountShares: amountUsd,
-        bids,
-        ...previewOpts
-      });
-    } else {
-      const asks = parseBookLevels(book, "asks");
-      preview = buildBuyPreview({
-        amountUsd,
-        asks,
-        ...previewOpts
-      });
+    try {
+      if (side === "SELL") {
+        const bids = parseBookLevels(book, "bids");
+        preview = buildSellPreview({
+          amountShares: amountUsd,
+          bids,
+          ...previewOpts
+        });
+      } else {
+        const asks = parseBookLevels(book, "asks");
+        preview = buildBuyPreview({
+          amountUsd,
+          asks,
+          ...previewOpts
+        });
+      }
+    } catch (err) {
+      req.log.error({ err, tokenId, side }, "Unable to build trade preview");
+      reply.status(502);
+      return { ok: false, error: "preview_build_failed" };
     }
 
     let platformFee: PlatformFee | undefined;

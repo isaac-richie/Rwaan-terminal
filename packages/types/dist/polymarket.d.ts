@@ -163,6 +163,7 @@ export type TradeInsight = {
 export type TradePreviewResponse = {
     ok: boolean;
     error?: string;
+    message?: string;
     marketId?: string;
     tokenId?: string;
     outcome?: string;

@@ -14,6 +14,14 @@ type TradingProfileState = {
   createDepositAddress: () => Promise<TradingProfile | null>
 }
 
+async function readJsonResponse(res: Response) {
+  try {
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
 export function shortAddress(address?: string | null) {
   if (!address) return "—"
   return `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -51,7 +59,7 @@ export function useTradingProfile(
             }),
           })
         : await fetch(`${API_BASE}/trading-profile/${connectedWalletAddress}`)
-      const payload = await res.json()
+      const payload = await readJsonResponse(res)
       if (!hasTradingWallet && res.status === 404) {
         setProfile(null)
         return
@@ -80,7 +88,7 @@ export function useTradingProfile(
       const res = await fetch(`${API_BASE}/trading-profile/${connectedWalletAddress}/deposit-address`, {
         method: "POST",
       })
-      const payload = await res.json()
+      const payload = await readJsonResponse(res)
       if (!res.ok) {
         throw new Error(payload?.error ?? "Deposit address setup failed")
       }

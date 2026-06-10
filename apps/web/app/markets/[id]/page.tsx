@@ -122,14 +122,16 @@ function formatCompactUsd(raw?: string | null): string {
 function previewErrorLabel(error: string) {
   const labels: Record<string, string> = {
     invalid_preview_payload: "Preview request is incomplete.",
+    internal_error: "Rawli could not prepare this preview. Refresh the market and try again.",
     market_lookup_failed: "Market lookup failed. Try again in a moment.",
     market_not_found: "Market not found.",
     market_closed: "This market is closed.",
     token_not_in_market: "Selected outcome is not tradable on this market.",
     orderbook_unavailable: "This market has no active order book. It may be closed, resolved, or waiting for settlement.",
     orderbook_lookup_failed: "Order book lookup failed. Try again in a moment.",
+    preview_build_failed: "Rawli could not calculate this preview. Try a smaller amount or reopen the market.",
   };
-  return labels[error] ?? error;
+  return labels[error] ?? friendlyErrorMessage(error, "Rawli could not prepare this preview. Try again in a moment.", "trade");
 }
 
 function friendlyTradeError(error?: string | null) {
@@ -954,12 +956,15 @@ export default function MarketDetailPage() {
         });
         const body: TradePreviewResponse = await res.json();
         if (!res.ok || !body.ok) {
-          const isRetryable = body.error === "orderbook_lookup_failed" || body.error === "market_lookup_failed";
+          const isRetryable =
+            body.error === "orderbook_lookup_failed" ||
+            body.error === "market_lookup_failed" ||
+            body.error === "internal_error";
           if (isRetryable && attempt < MAX_RETRIES) {
             lastError = body.error ? previewErrorLabel(body.error) : "Preview failed.";
             continue;
           }
-          throw new Error(body.error ? previewErrorLabel(body.error) : "Preview failed.");
+          throw new Error(body.message ?? (body.error ? previewErrorLabel(body.error) : "Preview failed."));
         }
         setTradePreview(body);
         lastError = null;
@@ -1677,11 +1682,35 @@ export default function MarketDetailPage() {
                     <Wallet className="w-4 h-4" />
                     {ready ? "Connect Wallet to Trade" : "Loading..."}
                   </Button>
-                ) : !tradingProfile.profile ? (
+                ) : !tradingProfile.profile && (tradingProfile.loading || polymarketDepositWallet.loading) ? (
                   <Button className="w-full h-12 rounded-xl gap-2" disabled>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Resolving Trading Wallet
                   </Button>
+                ) : !tradingProfile.profile ? (
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      className="w-full h-12 rounded-xl gap-2 bg-[oklch(0.78_0.16_82)] text-[oklch(0.12_0.01_255)] hover:bg-[oklch(0.82_0.16_82)] font-semibold text-sm"
+                      onClick={async () => {
+                        await polymarketDepositWallet.refresh();
+                        void tradingProfile.refresh();
+                      }}
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Retry Trading Wallet
+                    </Button>
+                    <div className="flex gap-2 rounded-lg border border-[oklch(0.58_0.2_25/0.25)] bg-[oklch(0.58_0.2_25/0.08)] p-2.5 text-[11px] leading-snug text-[oklch(0.74_0.14_25)]">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span className="min-w-0 break-words">
+                        {polymarketDepositWallet.error
+                          ? friendlyTradeError(polymarketDepositWallet.error)
+                          : tradingProfile.error
+                          ? friendlyTradeError(tradingProfile.error)
+                          : "Rawli could not finish preparing your trading wallet. Retry the setup, then preview the trade again."}
+                      </span>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-1.5">
                     <Button
@@ -1926,9 +1955,11 @@ export default function MarketDetailPage() {
                         </div>
                       )}
 
-                      {(tradePreview?.warnings?.length ?? 0) > 0 && (
+                      {(tradePreview?.warnings?.some((warning) => warning.severity === "warning") ?? false) && (
                         <div className="space-y-1.5">
-                          {tradePreview!.warnings!.map((warning) => (
+                          {tradePreview!.warnings!
+                            .filter((warning) => warning.severity === "warning")
+                            .map((warning) => (
                             <div
                               key={warning.code}
                               className={cn(
