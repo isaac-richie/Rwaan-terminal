@@ -306,6 +306,26 @@ const categoryNeedles: Record<string, string[]> = {
     "knockout stage",
     "champions league",
   ],
+  worldcup: [
+    "world cup",
+    "fifa world cup",
+    "2026 world cup",
+    "2026 fifa world cup",
+    "club world cup",
+    "fifa club world cup",
+    "world cup winner",
+    "world cup group",
+    "world cup final",
+    "world cup champion",
+    "group stage",
+    "group futures",
+    "knockout stage",
+    "round of 16",
+    "quarterfinal",
+    "semifinal",
+    "world cup match",
+    "world cup game",
+  ],
   news: [
     "news",
     "breaking",
@@ -475,7 +495,7 @@ const categoryNeedles: Record<string, string[]> = {
   ],
 }
 
-const targetCategoryIds = ["crypto", "africa", "sports", "entertainment", "ipos", "world", "macro"] as const
+const targetCategoryIds = ["crypto", "africa", "sports", "worldcup", "entertainment", "ipos", "world", "macro"] as const
 const targetCategoryNeedles = targetCategoryIds.flatMap((id) => categoryNeedles[id])
 const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> = {
   // Africa: broad sports/entertainment/world tags filtered by strict African identity needles.
@@ -487,6 +507,8 @@ const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> =
   ],
   crypto: ["21", "235", "101611", "1312"],
   sports: ["1"],
+  // World Cup uses the sports tag — client-side needles do the precise filtering.
+  worldcup: ["1"],
   entertainment: ["596", "100", "53"],
   ipos: ["600"],
   // World folds News + Politics + Legal + Geopolitics into one cleaner lane.
@@ -494,6 +516,14 @@ const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> =
   macro: ["120", "370", "102000", "101250", "101247", "833"],
 }
 const categoryExclusionNeedles: Record<string, string[]> = {
+  // WorldCup: only world cup markets — exclude NBA, NFL, F1, boxing, tennis, cricket etc.
+  worldcup: [
+    "nba", "nfl", "mlb", "nhl", "ufc", "mma", "boxing", "tennis",
+    "f1", "formula 1", "formula one", "cricket", "golf", "olympics",
+    "champions league", "premier league", "la liga", "bundesliga",
+    "serie a", "ligue 1", "euros", "euro 2024",
+    ...categoryNeedles.crypto,
+  ],
   entertainment: [
     ...categoryNeedles.sports,
     ...categoryNeedles.crypto,
@@ -580,6 +610,7 @@ function getCategoryFeedTagIds(category?: string): string[] {
     return Array.from(new Set(targetCategoryIds.flatMap((id) => categoryFeedTagIds[id])))
   }
   if (normalized === "sport") return categoryFeedTagIds.sports
+  if (normalized === "worldcup") return categoryFeedTagIds.worldcup
   const tagIds = categoryFeedTagIds[normalized as (typeof targetCategoryIds)[number]]
   return tagIds ? Array.from(new Set(tagIds)) : []
 }
@@ -730,7 +761,8 @@ function shouldKeepAfricaMarket(event: GammaEventRaw, market: GammaMarketRaw): b
 }
 
 function detectTargetCategory(text: string): string | null {
-  const priority = ["ipos", "crypto", "africa", "sports", "entertainment", "macro", "world"]
+  // worldcup before sports so match pages bubble to the right lane
+  const priority = ["ipos", "crypto", "africa", "worldcup", "sports", "entertainment", "macro", "world"]
   for (const category of priority) {
     const needles = categoryNeedles[category]
     if (needles?.some((needle) => includesNeedle(text, needle.toLowerCase()))) return category
@@ -812,7 +844,9 @@ function smartMarketScore(input: {
   const ipoBoost = ipo && input.normalizedCategory === "ipos" ? 30 : ipo ? 8 : 0
   const categoryBoost = input.normalizedCategory !== "all" && input.normalizedCategory === detectedCategory ? 18 : 0
   const worldCupBoost =
-    worldCup && input.normalizedCategory === "sports"
+    worldCup && (input.normalizedCategory === "worldcup")
+      ? 40
+      : worldCup && input.normalizedCategory === "sports"
       ? 30
       : worldCup
       ? 12
@@ -880,7 +914,7 @@ function blendIpoMarkets(markets: FeedGammaMarket[], limit: number): FeedGammaMa
 function blendAllCategoryMarkets(markets: FeedGammaMarket[], limit: number): FeedGammaMarket[] {
   const used = new Set<string>()
   const sorted = [...markets].sort((a, b) => (b.smartScore ?? 0) - (a.smartScore ?? 0))
-  const priority = ["crypto", "africa", "sports", "entertainment", "ipos", "world", "macro"]
+  const priority = ["crypto", "africa", "worldcup", "sports", "entertainment", "ipos", "world", "macro"]
   const categorySlots = Math.min(priority.length, Math.max(5, Math.round(limit * 0.7)))
   const selected: FeedGammaMarket[] = []
 
@@ -1095,12 +1129,13 @@ export async function fetchPolymarketMarkets(
     const sportsCategory = normalizedCat === "sports" || normalizedCat === "sport"
     // Keep the first "All" page on the prewarmed markets index. The old all-tags
     // batch could pull multi-MB payloads on production and delay first render.
+    const worldCupCategory = normalizedCat === "worldcup"
     const fetchLimit =
       fastAllFeed
         ? Math.max(limit * 2, 24)
         : cryptoCategory
         ? Math.max(limit * 10, 120)  // was ×20, 240 → 50% smaller (biggest win)
-        : sportsCategory
+        : sportsCategory || worldCupCategory
         ? Math.max(limit * 10, 120)
         : sortBy === "daily"
         ? Math.max(limit * 10, 120)  // was ×24, 240 → 50% smaller

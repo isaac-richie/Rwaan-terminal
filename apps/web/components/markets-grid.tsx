@@ -157,13 +157,14 @@ export function MarketsGrid({ category, sortBy, search, onFirstData }: MarketsGr
   }
 
   if (!loading && filteredMarkets.length === 0) {
-    const categoryLabel = category === "all" ? "Rawli categories" : category === "Sports" ? "Sport" : category
+    const categoryLabel =
+      category === "all" ? "Rawli categories" : category === "Sports" ? "Sport" : category === "WorldCup" ? "World Cup" : category
 
     return (
       <div className="surface-card rounded-2xl p-8 text-center border border-[oklch(0.22_0.015_255)]">
         <p className="text-sm font-semibold text-foreground">No active events in {categoryLabel} right now.</p>
         <p className="text-xs text-muted-foreground mt-2">
-          Rawli is focused on Crypto, Africa, Sport, Entertainment, IPOs, World events, and Macro markets. Try a broader category or remove your search term.
+          Rawli is focused on Crypto, World Cup, Africa, Sport, Entertainment, IPOs, World events, and Macro markets. Try a broader category or remove your search term.
         </p>
       </div>
     )
