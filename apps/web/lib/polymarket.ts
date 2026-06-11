@@ -296,6 +296,14 @@ const categoryNeedles: Record<string, string[]> = {
     "formula 1",
     "olympics",
     "world cup",
+    "fifa world cup",
+    "2026 fifa world cup",
+    "club world cup",
+    "fifa club world cup",
+    "world cup winner",
+    "world cup group",
+    "group futures",
+    "knockout stage",
     "champions league",
   ],
   news: [
@@ -678,6 +686,21 @@ function isIpoMarket(text: string): boolean {
   return categoryNeedles.ipos.some((needle) => includesNeedle(text, needle.toLowerCase()))
 }
 
+function isWorldCupMarket(text: string): boolean {
+  return [
+    "world cup",
+    "fifa world cup",
+    "2026 fifa world cup",
+    "club world cup",
+    "fifa club world cup",
+    "world cup winner",
+    "world cup group",
+    "group futures",
+    "tournament futures",
+    "knockout stage",
+  ].some((needle) => includesNeedle(text, needle))
+}
+
 function focusedMarketText(market: GammaMarketRaw): string {
   const marketTags = market.tags?.map((t) => t.label) ?? []
   return [
@@ -737,8 +760,10 @@ function qualityBadges(input: {
   const asset = crypto ? detectCryptoAsset(input.text) : null
   const africa = isAfricaMarket(input.text)
   const ipo = isIpoMarket(input.text)
+  const worldCup = isWorldCupMarket(input.text)
   if (asset) badges.push(asset)
   if (ipo) badges.push("IPO")
+  if (worldCup) badges.push("World Cup")
   // Highest-priority combo badge
   if (quick && crypto) badges.push("24h Crypto")
   else if (quick) badges.push("Closes today")
@@ -766,6 +791,7 @@ function smartMarketScore(input: {
   const crypto = isCryptoMarket(input.text)
   const detectedCategory = detectTargetCategory(input.text)
   const ipo = isIpoMarket(input.text)
+  const worldCup = isWorldCupMarket(input.text)
   const hasVisual = Boolean(input.market.image || input.market.icon || input.event.image || input.event.icon)
   const hasTokens = parseTokenIds(input.market).length > 0
   const hours = hoursUntil(input.endDate, input.now)
@@ -785,6 +811,12 @@ function smartMarketScore(input: {
   const africaBoost = africa && input.normalizedCategory === "africa" ? 25 : 0
   const ipoBoost = ipo && input.normalizedCategory === "ipos" ? 30 : ipo ? 8 : 0
   const categoryBoost = input.normalizedCategory !== "all" && input.normalizedCategory === detectedCategory ? 18 : 0
+  const worldCupBoost =
+    worldCup && input.normalizedCategory === "sports"
+      ? 30
+      : worldCup
+      ? 12
+      : 0
 
   return (
     logScore(input.liquidity) * 32 +
@@ -794,6 +826,7 @@ function smartMarketScore(input: {
     cryptoQuickBoost +
     africaBoost +
     ipoBoost +
+    worldCupBoost +
     categoryBoost +
     priceOpportunityScore(input.market) * 10 +
     (hasTokens ? 8 : 0) +
@@ -1059,6 +1092,7 @@ export async function fetchPolymarketMarkets(
     const normalizedCat = normalizeCategory(category)
     const fastAllFeed = normalizedCat === "all" && (sortBy === "trending" || sortBy === "volume") && !search
     const cryptoCategory = normalizedCat === "crypto"
+    const sportsCategory = normalizedCat === "sports" || normalizedCat === "sport"
     // Keep the first "All" page on the prewarmed markets index. The old all-tags
     // batch could pull multi-MB payloads on production and delay first render.
     const fetchLimit =
@@ -1066,6 +1100,8 @@ export async function fetchPolymarketMarkets(
         ? Math.max(limit * 2, 24)
         : cryptoCategory
         ? Math.max(limit * 10, 120)  // was ×20, 240 → 50% smaller (biggest win)
+        : sportsCategory
+        ? Math.max(limit * 10, 120)
         : sortBy === "daily"
         ? Math.max(limit * 10, 120)  // was ×24, 240 → 50% smaller
         : Math.max(limit * 6, 72)    // was ×8, 96  → ~25% smaller

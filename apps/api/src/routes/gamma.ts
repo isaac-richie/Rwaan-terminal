@@ -43,7 +43,9 @@ const PREWARM_TAG_IDS = [
 // See apps/web/lib/polymarket.ts fetchLimit: default category = 72, crypto = 120.
 const CATEGORY_EVENT_LIMIT = "72";
 const CRYPTO_EVENT_LIMIT = "120";
+const SPORTS_EVENT_LIMIT = "120";
 const CRYPTO_PREWARM_TAG_IDS = ["21", "235", "101611", "1312"];
+const SPORTS_PREWARM_TAG_IDS = ["1"];
 const FEED_PREWARM_QUERIES: Array<Record<string, string>> = [
   ...PREWARM_TAG_IDS.map((tagId) => ({
   active: "true", closed: "false", compact: "true", limit: CATEGORY_EVENT_LIMIT, offset: "0",
@@ -51,6 +53,10 @@ const FEED_PREWARM_QUERIES: Array<Record<string, string>> = [
   })),
   ...CRYPTO_PREWARM_TAG_IDS.map((tagId) => ({
     active: "true", closed: "false", compact: "true", limit: CRYPTO_EVENT_LIMIT, offset: "0",
+    order: "volume_24hr", ascending: "false", tag_id: tagId, related_tags: "true",
+  })),
+  ...SPORTS_PREWARM_TAG_IDS.map((tagId) => ({
+    active: "true", closed: "false", compact: "true", limit: SPORTS_EVENT_LIMIT, offset: "0",
     order: "volume_24hr", ascending: "false", tag_id: tagId, related_tags: "true",
   })),
 ];
