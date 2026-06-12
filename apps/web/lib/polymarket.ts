@@ -1133,9 +1133,9 @@ export async function fetchPolymarketMarkets(
     const fastAllFeed = normalizedCat === "all" && (sortBy === "trending" || sortBy === "volume") && !search
     const cryptoCategory = normalizedCat === "crypto"
     const sportsCategory = normalizedCat === "sports" || normalizedCat === "sport"
+    const worldCupCategory = normalizedCat === "worldcup"
     // Keep the first "All" page on the prewarmed markets index. The old all-tags
     // batch could pull multi-MB payloads on production and delay first render.
-    const worldCupCategory = normalizedCat === "worldcup"
     const fetchLimit =
       fastAllFeed
         ? Math.max(limit * 2, 24)
@@ -1207,8 +1207,8 @@ export async function fetchPolymarketMarkets(
         if (normalizedCategory === "africa") {
           if (!shouldKeepAfricaMarket(event, candidate)) continue
         } else if (normalizedCategory === "worldcup") {
-          // Tag 102232 = "FIFA World Cup" — game events use this tag but may not say "world cup"
-          // in their title (e.g. "Morocco vs. Haiti - First Team to Score")
+          // Tag 102232 = "FIFA World Cup" — game events use this tag but may not say
+          // "world cup" in the title, so tags must be treated as first-class matches.
           const allTagIds = [
             ...(event.tags?.map((t) => t.id) ?? []),
             ...(candidate.tags?.map((t) => t.id) ?? []),
