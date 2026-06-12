@@ -507,8 +507,8 @@ const categoryFeedTagIds: Record<(typeof targetCategoryIds)[number], string[]> =
   ],
   crypto: ["21", "235", "101611", "1312"],
   sports: ["1"],
-  // World Cup uses the sports tag — client-side needles do the precise filtering.
-  worldcup: ["1"],
+  // World Cup: tag 519 = "world cup" futures, tag 102232 = "FIFA World Cup" games/matches, tag 1 = Sports
+  worldcup: ["519", "102232", "1"],
   entertainment: ["596", "100", "53"],
   ipos: ["600"],
   // World folds News + Politics + Legal + Geopolitics into one cleaner lane.
@@ -657,9 +657,13 @@ function isQuickSettle(endDate: string | undefined, now: number): boolean {
   return hours !== null && hours >= 0 && hours <= QUICK_SETTLE_WINDOW_MS / (60 * 60 * 1000)
 }
 
+function tagSearchParts(tags?: GammaEventRaw["tags"]): string[] {
+  return tags?.flatMap((tag) => [tag.id, tag.label, tag.slug].filter(Boolean) as string[]) ?? []
+}
+
 function marketText(event: GammaEventRaw, market: GammaMarketRaw): string {
-  const eventTags = event.tags?.map((t) => t.label) ?? []
-  const marketTags = market.tags?.map((t) => t.label) ?? []
+  const eventTags = tagSearchParts(event.tags)
+  const marketTags = tagSearchParts(market.tags)
   return [
     ...eventTags,
     ...marketTags,
@@ -719,6 +723,8 @@ function isIpoMarket(text: string): boolean {
 
 function isWorldCupMarket(text: string): boolean {
   return [
+    "519",
+    "102232",
     "world cup",
     "fifa world cup",
     "2026 fifa world cup",
@@ -733,7 +739,7 @@ function isWorldCupMarket(text: string): boolean {
 }
 
 function focusedMarketText(market: GammaMarketRaw): string {
-  const marketTags = market.tags?.map((t) => t.label) ?? []
+  const marketTags = tagSearchParts(market.tags)
   return [
     ...marketTags,
     market.category ?? "",
@@ -1200,6 +1206,17 @@ export async function fetchPolymarketMarkets(
         const haystack = marketText(event, candidate)
         if (normalizedCategory === "africa") {
           if (!shouldKeepAfricaMarket(event, candidate)) continue
+        } else if (normalizedCategory === "worldcup") {
+          // Tag 102232 = "FIFA World Cup" — game events use this tag but may not say "world cup"
+          // in their title (e.g. "Morocco vs. Haiti - First Team to Score")
+          const allTagIds = [
+            ...(event.tags?.map((t) => t.id) ?? []),
+            ...(candidate.tags?.map((t) => t.id) ?? []),
+          ]
+          const hasFifaTag = allTagIds.includes("102232") || allTagIds.includes("519")
+          const textMatch = needles.some((needle) => includesNeedle(haystack, needle.toLowerCase()))
+          const excluded = exclusionNeedles.some((needle) => includesNeedle(haystack, needle.toLowerCase()))
+          if ((!hasFifaTag && !textMatch) || excluded) continue
         } else if (needles.length) {
           const fuzzyMatch = needles.length > 0 ? needles.some((needle) => includesNeedle(haystack, needle.toLowerCase())) : false
           const excluded = exclusionNeedles.some((needle) => includesNeedle(haystack, needle.toLowerCase()))
