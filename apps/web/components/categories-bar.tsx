@@ -6,6 +6,7 @@ import {
   Coins,
   Flame,
   Trophy,
+  Medal,
   ArrowDownUp,
   ChevronDown,
   MapPin,
@@ -26,6 +27,7 @@ type CategoryItem = {
 
 const polymarketCategories: CategoryItem[] = [
   { id: "all", label: "All", icon: Flame },
+  { id: "WorldCup", label: "World Cup ⚽", icon: Medal },
   { id: "Crypto", label: "Crypto", icon: Coins },
   { id: "Africa", label: "Africa 🌍", icon: MapPin },
   { id: "Sports", label: "Sport", icon: Trophy },

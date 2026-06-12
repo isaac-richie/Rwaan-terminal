@@ -25,8 +25,8 @@ const PREWARM_TAG_IDS = [
   "2", "144",
   // entertainment
   "596", "100", "53",
-  // sports
-  "1",
+  // sports + world cup (519 = "world cup" futures)
+  "1", "519",
   // africa (AFCON + soccer + world cup + Egypt PL)
   "102974", "102969", "100350", "102350", "102232", "104397",
   // geopolitics
@@ -35,11 +35,15 @@ const PREWARM_TAG_IDS = [
 
 // CRITICAL: these params must byte-for-byte match what the web client sends for a
 // category switch, because `buildCacheKey` hashes the full param set (limit included).
-// The default category feed uses limit=96; crypto uses a deeper limit=240 so
-// SOL/BNB/XRP/DOGE/altcoin markets are not crowded out by BTC/ETH.
-const CATEGORY_EVENT_LIMIT = "96";
-const CRYPTO_EVENT_LIMIT = "240";
+// See apps/web/lib/polymarket.ts fetchLimit: default category = 72, crypto = 120.
+const CATEGORY_EVENT_LIMIT = "72";
+const CRYPTO_EVENT_LIMIT = "120";
+const SPORTS_EVENT_LIMIT = "120";
 const CRYPTO_PREWARM_TAG_IDS = ["21", "235", "101611", "1312"];
+const SPORTS_PREWARM_TAG_IDS = ["1"];
+// 519 = "world cup" (futures), 102232 = "FIFA World Cup" (game-level match events)
+const WORLDCUP_PREWARM_TAG_IDS = ["519", "102232"];
+const WORLDCUP_EVENT_LIMIT = "120";
 const FEED_PREWARM_QUERIES: Array<Record<string, string>> = [
   ...PREWARM_TAG_IDS.map((tagId) => ({
   active: "true", closed: "false", compact: "true", limit: CATEGORY_EVENT_LIMIT, offset: "0",
@@ -47,6 +51,14 @@ const FEED_PREWARM_QUERIES: Array<Record<string, string>> = [
   })),
   ...CRYPTO_PREWARM_TAG_IDS.map((tagId) => ({
     active: "true", closed: "false", compact: "true", limit: CRYPTO_EVENT_LIMIT, offset: "0",
+    order: "volume_24hr", ascending: "false", tag_id: tagId, related_tags: "true",
+  })),
+  ...WORLDCUP_PREWARM_TAG_IDS.map((tagId) => ({
+    active: "true", closed: "false", compact: "true", limit: WORLDCUP_EVENT_LIMIT, offset: "0",
+    order: "volume_24hr", ascending: "false", tag_id: tagId, related_tags: "true",
+  })),
+  ...SPORTS_PREWARM_TAG_IDS.map((tagId) => ({
+    active: "true", closed: "false", compact: "true", limit: SPORTS_EVENT_LIMIT, offset: "0",
     order: "volume_24hr", ascending: "false", tag_id: tagId, related_tags: "true",
   })),
 ];
@@ -83,7 +95,12 @@ function compactTags(value: unknown) {
       if (!tag || typeof tag !== "object") return null;
       const record = tag as UnknownRecord;
       const label = record.label ?? record.name ?? record.slug;
-      return typeof label === "string" && label ? { label } : null;
+      if (typeof label !== "string" || !label) return null;
+      return {
+        ...(typeof record.id === "string" || typeof record.id === "number" ? { id: String(record.id) } : {}),
+        label,
+        ...(typeof record.slug === "string" && record.slug ? { slug: record.slug } : {}),
+      };
     })
     .filter(Boolean);
 }
