@@ -158,7 +158,13 @@ export function MarketsGrid({ category, sortBy, search, onFirstData }: MarketsGr
 
   if (!loading && filteredMarkets.length === 0) {
     const categoryLabel =
-      category === "all" ? "Rawli categories" : category === "Sports" ? "Sport" : category === "WorldCup" ? "World Cup" : category
+      category === "all"
+        ? "Rawli categories"
+        : category === "Sports"
+        ? "Sport"
+        : category === "WorldCup"
+        ? "World Cup"
+        : category
 
     return (
       <div className="surface-card rounded-2xl p-8 text-center border border-[oklch(0.22_0.015_255)]">
