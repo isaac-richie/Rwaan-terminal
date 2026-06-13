@@ -656,6 +656,13 @@ const assets: RwaAsset[] = [
     risk: "high", accent: "oklch(0.62 0.16 240)", listedAt: "2026-06-03", volumeRank: 22,
   }),
   expandedAsset({
+    id: "spcx", symbol: "SPCX", displaySymbol: "SPCX", name: "Space Exploration Technologies (SpaceX)",
+    assetClass: "equity", sector: "Space & rockets", sectorGroup: "Defense & Industrials",
+    theme: "Starship, Starlink satellite internet, and reusable rocketry. The defining private space company.",
+    quoteSymbol: "SPCX", polymarketKeyword: "SpaceX",
+    risk: "high", accent: "oklch(0.68 0.14 260)", listedAt: "2026-06-12", volumeRank: 50,
+  }),
+  expandedAsset({
     id: "nvo", symbol: "NVO", displaySymbol: "NVO", name: "Novo Nordisk",
     assetClass: "equity", sector: "GLP-1 drugs", sectorGroup: "Healthcare",
     theme: "Global weight-loss and diabetes leader. Wegovy/Ozempic demand and capacity are key.",
