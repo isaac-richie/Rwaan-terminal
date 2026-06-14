@@ -74,7 +74,7 @@ function routeLabel(route?: RwaAsset["route"]) {
   if (routeNeedsLiveCheck(route)) return "Checking"
   if (route.status === "watch_only") return "Coming Soon"
   if (route.status === "route_unsafe") return "Low Liquidity"
-  if (route.status === "quote_adapter_unavailable") return "Paused"
+  if (route.status === "quote_adapter_unavailable") return "Route Pending"
   return "Checking"
 }
 
@@ -1738,6 +1738,16 @@ function RwaTradeModal({
 
   const quoteErrorMessage = (err: unknown) => {
     const raw = friendlyErrorMessage(err, "Could not get a price right now. Please try again.", "trade")
+    if (
+      /no executable (buy|sell) quote/i.test(raw) ||
+      /stock route quote unavailable/i.test(raw)
+    ) {
+      if (!asset.route?.exitVerified || asset.route?.status === "quote_adapter_unavailable") {
+        return side === "sell"
+          ? `${asset.displaySymbol} is listed, but live sell routing is not open yet.`
+          : `${asset.displaySymbol} is listed, but live buy routing is not open yet.`
+      }
+    }
     if (/quote|route|price|liquidity|unavailable/i.test(raw)) {
       return side === "sell"
         ? `No sell quote for this size. Try Max or a larger ${inputSymbol} amount.`
